@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Meal Prep" />
+  <meta name="theme-color" content="#FAF6F1" />
+  <title>Meal Prep</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Nunito:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Nunito', sans-serif; background: #FAF6F1; color: #2C2C2C; -webkit-font-smoothing: antialiased; }
+    #root { min-height: 100vh; }
+
+    .fade-in { animation: fadeIn 0.35s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .slide-up { animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+    .stagger-1 { animation-delay: 0.05s; animation-fill-mode: both; }
+    .stagger-2 { animation-delay: 0.1s; animation-fill-mode: both; }
+    .stagger-3 { animation-delay: 0.15s; animation-fill-mode: both; }
+    .stagger-4 { animation-delay: 0.2s; animation-fill-mode: both; }
+
+    input:focus, textarea:focus, select:focus { outline: 2px solid #5B7C5A; outline-offset: -1px; }
+
+    .checkbox-btn { width: 26px; height: 26px; border-radius: 8px; border: 2px solid #E5DED3; background: white; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; }
+    .checkbox-btn.checked { background: #5B7C5A; border-color: #5B7C5A; color: white; }
+    .checkbox-btn:hover { border-color: #5B7C5A; }
+
+    .recipe-card { background: white; border-radius: 16px; padding: 18px 20px; border: 1px solid #F0EBE3; cursor: pointer; transition: all 0.2s; }
+    .recipe-card:hover { border-color: #5B7C5A; box-shadow: 0 4px 20px rgba(91,124,90,0.08); transform: translateY(-1px); }
+    .recipe-card:active { transform: translateY(0); }
+
+    .btn-primary { background: #5B7C5A; color: white; border: none; border-radius: 12px; padding: 12px 24px; font-family: 'Nunito', sans-serif; font-weight: 600; font-size: 15px; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; }
+    .btn-primary:hover { background: #3D5A3C; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-secondary { background: #F5EDE3; color: #2C2C2C; border: 1px solid #E5DED3; border-radius: 12px; padding: 10px 20px; font-family: 'Nunito', sans-serif; font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; }
+    .btn-secondary:hover { background: #EDE5D8; }
+
+    .input-field { width: 100%; padding: 12px 16px; border: 1.5px solid #E5DED3; border-radius: 12px; font-family: 'Nunito', sans-serif; font-size: 15px; background: white; color: #2C2C2C; transition: border-color 0.2s; }
+    .input-field::placeholder { color: #A39E93; }
+
+    .select-field { width: 100%; padding: 12px 16px; border: 1.5px solid #E5DED3; border-radius: 12px; font-family: 'Nunito', sans-serif; font-size: 15px; background: white; color: #2C2C2C; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237A7568' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; }
+
+    .tab-pill { padding: 8px 18px; border-radius: 100px; font-weight: 600; font-size: 13px; border: none; cursor: pointer; transition: all 0.2s; font-family: 'Nunito', sans-serif; white-space: nowrap; }
+    .tab-pill.active { background: #5B7C5A; color: white; }
+    .tab-pill:not(.active) { background: transparent; color: #7A7568; }
+    .tab-pill:not(.active):hover { background: #EDE5D8; }
+
+    .badge { display: inline-flex; padding: 4px 12px; border-radius: 100px; font-size: 12px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase; }
+
+    .shopping-item { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid #F0EBE3; }
+    .shopping-item:last-child { border-bottom: none; }
+    .shopping-item.got-it { opacity: 0.5; }
+    .shopping-item.got-it .item-name { text-decoration: line-through; }
+
+    .nav-bar { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,0.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 1px solid #F0EBE3; padding: 6px 0 env(safe-area-inset-bottom, 8px); z-index: 100; display: flex; justify-content: space-around; }
+    .nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 12px; border-radius: 12px; cursor: pointer; transition: all 0.2s; border: none; background: none; color: #A39E93; font-size: 11px; font-weight: 600; font-family: 'Nunito', sans-serif; }
+    .nav-item.active { color: #5B7C5A; }
+
+    .empty-state { text-align: center; padding: 48px 24px; }
+    .empty-state p { color: #7A7568; font-size: 15px; margin-top: 12px; line-height: 1.5; }
+
+    .ingredient-row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+    .ingredient-row input { flex: 1; }
+    .ingredient-row .qty-input { width: 70px; flex: none; }
+    .ingredient-row .unit-input { width: 90px; flex: none; }
+
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200; display: flex; align-items: flex-end; justify-content: center; }
+    .modal-content { background: #FAF6F1; border-radius: 24px 24px 0 0; width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto; padding: 24px; }
+    .modal-handle { width: 40px; height: 4px; background: #E5DED3; border-radius: 4px; margin: 0 auto 20px; }
+
+    @media (min-width: 768px) {
+      .modal-content { border-radius: 24px; margin-bottom: 40px; max-height: 80vh; }
+      .nav-bar { position: fixed; top: 0; bottom: auto; border-top: none; border-bottom: 1px solid #F0EBE3; padding: 0; }
+      .nav-item { flex-direction: row; gap: 8px; padding: 14px 20px; font-size: 14px; }
+      .page-content { padding-top: 60px !important; }
+    }
+
+    .loading-spinner { width: 32px; height: 32px; border: 3px solid #F0EBE3; border-top-color: #5B7C5A; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .match-card { background: white; border-radius: 16px; padding: 18px 20px; border: 1px solid #F0EBE3; margin-bottom: 12px; }
+    .match-bar { height: 6px; border-radius: 3px; background: #EDE5D8; overflow: hidden; margin-top: 8px; }
+    .match-bar-fill { height: 100%; border-radius: 3px; background: #5B7C5A; transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+
+    .toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: #3D5A3C; color: white; padding: 12px 24px; border-radius: 12px; font-weight: 600; font-size: 14px; z-index: 300; animation: toastIn 0.3s ease-out, toastOut 0.3s ease-in 2.2s forwards; box-shadow: 0 8px 30px rgba(0,0,0,0.15); }
+    @keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(-16px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+    @keyframes toastOut { from { opacity: 1; } to { opacity: 0; } }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+  <script type="text/babel">
+    const { useState, useEffect, useCallback } = React;
+
+    // ─── Config ───
+    const SHEET_ID = "1h2SZCwjKsfIaxThGBCfh55rOZVfZUjzp0fRuGgQMK0k";
+    const API_KEY_STORAGE = "meal-prep-api-key";
+
+    function getApiKey() { try { return localStorage.getItem(API_KEY_STORAGE) || ""; } catch { return ""; } }
+    function setApiKeyStore(k) { try { localStorage.setItem(API_KEY_STORAGE, k); } catch {} }
+
+    async function fetchSheet(tab, apiKey) {
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}?key=${apiKey}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Failed: ${res.status}`);
+      const data = await res.json();
+      return data.values || [];
+    }
+
+    async function appendToSheet(tab, values, apiKey) {
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}:append?valueInputOption=USER_ENTERED&key=${apiKey}`;
+      const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values }) });
+      if (!res.ok) throw new Error(`Failed: ${res.status}`);
+      return res.json();
+    }
+
+    // ─── Icons ───
+    const I = {
+      recipes: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>,
+      cart: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>,
+      search: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>,
+      plus: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>,
+      settings: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>,
+      external: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>,
+      check: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
+      chevron: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>,
+      trash: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>,
+      leaf: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.9C15.5 4.9 17 3.5 19 2c1 2 2 4.5 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>,
+      refresh: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>,
+    };
+
+    // ─── Type badge colors ───
+    const typeBadgeColors = {
+      dinner: { bg: "#E8F0E7", text: "#3D5A3C" }, stew: { bg: "#FDE8D8", text: "#8B5C3A" },
+      soup: { bg: "#E3ECF5", text: "#3A5A8B" }, dessert: { bg: "#F5E0F0", text: "#7A3A6B" },
+      bread: { bg: "#F5EDE3", text: "#7A6538" }, lunch: { bg: "#FFF3D6", text: "#7A6020" },
+      breakfast: { bg: "#FFF0E0", text: "#8B5C3A" }, snack: { bg: "#E8F5E8", text: "#3A7A3A" },
+      default: { bg: "#F0EBE3", text: "#5A5548" },
+    };
+    function getTypeBadge(type) { return typeBadgeColors[(type||"").toLowerCase()] || typeBadgeColors.default; }
+
+    // ─── Toast ───
+    function Toast({ message, onDone }) {
+      useEffect(() => { const t = setTimeout(onDone, 2500); return () => clearTimeout(t); }, [onDone]);
+      return <div className="toast">{message}</div>;
+    }
+
+    // ─── Setup Screen ───
+    function SetupScreen({ onSave }) {
+      const [key, setKey] = useState(getApiKey());
+      const [error, setError] = useState("");
+      const [testing, setTesting] = useState(false);
+      const handleSave = async () => {
+        if (!key.trim()) return setError("Please enter your API key");
+        setTesting(true); setError("");
+        try { await fetchSheet("Recipes", key.trim()); setApiKeyStore(key.trim()); onSave(key.trim()); }
+        catch { setError("Could not connect. Check your API key and make sure the sheet is shared."); }
+        setTesting(false);
+      };
+      return (
+        <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, background: "#FAF6F1" }}>
+          <div className="fade-in" style={{ maxWidth: 440, width: "100%", textAlign: "center" }}>
+            <div style={{ display: "inline-flex", background: "#E8F0E7", borderRadius: "50%", padding: 20, marginBottom: 24 }}>
+              <span style={{ color: "#5B7C5A" }}>{I.leaf}</span>
+            </div>
+            <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 28, marginBottom: 8 }}>Meal Prep</h1>
+            <p style={{ color: "#7A7568", marginBottom: 32, lineHeight: 1.5 }}>Connect your Google Sheet to get started.</p>
+            <div style={{ textAlign: "left", marginBottom: 16 }}>
+              <label style={{ fontSize: 13, fontWeight: 700, color: "#7A7568", display: "block", marginBottom: 6 }}>GOOGLE SHEETS API KEY</label>
+              <input className="input-field" type="password" value={key} onChange={e => setKey(e.target.value)} placeholder="AIzaSy..." onKeyDown={e => e.key === "Enter" && handleSave()} />
+            </div>
+            {error && <p style={{ color: "#C26A5A", fontSize: 14, marginBottom: 16, textAlign: "left" }}>{error}</p>}
+            <button className="btn-primary" style={{ width: "100%", justifyContent: "center", padding: 14 }} onClick={handleSave} disabled={testing}>
+              {testing ? "Connecting..." : "Connect Sheet"}
+            </button>
+            <details style={{ marginTop: 24, textAlign: "left" }}>
+              <summary style={{ cursor: "pointer", color: "#5B7C5A", fontWeight: 600, fontSize: 14 }}>How do I get an API key?</summary>
+              <div style={{ marginTop: 12, padding: 16, background: "#F5EDE3", borderRadius: 12, fontSize: 13, lineHeight: 1.7, color: "#7A7568" }}>
+                <p>1. Go to <strong>console.cloud.google.com</strong></p>
+                <p>2. Create a new project (or use an existing one)</p>
+                <p>3. Enable the <strong>Google Sheets API</strong></p>
+                <p>4. Go to <strong>Credentials → Create Credentials → API Key</strong></p>
+                <p>5. Copy the key and paste it above</p>
+                <p style={{ marginTop: 8 }}>Make sure your Google Sheet is set to <strong>"Anyone with the link can view"</strong></p>
+              </div>
+            </details>
+          </div>
+        </div>
+      );
+    }
+
+    // ─── Recipe Detail Modal ───
+    function RecipeDetail({ recipe, ingredients, onClose, onAddToList }) {
+      const recipeIngredients = ingredients.filter(i => i.recipeId === recipe.id);
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal-content slide-up" onClick={e => e.stopPropagation()}>
+            <div className="modal-handle" />
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+              <div>
+                <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 24, marginBottom: 6 }}>{recipe.name}</h2>
+                <span className="badge" style={{ background: getTypeBadge(recipe.type).bg, color: getTypeBadge(recipe.type).text }}>{recipe.type}</span>
+              </div>
+              {recipe.cardUrl && (
+                <a href={recipe.cardUrl} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#5B7C5A", fontWeight: 600, fontSize: 14, textDecoration: "none", padding: "8px 14px", background: "#E8F0E7", borderRadius: 10 }}>
+                  Recipe {I.external}
+                </a>
+              )}
+            </div>
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: "#7A7568", letterSpacing: 0.5, marginBottom: 12 }}>INGREDIENTS</h3>
+            {recipeIngredients.length === 0 ? (
+              <p style={{ color: "#7A7568", fontSize: 14 }}>No ingredients listed yet.</p>
+            ) : (
+              <div style={{ background: "#F5EDE3", borderRadius: 14, padding: 16, marginBottom: 20 }}>
+                {recipeIngredients.map((ing, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < recipeIngredients.length - 1 ? "1px solid #E5DED3" : "none" }}>
+                    <span style={{ fontWeight: 600, fontSize: 15 }}>{ing.ingredient}</span>
+                    <span style={{ color: "#7A7568", fontSize: 14, fontWeight: 500 }}>{ing.quantity} {ing.unit}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button className="btn-primary" style={{ width: "100%", justifyContent: "center" }} onClick={() => onAddToList(recipe)}>
+              {I.cart} <span>Add to Shopping List</span>
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // ─── Recipes Page ───
+    function RecipesPage({ recipes, ingredients, onAddToList, toast }) {
+      const [filter, setFilter] = useState("All");
+      const [searchTerm, setSearchTerm] = useState("");
+      const [selected, setSelected] = useState(null);
+      const types = ["All", ...new Set(recipes.map(r => r.type).filter(Boolean))];
+      const filtered = recipes.filter(r => {
+        const matchesType = filter === "All" || r.type === filter;
+        const matchesSearch = !searchTerm || r.name.toLowerCase().includes(searchTerm.toLowerCase());
+        return matchesType && matchesSearch;
+      });
+      return (
+        <div className="fade-in">
+          <div style={{ marginBottom: 20 }}>
+            <input className="input-field" placeholder="Search recipes..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ background: "#F5EDE3", border: "1.5px solid #E5DED3" }} />
+          </div>
+          <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 8, marginBottom: 16, scrollbarWidth: "none" }}>
+            {types.map(t => <button key={t} className={`tab-pill ${filter === t ? "active" : ""}`} onClick={() => setFilter(t)}>{t}</button>)}
+          </div>
+          {filtered.length === 0 ? (
+            <div className="empty-state"><span style={{ fontSize: 40 }}>🍳</span><p>No recipes found.</p></div>
+          ) : (
+            <div style={{ display: "grid", gap: 10 }}>
+              {filtered.map((r, i) => (
+                <div key={r.id} className={`recipe-card fade-in stagger-${(i % 4) + 1}`} onClick={() => setSelected(r)}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <h3 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 18, marginBottom: 6 }}>{r.name}</h3>
+                      <span className="badge" style={{ background: getTypeBadge(r.type).bg, color: getTypeBadge(r.type).text }}>{r.type}</span>
+                    </div>
+                    <span style={{ color: "#A39E93" }}>{I.chevron}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {selected && <RecipeDetail recipe={selected} ingredients={ingredients} onClose={() => setSelected(null)} onAddToList={r => { onAddToList(r); setSelected(null); }} />}
+        </div>
+      );
+    }
+
+    // ─── Shopping List Page ───
+    function ShoppingListPage({ shoppingList, setShoppingList, toast }) {
+      const [checkedItems, setCheckedItems] = useState(new Set());
+      const toggleItem = idx => { setCheckedItems(prev => { const next = new Set(prev); next.has(idx) ? next.delete(idx) : next.add(idx); return next; }); };
+      const clearChecked = () => { setShoppingList(prev => prev.filter((_, i) => !checkedItems.has(i))); setCheckedItems(new Set()); toast("Cleared checked items"); };
+      const clearAll = () => { setShoppingList([]); setCheckedItems(new Set()); toast("Shopping list cleared"); };
+      const uncheckedCount = shoppingList.length - checkedItems.size;
+      return (
+        <div className="fade-in">
+          {shoppingList.length > 0 && (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: "#7A7568" }}>{uncheckedCount} item{uncheckedCount !== 1 ? "s" : ""} remaining</span>
+              <div style={{ display: "flex", gap: 8 }}>
+                {checkedItems.size > 0 && <button className="btn-secondary" style={{ padding: "6px 14px", fontSize: 13 }} onClick={clearChecked}>{I.trash} Checked</button>}
+                <button className="btn-secondary" style={{ padding: "6px 14px", fontSize: 13, color: "#C26A5A" }} onClick={clearAll}>Clear All</button>
+              </div>
+            </div>
+          )}
+          {shoppingList.length === 0 ? (
+            <div className="empty-state"><span style={{ fontSize: 40 }}>🛒</span><p>Your shopping list is empty. Add recipes from the Recipes tab!</p></div>
+          ) : (
+            <div style={{ background: "white", borderRadius: 16, padding: "4px 20px", border: "1px solid #F0EBE3" }}>
+              {shoppingList.map((item, i) => (
+                <div key={`${item.ingredient}-${i}`} className={`shopping-item ${checkedItems.has(i) ? "got-it" : ""}`}>
+                  <button className={`checkbox-btn ${checkedItems.has(i) ? "checked" : ""}`} onClick={() => toggleItem(i)}>
+                    {checkedItems.has(i) && I.check}
+                  </button>
+                  <div style={{ flex: 1 }}>
+                    <span className="item-name" style={{ fontWeight: 600, fontSize: 15 }}>{item.ingredient}</span>
+                    {item.aisle && <span style={{ display: "block", fontSize: 12, color: "#A39E93", marginTop: 2 }}>Aisle: {item.aisle}</span>}
+                  </div>
+                  <span style={{ color: "#7A7568", fontSize: 14, fontWeight: 500, whiteSpace: "nowrap" }}>{item.total} {item.unit}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ─── Ingredients Match Page ───
+    function IngredientsMatchPage({ recipes, ingredients }) {
+      const [haveIngredients, setHaveIngredients] = useState(new Set());
+      const allIngredients = [...new Set(ingredients.map(i => i.ingredient.toLowerCase()))].sort();
+      const toggleIngredient = ing => { setHaveIngredients(prev => { const next = new Set(prev); next.has(ing) ? next.delete(ing) : next.add(ing); return next; }); };
+      const matches = recipes.map(recipe => {
+        const recipeIngs = ingredients.filter(i => i.recipeId === recipe.id).map(i => i.ingredient.toLowerCase());
+        if (recipeIngs.length === 0) return { recipe, matchCount: 0, total: 0, missing: [], percentage: 0 };
+        const matchCount = recipeIngs.filter(i => haveIngredients.has(i)).length;
+        const missing = recipeIngs.filter(i => !haveIngredients.has(i));
+        return { recipe, matchCount, total: recipeIngs.length, missing, percentage: Math.round((matchCount / recipeIngs.length) * 100) };
+      }).filter(m => m.total > 0).sort((a, b) => b.percentage - a.percentage);
+      return (
+        <div className="fade-in">
+          <p style={{ color: "#7A7568", fontSize: 14, marginBottom: 16, lineHeight: 1.5 }}>Check off ingredients you have, and we'll suggest recipes you can make.</p>
+          <div style={{ background: "white", borderRadius: 16, padding: 16, border: "1px solid #F0EBE3", marginBottom: 24, maxHeight: 260, overflowY: "auto" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {allIngredients.map(ing => (
+                <button key={ing} onClick={() => toggleIngredient(ing)} style={{
+                  padding: "6px 14px", borderRadius: 100, fontSize: 13, fontWeight: 600, fontFamily: "'Nunito', sans-serif",
+                  border: `1.5px solid ${haveIngredients.has(ing) ? "#5B7C5A" : "#E5DED3"}`,
+                  background: haveIngredients.has(ing) ? "#E8F0E7" : "white",
+                  color: haveIngredients.has(ing) ? "#3D5A3C" : "#7A7568",
+                  cursor: "pointer", transition: "all 0.15s", textTransform: "capitalize",
+                }}>
+                  {haveIngredients.has(ing) ? "✓ " : ""}{ing}
+                </button>
+              ))}
+              {allIngredients.length === 0 && <p style={{ color: "#A39E93", fontSize: 14, textAlign: "center", width: "100%" }}>No ingredients loaded yet.</p>}
+            </div>
+          </div>
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: "#7A7568", letterSpacing: 0.5, marginBottom: 12 }}>
+            {haveIngredients.size > 0 ? "RECIPE MATCHES" : "SELECT INGREDIENTS ABOVE"}
+          </h3>
+          {haveIngredients.size > 0 && matches.map(m => (
+            <div key={m.recipe.id} className="match-card fade-in">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <h4 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 17, marginBottom: 4 }}>{m.recipe.name}</h4>
+                  <span style={{ fontSize: 13, color: "#7A7568" }}>{m.matchCount} of {m.total} ingredients</span>
+                </div>
+                <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 22, color: m.percentage === 100 ? "#5B7C5A" : m.percentage >= 60 ? "#C4956A" : "#A39E93" }}>{m.percentage}%</span>
+              </div>
+              <div className="match-bar">
+                <div className="match-bar-fill" style={{ width: `${m.percentage}%`, background: m.percentage === 100 ? "#5B7C5A" : m.percentage >= 60 ? "#C4956A" : "#A39E93" }} />
+              </div>
+              {m.missing.length > 0 && (
+                <div style={{ marginTop: 10, fontSize: 13, color: "#7A7568" }}>
+                  <span style={{ fontWeight: 700 }}>Missing: </span>
+                  {m.missing.map(mi => mi.charAt(0).toUpperCase() + mi.slice(1)).join(", ")}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // ─── Add Recipe Page ───
+    function AddRecipePage({ apiKey, onRecipeAdded, toast, recipes }) {
+      const [name, setName] = useState("");
+      const [type, setType] = useState("");
+      const [cardUrl, setCardUrl] = useState("");
+      const [ingredientRows, setIngredientRows] = useState([{ ingredient: "", quantity: "", unit: "" }]);
+      const [saving, setSaving] = useState(false);
+      const addRow = () => setIngredientRows(prev => [...prev, { ingredient: "", quantity: "", unit: "" }]);
+      const removeRow = idx => setIngredientRows(prev => prev.filter((_, i) => i !== idx));
+      const updateRow = (idx, field, value) => { setIngredientRows(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r)); };
+      const nextId = () => {
+        const nums = recipes.map(r => parseInt(r.id.replace(/\D/g, ""), 10)).filter(n => !isNaN(n));
+        const next = nums.length > 0 ? Math.max(...nums) + 1 : 1;
+        return `R${String(next).padStart(3, "0")}`;
+      };
+      const handleSave = async () => {
+        if (!name.trim()) return toast("Please enter a recipe name");
+        if (!type.trim()) return toast("Please select a type");
+        setSaving(true);
+        try {
+          const id = nextId();
+          await appendToSheet("Recipes", [[id, name, type, cardUrl, ""]], apiKey);
+          const ingRows = ingredientRows.filter(r => r.ingredient.trim()).map(r => [id, r.ingredient, r.quantity, r.unit]);
+          if (ingRows.length > 0) await appendToSheet("Ingredients", ingRows, apiKey);
+          toast(`"${name}" added!`);
+          setName(""); setType(""); setCardUrl("");
+          setIngredientRows([{ ingredient: "", quantity: "", unit: "" }]);
+          onRecipeAdded();
+        } catch { toast("Error saving — the API key may need write access. See Settings for details."); }
+        setSaving(false);
+      };
+      return (
+        <div className="fade-in">
+          <div style={{ background: "white", borderRadius: 16, padding: 20, border: "1px solid #F0EBE3", marginBottom: 16 }}>
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: "#7A7568", letterSpacing: 0.5, marginBottom: 14 }}>RECIPE INFO</h3>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#7A7568", display: "block", marginBottom: 5 }}>Recipe Name *</label>
+              <input className="input-field" placeholder="e.g., Chicken Teriyaki Bowl" value={name} onChange={e => setName(e.target.value)} />
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#7A7568", display: "block", marginBottom: 5 }}>Type *</label>
+              <select className="select-field" value={type} onChange={e => setType(e.target.value)}>
+                <option value="">Select type...</option>
+                {["Dinner", "Lunch", "Breakfast", "Soup", "Stew", "Dessert", "Bread", "Snack"].map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#7A7568", display: "block", marginBottom: 5 }}>Recipe Link (optional)</label>
+              <input className="input-field" placeholder="https://..." value={cardUrl} onChange={e => setCardUrl(e.target.value)} />
+            </div>
+          </div>
+          <div style={{ background: "white", borderRadius: 16, padding: 20, border: "1px solid #F0EBE3", marginBottom: 20 }}>
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: "#7A7568", letterSpacing: 0.5, marginBottom: 14 }}>INGREDIENTS</h3>
+            {ingredientRows.map((row, i) => (
+              <div key={i} className="ingredient-row">
+                <input className="input-field" placeholder="Ingredient" value={row.ingredient} onChange={e => updateRow(i, "ingredient", e.target.value)} />
+                <input className="input-field qty-input" placeholder="Qty" value={row.quantity} onChange={e => updateRow(i, "quantity", e.target.value)} />
+                <input className="input-field unit-input" placeholder="Unit" value={row.unit} onChange={e => updateRow(i, "unit", e.target.value)} />
+                {ingredientRows.length > 1 && <button onClick={() => removeRow(i)} style={{ background: "none", border: "none", color: "#C26A5A", cursor: "pointer", padding: 4 }}>{I.trash}</button>}
+              </div>
+            ))}
+            <button className="btn-secondary" onClick={addRow} style={{ marginTop: 8 }}>{I.plus} Add Ingredient</button>
+          </div>
+          <button className="btn-primary" style={{ width: "100%", justifyContent: "center", padding: 14 }} onClick={handleSave} disabled={saving}>
+            {saving ? "Saving..." : "Save Recipe"}
+          </button>
+        </div>
+      );
+    }
+
+    // ─── Settings Page ───
+    function SettingsPage({ apiKey, onDisconnect, onRefresh, refreshing }) {
+      return (
+        <div className="fade-in">
+          <div style={{ background: "white", borderRadius: 16, padding: 20, border: "1px solid #F0EBE3", marginBottom: 16 }}>
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: "#7A7568", letterSpacing: 0.5, marginBottom: 14 }}>CONNECTION</h3>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+              <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#5B7C5A" }} />
+              <span style={{ fontSize: 14, fontWeight: 600 }}>Connected to Google Sheets</span>
+            </div>
+            <p style={{ fontSize: 13, color: "#7A7568", marginBottom: 16 }}>API Key: {apiKey.slice(0, 8)}...{apiKey.slice(-4)}</p>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button className="btn-secondary" onClick={onRefresh} disabled={refreshing}>{I.refresh} {refreshing ? "Refreshing..." : "Refresh Data"}</button>
+              <button className="btn-secondary" style={{ color: "#C26A5A", borderColor: "#C26A5A" }} onClick={onDisconnect}>Disconnect</button>
+            </div>
+          </div>
+          <div style={{ background: "white", borderRadius: 16, padding: 20, border: "1px solid #F0EBE3", marginBottom: 16 }}>
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: "#7A7568", letterSpacing: 0.5, marginBottom: 14 }}>GOOGLE SHEET</h3>
+            <a href={`https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`} target="_blank" rel="noopener noreferrer" className="btn-secondary" style={{ textDecoration: "none" }}>
+              Open in Google Sheets {I.external}
+            </a>
+          </div>
+          <div style={{ background: "white", borderRadius: 16, padding: 20, border: "1px solid #F0EBE3", marginBottom: 16 }}>
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: "#7A7568", letterSpacing: 0.5, marginBottom: 14 }}>ADD TO HOME SCREEN</h3>
+            <p style={{ fontSize: 13, color: "#7A7568", lineHeight: 1.6 }}>
+              To use this as an app on your iPhone: tap the <strong>Share</strong> button in Safari, then <strong>"Add to Home Screen"</strong>.
+            </p>
+          </div>
+          <div style={{ background: "white", borderRadius: 16, padding: 20, border: "1px solid #F0EBE3" }}>
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: "#7A7568", letterSpacing: 0.5, marginBottom: 14 }}>WRITE ACCESS NOTE</h3>
+            <p style={{ fontSize: 13, color: "#7A7568", lineHeight: 1.6 }}>
+              To add recipes from the app, your API key needs write access. Standard API keys are read-only. For write access, you'll need to use a <strong>Service Account</strong> or <strong>OAuth</strong>. Alternatively, you can add recipes directly in Google Sheets and use this app for browsing and shopping.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    // ─── Main App ───
+    function MealPrepApp() {
+      const [apiKey, setApiKeyState] = useState(getApiKey());
+      const [tab, setTab] = useState("recipes");
+      const [recipes, setRecipes] = useState([]);
+      const [ingredients, setIngredients] = useState([]);
+      const [shoppingList, setShoppingList] = useState([]);
+      const [loading, setLoading] = useState(false);
+      const [refreshing, setRefreshing] = useState(false);
+      const [toastMsg, setToastMsg] = useState("");
+
+      const toast = useCallback(msg => { setToastMsg(""); setTimeout(() => setToastMsg(msg), 10); }, []);
+
+      const loadData = useCallback(async (key) => {
+        setLoading(true);
+        try {
+          const [recipeRows, ingRows] = await Promise.all([fetchSheet("Recipes", key), fetchSheet("Ingredients", key)]);
+          setRecipes(recipeRows.slice(1).filter(r => r[0]).map(r => ({ id: r[0]||"", name: r[1]||"", type: r[2]||"", cardUrl: r[3]||"" })));
+          setIngredients(ingRows.slice(1).filter(r => r[0]).map(r => ({ recipeId: r[0]||"", ingredient: r[1]||"", quantity: r[2]||"", unit: r[3]||"" })));
+        } catch { toast("Error loading data. Check your connection."); }
+        setLoading(false);
+      }, [toast]);
+
+      useEffect(() => { if (apiKey) loadData(apiKey); }, [apiKey, loadData]);
+
+      const handleRefresh = async () => { setRefreshing(true); await loadData(apiKey); setRefreshing(false); toast("Data refreshed!"); };
+      const handleAddToList = recipe => {
+        const recipeIngs = ingredients.filter(i => i.recipeId === recipe.id);
+        if (recipeIngs.length === 0) return toast("No ingredients found for this recipe");
+        setShoppingList(prev => [...prev, ...recipeIngs.map(i => ({ recipeId: recipe.id, recipeName: recipe.name, ingredient: i.ingredient, total: i.quantity, unit: i.unit, aisle: "" }))]);
+        toast(`Added ${recipe.name} to shopping list`);
+      };
+      const handleDisconnect = () => { setApiKeyStore(""); setApiKeyState(""); setRecipes([]); setIngredients([]); setShoppingList([]); };
+
+      if (!apiKey) return <SetupScreen onSave={k => setApiKeyState(k)} />;
+
+      const navItems = [
+        { id: "recipes", label: "Recipes", icon: I.recipes },
+        { id: "shopping", label: "Shopping", icon: I.cart },
+        { id: "match", label: "Match", icon: I.search },
+        { id: "add", label: "Add", icon: I.plus },
+        { id: "settings", label: "Settings", icon: I.settings },
+      ];
+      const pageTitle = { recipes: "Recipes", shopping: "Shopping List", match: "What Can I Make?", add: "Add Recipe", settings: "Settings" };
+
+      return (
+        <div style={{ minHeight: "100vh", background: "#FAF6F1" }}>
+          {toastMsg && <Toast message={toastMsg} onDone={() => setToastMsg("")} />}
+          <nav className="nav-bar">
+            {navItems.map(n => <button key={n.id} className={`nav-item ${tab === n.id ? "active" : ""}`} onClick={() => setTab(n.id)}>{n.icon}<span>{n.label}</span></button>)}
+          </nav>
+          <div className="page-content" style={{ padding: "24px 20px 100px", maxWidth: 640, margin: "0 auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <div>
+                <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 26 }}>{pageTitle[tab]}</h1>
+                {tab === "recipes" && <p style={{ color: "#7A7568", fontSize: 14, marginTop: 2 }}>{recipes.length} recipe{recipes.length !== 1 ? "s" : ""}</p>}
+              </div>
+              {tab === "recipes" && <button className="btn-secondary" style={{ padding: "8px 14px" }} onClick={handleRefresh} disabled={refreshing}>{I.refresh}</button>}
+            </div>
+            {loading ? (
+              <div style={{ padding: "60px 0", textAlign: "center" }}><div className="loading-spinner" /><p style={{ color: "#7A7568", marginTop: 16, fontSize: 14 }}>Loading your meal prep data...</p></div>
+            ) : (
+              <>
+                {tab === "recipes" && <RecipesPage recipes={recipes} ingredients={ingredients} onAddToList={handleAddToList} toast={toast} />}
+                {tab === "shopping" && <ShoppingListPage shoppingList={shoppingList} setShoppingList={setShoppingList} toast={toast} />}
+                {tab === "match" && <IngredientsMatchPage recipes={recipes} ingredients={ingredients} />}
+                {tab === "add" && <AddRecipePage apiKey={apiKey} onRecipeAdded={handleRefresh} toast={toast} recipes={recipes} />}
+                {tab === "settings" && <SettingsPage apiKey={apiKey} onDisconnect={handleDisconnect} onRefresh={handleRefresh} refreshing={refreshing} />}
+              </>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<MealPrepApp />);
+  </script>
+</body>
+</html>
