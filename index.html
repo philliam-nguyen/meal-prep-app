@@ -138,6 +138,15 @@
       return data;
     }
 
+    async function updateCell(tab, range, value, scriptUrl) {
+      if (!scriptUrl) throw new Error("No script URL configured");
+      const res = await fetch(scriptUrl, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ action: "updateCell", tab, range, value }) });
+      if (!res.ok) throw new Error(`Failed: ${res.status}`);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Script error");
+      return data;
+    }
+
     // ─── Icons ───
     const I = {
       recipes: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>,
@@ -214,7 +223,7 @@
     }
 
     // ─── Recipe Detail Modal ───
-    function RecipeDetail({ recipe, ingredients, onClose, onAddToList }) {
+    function RecipeDetail({ recipe, ingredients, onClose, onToggleShoppingList }) {
       const recipeIngredients = ingredients.filter(i => i.recipeId === recipe.id);
       return (
         <div className="modal-overlay" onClick={onClose}>
@@ -244,8 +253,8 @@
                 ))}
               </div>
             )}
-            <button className="btn-primary" style={{ width: "100%", justifyContent: "center" }} onClick={() => onAddToList(recipe)}>
-              {I.cart} <span>Add to Shopping List</span>
+            <button className="btn-primary" style={{ width: "100%", justifyContent: "center" }} onClick={() => onToggleShoppingList(recipe)}>
+              {I.cart} <span>{recipe.inShoppingList ? "Remove from Shopping List" : "Add to Shopping List"}</span>
             </button>
           </div>
         </div>
@@ -253,7 +262,7 @@
     }
 
     // ─── Recipes Page ───
-    function RecipesPage({ recipes, ingredients, onAddToList, toast }) {
+    function RecipesPage({ recipes, ingredients, onToggleShoppingList, toast }) {
       const [filter, setFilter] = useState("All");
       const [searchTerm, setSearchTerm] = useState("");
       const [selected, setSelected] = useState(null);
@@ -280,7 +289,10 @@
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
                       <h3 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 18, marginBottom: 6 }}>{r.name}</h3>
-                      <span className="badge" style={{ background: getTypeBadge(r.type).bg, color: getTypeBadge(r.type).text }}>{r.type}</span>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        <span className="badge" style={{ background: getTypeBadge(r.type).bg, color: getTypeBadge(r.type).text }}>{r.type}</span>
+                        {r.inShoppingList && <span className="badge" style={{ background: "#E8F0E7", color: "#3D5A3C" }}>In List</span>}
+                      </div>
                     </div>
                     <span style={{ color: "#A39E93" }}>{I.chevron}</span>
                   </div>
@@ -288,37 +300,35 @@
               ))}
             </div>
           )}
-          {selected && <RecipeDetail recipe={selected} ingredients={ingredients} onClose={() => setSelected(null)} onAddToList={r => { onAddToList(r); setSelected(null); }} />}
+          {selected && <RecipeDetail recipe={selected} ingredients={ingredients} onClose={() => setSelected(null)} onToggleShoppingList={r => { onToggleShoppingList(r); setSelected(null); }} />}
         </div>
       );
     }
 
     // ─── Shopping List Page ───
     function ShoppingListPage({ shoppingList, setShoppingList, scriptUrl, toast }) {
-      const [checkedItems, setCheckedItems] = useState(new Set());
-      const toggleItem = idx => { setCheckedItems(prev => { const next = new Set(prev); next.has(idx) ? next.delete(idx) : next.add(idx); return next; }); };
-      const clearChecked = async () => { const updated = shoppingList.filter((_, i) => !checkedItems.has(i)); setShoppingList(updated); setCheckedItems(new Set()); toast("Cleared checked items"); try { await rewriteSheet("App_Shopping_List", updated.map(item => [item.recipeId, item.recipeName, item.ingredient, item.total, item.unit, item.aisle]), scriptUrl); } catch {} };
-      const clearAll = async () => { setShoppingList([]); setCheckedItems(new Set()); toast("Shopping list cleared"); try { await rewriteSheet("App_Shopping_List", [], scriptUrl); } catch {} };
-      const uncheckedCount = shoppingList.length - checkedItems.size;
+      const toggleItem = async (item, idx) => {
+        const newGotIt = !item.gotIt;
+        setShoppingList(prev => prev.map((it, i) => i === idx ? { ...it, gotIt: newGotIt } : it));
+        try { await updateCell("Shopping_List", `A${item.rowIndex}`, newGotIt, scriptUrl); }
+        catch { toast("Failed to save"); setShoppingList(prev => prev.map((it, i) => i === idx ? { ...it, gotIt: !newGotIt } : it)); }
+      };
+      const remaining = shoppingList.filter(item => !item.gotIt).length;
       return (
         <div className="fade-in">
           {shoppingList.length > 0 && (
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: "#7A7568" }}>{uncheckedCount} item{uncheckedCount !== 1 ? "s" : ""} remaining</span>
-              <div style={{ display: "flex", gap: 8 }}>
-                {checkedItems.size > 0 && <button className="btn-secondary" style={{ padding: "6px 14px", fontSize: 13 }} onClick={clearChecked}>{I.trash} Checked</button>}
-                <button className="btn-secondary" style={{ padding: "6px 14px", fontSize: 13, color: "#C26A5A" }} onClick={clearAll}>Clear All</button>
-              </div>
+            <div style={{ marginBottom: 16 }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: "#7A7568" }}>{remaining} item{remaining !== 1 ? "s" : ""} remaining</span>
             </div>
           )}
           {shoppingList.length === 0 ? (
-            <div className="empty-state"><span style={{ fontSize: 40 }}>🛒</span><p>Your shopping list is empty. Add recipes from the Recipes tab!</p></div>
+            <div className="empty-state"><span style={{ fontSize: 40 }}>🛒</span><p>No shopping items yet. Select recipes from the Recipes tab!</p></div>
           ) : (
             <div style={{ background: "white", borderRadius: 16, padding: "4px 20px", border: "1px solid #F0EBE3" }}>
               {shoppingList.map((item, i) => (
-                <div key={`${item.ingredient}-${i}`} className={`shopping-item ${checkedItems.has(i) ? "got-it" : ""}`}>
-                  <button className={`checkbox-btn ${checkedItems.has(i) ? "checked" : ""}`} onClick={() => toggleItem(i)}>
-                    {checkedItems.has(i) && I.check}
+                <div key={`${item.ingredient}-${i}`} className={`shopping-item ${item.gotIt ? "got-it" : ""}`}>
+                  <button className={`checkbox-btn ${item.gotIt ? "checked" : ""}`} onClick={() => toggleItem(item, i)}>
+                    {item.gotIt && I.check}
                   </button>
                   <div style={{ flex: 1 }}>
                     <span className="item-name" style={{ fontWeight: 600, fontSize: 15 }}>{item.ingredient}</span>
@@ -334,56 +344,46 @@
     }
 
     // ─── Ingredients Match Page ───
-    function IngredientsMatchPage({ recipes, ingredients, haveIngredients, setHaveIngredients, scriptUrl }) {
-      const allIngredients = [...new Set(ingredients.map(i => i.ingredient.toLowerCase()))].sort();
-      const toggleIngredient = async ing => { const next = new Set(haveIngredients); next.has(ing) ? next.delete(ing) : next.add(ing); setHaveIngredients(next); try { await rewriteSheet("App_Ingredients_Match", [...next].map(i => [i]), scriptUrl); } catch {} };
-      const matches = recipes.map(recipe => {
-        const recipeIngs = ingredients.filter(i => i.recipeId === recipe.id).map(i => i.ingredient.toLowerCase());
-        if (recipeIngs.length === 0) return { recipe, matchCount: 0, total: 0, missing: [], percentage: 0 };
-        const matchCount = recipeIngs.filter(i => haveIngredients.has(i)).length;
-        const missing = recipeIngs.filter(i => !haveIngredients.has(i));
-        return { recipe, matchCount, total: recipeIngs.length, missing, percentage: Math.round((matchCount / recipeIngs.length) * 100) };
-      }).filter(m => m.total > 0).sort((a, b) => b.percentage - a.percentage);
+    function IngredientsMatchPage({ pantryItems, setPantryItems, bestMatches, scriptUrl, toast, onRefreshMatch }) {
+      const [refreshing, setRefreshing] = useState(false);
+      const toggleIngredient = async (item, idx) => {
+        const newHaveIt = !item.haveIt;
+        setPantryItems(prev => prev.map((it, i) => i === idx ? { ...it, haveIt: newHaveIt } : it));
+        try {
+          await updateCell("Ingredients Match", `A${item.rowIndex}`, newHaveIt, scriptUrl);
+          setRefreshing(true);
+          await onRefreshMatch();
+        } catch { toast("Failed to save"); setPantryItems(prev => prev.map((it, i) => i === idx ? { ...it, haveIt: !newHaveIt } : it)); }
+        setRefreshing(false);
+      };
+      const haveCount = pantryItems.filter(i => i.haveIt).length;
       return (
         <div className="fade-in">
-          <p style={{ color: "#7A7568", fontSize: 14, marginBottom: 16, lineHeight: 1.5 }}>Check off ingredients you have, and we'll suggest recipes you can make.</p>
-          <div style={{ background: "white", borderRadius: 16, padding: 16, border: "1px solid #F0EBE3", marginBottom: 24, maxHeight: 260, overflowY: "auto" }}>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {allIngredients.map(ing => (
-                <button key={ing} onClick={() => toggleIngredient(ing)} style={{
-                  padding: "6px 14px", borderRadius: 100, fontSize: 13, fontWeight: 600, fontFamily: "'Nunito', sans-serif",
-                  border: `1.5px solid ${haveIngredients.has(ing) ? "#5B7C5A" : "#E5DED3"}`,
-                  background: haveIngredients.has(ing) ? "#E8F0E7" : "white",
-                  color: haveIngredients.has(ing) ? "#3D5A3C" : "#7A7568",
-                  cursor: "pointer", transition: "all 0.15s", textTransform: "capitalize",
-                }}>
-                  {haveIngredients.has(ing) ? "✓ " : ""}{ing}
+          <p style={{ color: "#7A7568", fontSize: 14, marginBottom: 16, lineHeight: 1.5 }}>Check off ingredients you have and the sheet will find the best recipe matches.</p>
+          <div style={{ background: "white", borderRadius: 16, padding: "4px 20px", border: "1px solid #F0EBE3", marginBottom: 24, maxHeight: 300, overflowY: "auto" }}>
+            {pantryItems.length === 0 && <p style={{ color: "#A39E93", fontSize: 14, padding: "16px 0" }}>No ingredients found.</p>}
+            {pantryItems.map((item, i) => (
+              <div key={`${item.ingredient}-${i}`} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: i < pantryItems.length - 1 ? "1px solid #F0EBE3" : "none" }}>
+                <button className={`checkbox-btn ${item.haveIt ? "checked" : ""}`} onClick={() => toggleIngredient(item, i)}>
+                  {item.haveIt && I.check}
                 </button>
-              ))}
-              {allIngredients.length === 0 && <p style={{ color: "#A39E93", fontSize: 14, textAlign: "center", width: "100%" }}>No ingredients loaded yet.</p>}
-            </div>
+                <span style={{ fontSize: 15, fontWeight: 500, textTransform: "capitalize" }}>{item.ingredient}</span>
+              </div>
+            ))}
           </div>
           <h3 style={{ fontSize: 14, fontWeight: 700, color: "#7A7568", letterSpacing: 0.5, marginBottom: 12 }}>
-            {haveIngredients.size > 0 ? "RECIPE MATCHES" : "SELECT INGREDIENTS ABOVE"}
+            {haveCount > 0 ? `BEST MATCHES${refreshing ? " (updating...)" : ""}` : "SELECT INGREDIENTS ABOVE"}
           </h3>
-          {haveIngredients.size > 0 && matches.map(m => (
-            <div key={m.recipe.id} className="match-card fade-in">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <h4 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 17, marginBottom: 4 }}>{m.recipe.name}</h4>
-                  <span style={{ fontSize: 13, color: "#7A7568" }}>{m.matchCount} of {m.total} ingredients</span>
-                </div>
-                <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: 22, color: m.percentage === 100 ? "#5B7C5A" : m.percentage >= 60 ? "#C4956A" : "#A39E93" }}>{m.percentage}%</span>
-              </div>
-              <div className="match-bar">
-                <div className="match-bar-fill" style={{ width: `${m.percentage}%`, background: m.percentage === 100 ? "#5B7C5A" : m.percentage >= 60 ? "#C4956A" : "#A39E93" }} />
-              </div>
-              {m.missing.length > 0 && (
-                <div style={{ marginTop: 10, fontSize: 13, color: "#7A7568" }}>
-                  <span style={{ fontWeight: 700 }}>Missing: </span>
-                  {m.missing.map(mi => mi.charAt(0).toUpperCase() + mi.slice(1)).join(", ")}
-                </div>
-              )}
+          {haveCount > 0 && bestMatches.length === 0 && !refreshing && (
+            <p style={{ color: "#A39E93", fontSize: 14 }}>No matches found yet.</p>
+          )}
+          {bestMatches.map((m, i) => (
+            <div key={i} className="match-card fade-in">
+              <h4 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 17, marginBottom: 6 }}>{m.recipeName || m.recipeId}</h4>
+              {m.missing === "Nothing Missing"
+                ? <div style={{ fontSize: 13, color: "#5B7C5A", fontWeight: 600 }}>You have everything!</div>
+                : m.missing && <div style={{ fontSize: 13, color: "#7A7568" }}><span style={{ fontWeight: 700 }}>Missing: </span>{m.missing}</div>
+              }
             </div>
           ))}
         </div>
@@ -554,7 +554,8 @@
       const [recipes, setRecipes] = useState([]);
       const [ingredients, setIngredients] = useState([]);
       const [shoppingList, setShoppingList] = useState([]);
-      const [haveIngredients, setHaveIngredients] = useState(new Set());
+      const [pantryItems, setPantryItems] = useState([]);
+      const [bestMatches, setBestMatches] = useState([]);
       const [loading, setLoading] = useState(false);
       const [refreshing, setRefreshing] = useState(false);
       const [toastMsg, setToastMsg] = useState("");
@@ -564,30 +565,42 @@
       const loadData = useCallback(async (key) => {
         setLoading(true);
         try {
-          const [recipeRows, ingRows, shoppingRows, pantryRows] = await Promise.all([
+          const [recipeRows, ingRows, shoppingRows, matchRows] = await Promise.all([
             fetchSheet("Recipes", key), fetchSheet("Ingredients", key),
-            fetchSheet("App_Shopping_List", key), fetchSheet("App_Ingredients_Match", key),
+            fetchSheet("Shopping_List", key), fetchSheet("Ingredients Match", key),
           ]);
-          setRecipes(recipeRows.slice(1).filter(r => r[0]).map(r => ({ id: r[0]||"", name: r[1]||"", type: r[2]||"", cardUrl: r[3]||"" })));
+          setRecipes(recipeRows.slice(1).filter(r => r[0]).map((r, idx) => ({ id: r[0]||"", name: r[1]||"", type: r[2]||"", cardUrl: r[3]||"", inShoppingList: r[4] === "TRUE", rowIndex: idx + 2 })));
           setIngredients(ingRows.slice(1).filter(r => r[0]).map(r => ({ recipeId: r[0]||"", ingredient: r[1]||"", quantity: r[2]||"", unit: r[3]||"" })));
-          setShoppingList(shoppingRows.slice(1).filter(r => r[0]).map(r => ({ recipeId: r[0]||"", recipeName: r[1]||"", ingredient: r[2]||"", total: r[3]||"", unit: r[4]||"", aisle: r[5]||"" })));
-          setHaveIngredients(new Set(pantryRows.slice(1).filter(r => r[0]).map(r => r[0].toLowerCase())));
+          setShoppingList(shoppingRows.slice(1).filter(r => r[1]).map((r, idx) => ({ gotIt: r[0] === "TRUE", ingredient: r[1]||"", total: r[2]||"", unit: r[3]||"", aisle: r[4]||"", rowIndex: idx + 2 })));
+          setPantryItems(matchRows.slice(1).filter(r => r[1]).map((r, idx) => ({ haveIt: r[0] === "TRUE", ingredient: r[1]||"", rowIndex: idx + 2 })));
+          setBestMatches(matchRows.slice(1).filter(r => r[3]).map(r => ({ recipeId: r[3]||"", recipeName: r[4]||"", missing: r[5]||"" })));
         } catch { toast("Error loading data. Check your connection."); }
         setLoading(false);
       }, [toast]);
 
+      const loadMatchData = useCallback(async () => {
+        try {
+          const rows = await fetchSheet("Ingredients Match", apiKey);
+          setPantryItems(rows.slice(1).filter(r => r[1]).map((r, idx) => ({ haveIt: r[0] === "TRUE", ingredient: r[1]||"", rowIndex: idx + 2 })));
+          setBestMatches(rows.slice(1).filter(r => r[3]).map(r => ({ recipeId: r[3]||"", recipeName: r[4]||"", missing: r[5]||"" })));
+        } catch {}
+      }, [apiKey]);
+
       useEffect(() => { if (apiKey) loadData(apiKey); }, [apiKey, loadData]);
 
       const handleRefresh = async () => { setRefreshing(true); await loadData(apiKey); setRefreshing(false); toast("Data refreshed!"); };
-      const handleAddToList = async recipe => {
-        const recipeIngs = ingredients.filter(i => i.recipeId === recipe.id);
-        if (recipeIngs.length === 0) return toast("No ingredients found for this recipe");
-        const updatedList = [...shoppingList, ...recipeIngs.map(i => ({ recipeId: recipe.id, recipeName: recipe.name, ingredient: i.ingredient, total: i.quantity, unit: i.unit, aisle: "" }))];
-        setShoppingList(updatedList);
-        toast(`Added ${recipe.name} to shopping list`);
-        try { await rewriteSheet("App_Shopping_List", updatedList.map(item => [item.recipeId, item.recipeName, item.ingredient, item.total, item.unit, item.aisle]), scriptUrl); } catch {}
+      const handleToggleShoppingList = async recipe => {
+        const newVal = !recipe.inShoppingList;
+        setRecipes(prev => prev.map(r => r.id === recipe.id ? { ...r, inShoppingList: newVal } : r));
+        try {
+          await updateCell("Recipes", `E${recipe.rowIndex}`, newVal, scriptUrl);
+          toast(newVal ? `Added ${recipe.name} to shopping list` : `Removed ${recipe.name} from shopping list`);
+        } catch {
+          toast("Failed to save — check your Script URL in Settings.");
+          setRecipes(prev => prev.map(r => r.id === recipe.id ? { ...r, inShoppingList: !newVal } : r));
+        }
       };
-      const handleDisconnect = () => { setApiKeyStore(""); setScriptUrlStore(""); setApiKeyState(""); setScriptUrlState(""); setRecipes([]); setIngredients([]); setShoppingList([]); };
+      const handleDisconnect = () => { setApiKeyStore(""); setScriptUrlStore(""); setApiKeyState(""); setScriptUrlState(""); setRecipes([]); setIngredients([]); setShoppingList([]); setPantryItems([]); setBestMatches([]); };
       const handleScriptUrlSave = url => { setScriptUrlStore(url); setScriptUrlState(url); };
 
       if (!apiKey) return <SetupScreen onSave={k => setApiKeyState(k)} />;
@@ -599,7 +612,7 @@
         { id: "add", label: "Add", icon: I.plus },
         { id: "settings", label: "Settings", icon: I.settings },
       ];
-      const pageTitle = { recipes: "Recipes", shopping: "Shopping List", match: "What Can I Make?", add: "Add Recipe", settings: "Settings" };
+      const pageTitle = { recipes: "Recipes", shopping: "Shopping List", match: "Ingredients Match", add: "Add Recipe", settings: "Settings" };
 
       return (
         <div style={{ minHeight: "100vh", background: "#FAF6F1" }}>
@@ -619,9 +632,9 @@
               <div style={{ padding: "60px 0", textAlign: "center" }}><div className="loading-spinner" /><p style={{ color: "#7A7568", marginTop: 16, fontSize: 14 }}>Loading your meal prep data...</p></div>
             ) : (
               <>
-                {tab === "recipes" && <RecipesPage recipes={recipes} ingredients={ingredients} onAddToList={handleAddToList} toast={toast} />}
+                {tab === "recipes" && <RecipesPage recipes={recipes} ingredients={ingredients} onToggleShoppingList={handleToggleShoppingList} toast={toast} />}
                 {tab === "shopping" && <ShoppingListPage shoppingList={shoppingList} setShoppingList={setShoppingList} scriptUrl={scriptUrl} toast={toast} />}
-                {tab === "match" && <IngredientsMatchPage recipes={recipes} ingredients={ingredients} haveIngredients={haveIngredients} setHaveIngredients={setHaveIngredients} scriptUrl={scriptUrl} />}
+                {tab === "match" && <IngredientsMatchPage pantryItems={pantryItems} setPantryItems={setPantryItems} bestMatches={bestMatches} scriptUrl={scriptUrl} toast={toast} onRefreshMatch={loadMatchData} />}
                 {tab === "add" && <AddRecipePage scriptUrl={scriptUrl} onRecipeAdded={handleRefresh} toast={toast} recipes={recipes} />}
                 {tab === "settings" && <SettingsPage apiKey={apiKey} scriptUrl={scriptUrl} onScriptUrlSave={handleScriptUrlSave} onDisconnect={handleDisconnect} onRefresh={handleRefresh} refreshing={refreshing} />}
               </>
