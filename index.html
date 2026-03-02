@@ -571,7 +571,7 @@
           ]);
           setRecipes(recipeRows.slice(1).filter(r => r[0]).map((r, idx) => ({ id: r[0]||"", name: r[1]||"", type: r[2]||"", cardUrl: r[3]||"", inShoppingList: r[4] === "TRUE", rowIndex: idx + 2 })));
           setIngredients(ingRows.slice(1).filter(r => r[0]).map(r => ({ recipeId: r[0]||"", ingredient: r[1]||"", quantity: r[2]||"", unit: r[3]||"" })));
-          setShoppingList(shoppingRows.slice(1).filter(r => r[1]).map((r, idx) => ({ gotIt: r[0] === "TRUE", ingredient: r[1]||"", total: r[2]||"", unit: r[3]||"", aisle: r[4]||"", rowIndex: idx + 2 })));
+          setShoppingList(shoppingRows.slice(2).filter(r => r[1]).map((r, idx) => ({ gotIt: r[0] === "TRUE", ingredient: r[1]||"", total: r[2]||"", unit: r[3]||"", aisle: r[4]||"", rowIndex: idx + 3 })));
           setPantryItems(matchRows.slice(1).filter(r => r[1]).map((r, idx) => ({ haveIt: r[0] === "TRUE", ingredient: r[1]||"", rowIndex: idx + 2 })));
           setBestMatches(matchRows.slice(1).filter(r => r[3]).map(r => ({ recipeId: r[3]||"", recipeName: r[4]||"", missing: r[5]||"" })));
         } catch { toast("Error loading data. Check your connection."); }
@@ -586,7 +586,19 @@
         } catch {}
       }, [apiKey]);
 
+      const loadShoppingData = useCallback(async () => {
+        try {
+          const rows = await fetchSheet("Shopping_List", apiKey);
+          setShoppingList(rows.slice(2).filter(r => r[1]).map((r, idx) => ({ gotIt: r[0] === "TRUE", ingredient: r[1]||"", total: r[2]||"", unit: r[3]||"", aisle: r[4]||"", rowIndex: idx + 3 })));
+        } catch {}
+      }, [apiKey]);
+
       useEffect(() => { if (apiKey) loadData(apiKey); }, [apiKey, loadData]);
+      useEffect(() => {
+        if (!apiKey) return;
+        if (tab === "shopping") loadShoppingData();
+        else if (tab === "match") loadMatchData();
+      }, [tab, loadShoppingData, loadMatchData]);
 
       const handleRefresh = async () => { setRefreshing(true); await loadData(apiKey); setRefreshing(false); toast("Data refreshed!"); };
       const handleToggleShoppingList = async recipe => {
