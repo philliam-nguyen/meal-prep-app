@@ -129,6 +129,15 @@
       return data;
     }
 
+    async function rewriteSheet(tab, values, scriptUrl) {
+      if (!scriptUrl) throw new Error("No script URL configured");
+      const res = await fetch(scriptUrl, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ action: "rewrite", tab, values }) });
+      if (!res.ok) throw new Error(`Failed: ${res.status}`);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Script error");
+      return data;
+    }
+
     // ─── Icons ───
     const I = {
       recipes: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>,
@@ -285,11 +294,11 @@
     }
 
     // ─── Shopping List Page ───
-    function ShoppingListPage({ shoppingList, setShoppingList, toast }) {
+    function ShoppingListPage({ shoppingList, setShoppingList, scriptUrl, toast }) {
       const [checkedItems, setCheckedItems] = useState(new Set());
       const toggleItem = idx => { setCheckedItems(prev => { const next = new Set(prev); next.has(idx) ? next.delete(idx) : next.add(idx); return next; }); };
-      const clearChecked = () => { setShoppingList(prev => prev.filter((_, i) => !checkedItems.has(i))); setCheckedItems(new Set()); toast("Cleared checked items"); };
-      const clearAll = () => { setShoppingList([]); setCheckedItems(new Set()); toast("Shopping list cleared"); };
+      const clearChecked = async () => { const updated = shoppingList.filter((_, i) => !checkedItems.has(i)); setShoppingList(updated); setCheckedItems(new Set()); toast("Cleared checked items"); try { await rewriteSheet("App_Shopping_List", updated.map(item => [item.recipeId, item.recipeName, item.ingredient, item.total, item.unit, item.aisle]), scriptUrl); } catch {} };
+      const clearAll = async () => { setShoppingList([]); setCheckedItems(new Set()); toast("Shopping list cleared"); try { await rewriteSheet("App_Shopping_List", [], scriptUrl); } catch {} };
       const uncheckedCount = shoppingList.length - checkedItems.size;
       return (
         <div className="fade-in">
@@ -325,10 +334,9 @@
     }
 
     // ─── Ingredients Match Page ───
-    function IngredientsMatchPage({ recipes, ingredients }) {
-      const [haveIngredients, setHaveIngredients] = useState(new Set());
+    function IngredientsMatchPage({ recipes, ingredients, haveIngredients, setHaveIngredients, scriptUrl }) {
       const allIngredients = [...new Set(ingredients.map(i => i.ingredient.toLowerCase()))].sort();
-      const toggleIngredient = ing => { setHaveIngredients(prev => { const next = new Set(prev); next.has(ing) ? next.delete(ing) : next.add(ing); return next; }); };
+      const toggleIngredient = async ing => { const next = new Set(haveIngredients); next.has(ing) ? next.delete(ing) : next.add(ing); setHaveIngredients(next); try { await rewriteSheet("App_Ingredients_Match", [...next].map(i => [i]), scriptUrl); } catch {} };
       const matches = recipes.map(recipe => {
         const recipeIngs = ingredients.filter(i => i.recipeId === recipe.id).map(i => i.ingredient.toLowerCase());
         if (recipeIngs.length === 0) return { recipe, matchCount: 0, total: 0, missing: [], percentage: 0 };
@@ -546,6 +554,7 @@
       const [recipes, setRecipes] = useState([]);
       const [ingredients, setIngredients] = useState([]);
       const [shoppingList, setShoppingList] = useState([]);
+      const [haveIngredients, setHaveIngredients] = useState(new Set());
       const [loading, setLoading] = useState(false);
       const [refreshing, setRefreshing] = useState(false);
       const [toastMsg, setToastMsg] = useState("");
@@ -555,9 +564,14 @@
       const loadData = useCallback(async (key) => {
         setLoading(true);
         try {
-          const [recipeRows, ingRows] = await Promise.all([fetchSheet("Recipes", key), fetchSheet("Ingredients", key)]);
+          const [recipeRows, ingRows, shoppingRows, pantryRows] = await Promise.all([
+            fetchSheet("Recipes", key), fetchSheet("Ingredients", key),
+            fetchSheet("App_Shopping_List", key), fetchSheet("App_Ingredients_Match", key),
+          ]);
           setRecipes(recipeRows.slice(1).filter(r => r[0]).map(r => ({ id: r[0]||"", name: r[1]||"", type: r[2]||"", cardUrl: r[3]||"" })));
           setIngredients(ingRows.slice(1).filter(r => r[0]).map(r => ({ recipeId: r[0]||"", ingredient: r[1]||"", quantity: r[2]||"", unit: r[3]||"" })));
+          setShoppingList(shoppingRows.slice(1).filter(r => r[0]).map(r => ({ recipeId: r[0]||"", recipeName: r[1]||"", ingredient: r[2]||"", total: r[3]||"", unit: r[4]||"", aisle: r[5]||"" })));
+          setHaveIngredients(new Set(pantryRows.slice(1).filter(r => r[0]).map(r => r[0].toLowerCase())));
         } catch { toast("Error loading data. Check your connection."); }
         setLoading(false);
       }, [toast]);
@@ -565,11 +579,13 @@
       useEffect(() => { if (apiKey) loadData(apiKey); }, [apiKey, loadData]);
 
       const handleRefresh = async () => { setRefreshing(true); await loadData(apiKey); setRefreshing(false); toast("Data refreshed!"); };
-      const handleAddToList = recipe => {
+      const handleAddToList = async recipe => {
         const recipeIngs = ingredients.filter(i => i.recipeId === recipe.id);
         if (recipeIngs.length === 0) return toast("No ingredients found for this recipe");
-        setShoppingList(prev => [...prev, ...recipeIngs.map(i => ({ recipeId: recipe.id, recipeName: recipe.name, ingredient: i.ingredient, total: i.quantity, unit: i.unit, aisle: "" }))]);
+        const updatedList = [...shoppingList, ...recipeIngs.map(i => ({ recipeId: recipe.id, recipeName: recipe.name, ingredient: i.ingredient, total: i.quantity, unit: i.unit, aisle: "" }))];
+        setShoppingList(updatedList);
         toast(`Added ${recipe.name} to shopping list`);
+        try { await rewriteSheet("App_Shopping_List", updatedList.map(item => [item.recipeId, item.recipeName, item.ingredient, item.total, item.unit, item.aisle]), scriptUrl); } catch {}
       };
       const handleDisconnect = () => { setApiKeyStore(""); setScriptUrlStore(""); setApiKeyState(""); setScriptUrlState(""); setRecipes([]); setIngredients([]); setShoppingList([]); };
       const handleScriptUrlSave = url => { setScriptUrlStore(url); setScriptUrlState(url); };
@@ -604,8 +620,8 @@
             ) : (
               <>
                 {tab === "recipes" && <RecipesPage recipes={recipes} ingredients={ingredients} onAddToList={handleAddToList} toast={toast} />}
-                {tab === "shopping" && <ShoppingListPage shoppingList={shoppingList} setShoppingList={setShoppingList} toast={toast} />}
-                {tab === "match" && <IngredientsMatchPage recipes={recipes} ingredients={ingredients} />}
+                {tab === "shopping" && <ShoppingListPage shoppingList={shoppingList} setShoppingList={setShoppingList} scriptUrl={scriptUrl} toast={toast} />}
+                {tab === "match" && <IngredientsMatchPage recipes={recipes} ingredients={ingredients} haveIngredients={haveIngredients} setHaveIngredients={setHaveIngredients} scriptUrl={scriptUrl} />}
                 {tab === "add" && <AddRecipePage scriptUrl={scriptUrl} onRecipeAdded={handleRefresh} toast={toast} recipes={recipes} />}
                 {tab === "settings" && <SettingsPage apiKey={apiKey} scriptUrl={scriptUrl} onScriptUrlSave={handleScriptUrlSave} onDisconnect={handleDisconnect} onRefresh={handleRefresh} refreshing={refreshing} />}
               </>
