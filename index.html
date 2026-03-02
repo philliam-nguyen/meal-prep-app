@@ -105,9 +105,12 @@
     // ─── Config ───
     const SHEET_ID = "1h2SZCwjKsfIaxThGBCfh55rOZVfZUjzp0fRuGgQMK0k";
     const API_KEY_STORAGE = "meal-prep-api-key";
+    const SCRIPT_URL_STORAGE = "meal-prep-script-url";
 
     function getApiKey() { try { return localStorage.getItem(API_KEY_STORAGE) || ""; } catch { return ""; } }
     function setApiKeyStore(k) { try { localStorage.setItem(API_KEY_STORAGE, k); } catch {} }
+    function getScriptUrl() { try { return localStorage.getItem(SCRIPT_URL_STORAGE) || ""; } catch { return ""; } }
+    function setScriptUrlStore(u) { try { localStorage.setItem(SCRIPT_URL_STORAGE, u); } catch {} }
 
     async function fetchSheet(tab, apiKey) {
       const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}?key=${apiKey}`;
@@ -117,11 +120,13 @@
       return data.values || [];
     }
 
-    async function appendToSheet(tab, values, apiKey) {
-      const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(tab)}:append?valueInputOption=USER_ENTERED&key=${apiKey}`;
-      const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values }) });
+    async function appendToSheet(tab, values, scriptUrl) {
+      if (!scriptUrl) throw new Error("No script URL configured");
+      const res = await fetch(scriptUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tab, values }) });
       if (!res.ok) throw new Error(`Failed: ${res.status}`);
-      return res.json();
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Script error");
+      return data;
     }
 
     // ─── Icons ───
@@ -378,7 +383,7 @@
     }
 
     // ─── Add Recipe Page ───
-    function AddRecipePage({ apiKey, onRecipeAdded, toast, recipes }) {
+    function AddRecipePage({ scriptUrl, onRecipeAdded, toast, recipes }) {
       const [name, setName] = useState("");
       const [type, setType] = useState("");
       const [cardUrl, setCardUrl] = useState("");
@@ -395,17 +400,18 @@
       const handleSave = async () => {
         if (!name.trim()) return toast("Please enter a recipe name");
         if (!type.trim()) return toast("Please select a type");
+        if (!scriptUrl) return toast("Add your Apps Script URL in Settings to enable saving.");
         setSaving(true);
         try {
           const id = nextId();
-          await appendToSheet("Recipes", [[id, name, type, cardUrl, ""]], apiKey);
+          await appendToSheet("Recipes", [[id, name, type, cardUrl, ""]], scriptUrl);
           const ingRows = ingredientRows.filter(r => r.ingredient.trim()).map(r => [id, r.ingredient, r.quantity, r.unit]);
-          if (ingRows.length > 0) await appendToSheet("Ingredients", ingRows, apiKey);
+          if (ingRows.length > 0) await appendToSheet("Ingredients", ingRows, scriptUrl);
           toast(`"${name}" added!`);
           setName(""); setType(""); setCardUrl("");
           setIngredientRows([{ ingredient: "", quantity: "", unit: "" }]);
           onRecipeAdded();
-        } catch { toast("Error saving — the API key may need write access. See Settings for details."); }
+        } catch (err) { toast("Error saving — " + (err.message || "check your Script URL in Settings.")); }
         setSaving(false);
       };
       return (
@@ -448,7 +454,25 @@
     }
 
     // ─── Settings Page ───
-    function SettingsPage({ apiKey, onDisconnect, onRefresh, refreshing }) {
+    function SettingsPage({ apiKey, scriptUrl, onScriptUrlSave, onDisconnect, onRefresh, refreshing }) {
+      const [urlInput, setUrlInput] = useState(scriptUrl);
+      const [saving, setSaving] = useState(false);
+      const handleSaveUrl = async () => {
+        setSaving(true);
+        try {
+          const res = await fetch(urlInput.trim(), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tab: "__ping__", values: [] }) });
+          const data = await res.json();
+          if (data.ok || data.error === "Sheet tab not found: __ping__") {
+            onScriptUrlSave(urlInput.trim());
+            alert("Script URL saved!");
+          } else {
+            alert("Script responded with an error: " + (data.error || "unknown"));
+          }
+        } catch {
+          alert("Could not reach the script URL. Make sure it is deployed and access is set to Anyone.");
+        }
+        setSaving(false);
+      };
       return (
         <div className="fade-in">
           <div style={{ background: "white", borderRadius: 16, padding: 20, border: "1px solid #F0EBE3", marginBottom: 16 }}>
@@ -464,21 +488,50 @@
             </div>
           </div>
           <div style={{ background: "white", borderRadius: 16, padding: 20, border: "1px solid #F0EBE3", marginBottom: 16 }}>
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: "#7A7568", letterSpacing: 0.5, marginBottom: 14 }}>WRITE ACCESS (APPS SCRIPT)</h3>
+            <p style={{ fontSize: 13, color: "#7A7568", marginBottom: 12, lineHeight: 1.6 }}>
+              Paste your deployed Apps Script Web App URL here to enable adding recipes from the app.
+            </p>
+            <div style={{ marginBottom: 12 }}>
+              <input
+                className="input-field"
+                placeholder="https://script.google.com/macros/s/..."
+                value={urlInput}
+                onChange={e => setUrlInput(e.target.value)}
+              />
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <button className="btn-primary" style={{ padding: "10px 20px" }} onClick={handleSaveUrl} disabled={saving || !urlInput.trim()}>
+                {saving ? "Testing..." : "Save URL"}
+              </button>
+              {scriptUrl && (
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#5B7C5A" }} />
+                  <span style={{ fontSize: 13, color: "#5B7C5A", fontWeight: 600 }}>Write access enabled</span>
+                </div>
+              )}
+            </div>
+            <details style={{ marginTop: 16 }}>
+              <summary style={{ cursor: "pointer", color: "#5B7C5A", fontWeight: 600, fontSize: 13 }}>How to set this up</summary>
+              <div style={{ marginTop: 10, padding: 14, background: "#F5EDE3", borderRadius: 12, fontSize: 13, lineHeight: 1.8, color: "#7A7568" }}>
+                <p>1. Go to <strong>script.google.com</strong> and create a new project</p>
+                <p>2. Copy the contents of <strong>Code.gs</strong> into the editor</p>
+                <p>3. Click <strong>Deploy → New deployment → Web app</strong></p>
+                <p>4. Set <strong>Execute as: Me</strong> and <strong>Who has access: Anyone</strong></p>
+                <p>5. Copy the Web App URL and paste it above</p>
+              </div>
+            </details>
+          </div>
+          <div style={{ background: "white", borderRadius: 16, padding: 20, border: "1px solid #F0EBE3", marginBottom: 16 }}>
             <h3 style={{ fontSize: 14, fontWeight: 700, color: "#7A7568", letterSpacing: 0.5, marginBottom: 14 }}>GOOGLE SHEET</h3>
             <a href={`https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`} target="_blank" rel="noopener noreferrer" className="btn-secondary" style={{ textDecoration: "none" }}>
               Open in Google Sheets {I.external}
             </a>
           </div>
-          <div style={{ background: "white", borderRadius: 16, padding: 20, border: "1px solid #F0EBE3", marginBottom: 16 }}>
+          <div style={{ background: "white", borderRadius: 16, padding: 20, border: "1px solid #F0EBE3" }}>
             <h3 style={{ fontSize: 14, fontWeight: 700, color: "#7A7568", letterSpacing: 0.5, marginBottom: 14 }}>ADD TO HOME SCREEN</h3>
             <p style={{ fontSize: 13, color: "#7A7568", lineHeight: 1.6 }}>
               To use this as an app on your iPhone: tap the <strong>Share</strong> button in Safari, then <strong>"Add to Home Screen"</strong>.
-            </p>
-          </div>
-          <div style={{ background: "white", borderRadius: 16, padding: 20, border: "1px solid #F0EBE3" }}>
-            <h3 style={{ fontSize: 14, fontWeight: 700, color: "#7A7568", letterSpacing: 0.5, marginBottom: 14 }}>WRITE ACCESS NOTE</h3>
-            <p style={{ fontSize: 13, color: "#7A7568", lineHeight: 1.6 }}>
-              To add recipes from the app, your API key needs write access. Standard API keys are read-only. For write access, you'll need to use a <strong>Service Account</strong> or <strong>OAuth</strong>. Alternatively, you can add recipes directly in Google Sheets and use this app for browsing and shopping.
             </p>
           </div>
         </div>
@@ -488,6 +541,7 @@
     // ─── Main App ───
     function MealPrepApp() {
       const [apiKey, setApiKeyState] = useState(getApiKey());
+      const [scriptUrl, setScriptUrlState] = useState(getScriptUrl());
       const [tab, setTab] = useState("recipes");
       const [recipes, setRecipes] = useState([]);
       const [ingredients, setIngredients] = useState([]);
@@ -517,7 +571,8 @@
         setShoppingList(prev => [...prev, ...recipeIngs.map(i => ({ recipeId: recipe.id, recipeName: recipe.name, ingredient: i.ingredient, total: i.quantity, unit: i.unit, aisle: "" }))]);
         toast(`Added ${recipe.name} to shopping list`);
       };
-      const handleDisconnect = () => { setApiKeyStore(""); setApiKeyState(""); setRecipes([]); setIngredients([]); setShoppingList([]); };
+      const handleDisconnect = () => { setApiKeyStore(""); setScriptUrlStore(""); setApiKeyState(""); setScriptUrlState(""); setRecipes([]); setIngredients([]); setShoppingList([]); };
+      const handleScriptUrlSave = url => { setScriptUrlStore(url); setScriptUrlState(url); };
 
       if (!apiKey) return <SetupScreen onSave={k => setApiKeyState(k)} />;
 
@@ -551,8 +606,8 @@
                 {tab === "recipes" && <RecipesPage recipes={recipes} ingredients={ingredients} onAddToList={handleAddToList} toast={toast} />}
                 {tab === "shopping" && <ShoppingListPage shoppingList={shoppingList} setShoppingList={setShoppingList} toast={toast} />}
                 {tab === "match" && <IngredientsMatchPage recipes={recipes} ingredients={ingredients} />}
-                {tab === "add" && <AddRecipePage apiKey={apiKey} onRecipeAdded={handleRefresh} toast={toast} recipes={recipes} />}
-                {tab === "settings" && <SettingsPage apiKey={apiKey} onDisconnect={handleDisconnect} onRefresh={handleRefresh} refreshing={refreshing} />}
+                {tab === "add" && <AddRecipePage scriptUrl={scriptUrl} onRecipeAdded={handleRefresh} toast={toast} recipes={recipes} />}
+                {tab === "settings" && <SettingsPage apiKey={apiKey} scriptUrl={scriptUrl} onScriptUrlSave={handleScriptUrlSave} onDisconnect={handleDisconnect} onRefresh={handleRefresh} refreshing={refreshing} />}
               </>
             )}
           </div>
