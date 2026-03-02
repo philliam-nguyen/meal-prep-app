@@ -122,7 +122,7 @@
 
     async function appendToSheet(tab, values, scriptUrl) {
       if (!scriptUrl) throw new Error("No script URL configured");
-      const res = await fetch(scriptUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tab, values }) });
+      const res = await fetch(scriptUrl, { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ tab, values }) });
       if (!res.ok) throw new Error(`Failed: ${res.status}`);
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Script error");
@@ -460,7 +460,7 @@
       const handleSaveUrl = async () => {
         setSaving(true);
         try {
-          const res = await fetch(urlInput.trim(), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tab: "__ping__", values: [] }) });
+          const res = await fetch(urlInput.trim(), { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ tab: "__ping__", values: [] }) });
           const data = await res.json();
           if (data.ok || data.error === "Sheet tab not found: __ping__") {
             onScriptUrlSave(urlInput.trim());
