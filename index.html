@@ -334,6 +334,7 @@
     // ─── Shopping List Page ───
     function ShoppingListPage({ shoppingList, setShoppingList, scriptUrl, toast }) {
       const toggleItem = async (item, idx) => {
+        if (item.rowIndex === -1) { toast("Sync with sheet first — tap the refresh button"); return; }
         const newGotIt = !item.gotIt;
         setShoppingList(prev => prev.map((it, i) => i === idx ? { ...it, gotIt: newGotIt } : it));
         try { await updateCell("Shopping_List", `A${item.rowIndex}`, newGotIt, scriptUrl); }
@@ -645,11 +646,6 @@
       }, [apiKey]); // eslint-disable-line react-hooks/exhaustive-deps
       useEffect(() => {
         if (!apiKey) return;
-        const id = setInterval(() => loadData(apiKey, true), 30000);
-        return () => clearInterval(id);
-      }, [apiKey]); // eslint-disable-line react-hooks/exhaustive-deps
-      useEffect(() => {
-        if (!apiKey) return;
         if (tab === "shopping") loadShoppingData();
         else if (tab === "match") loadMatchData();
       }, [tab, loadShoppingData, loadMatchData]);
@@ -663,7 +659,6 @@
         try {
           await updateCell("Recipes", `E${recipe.rowIndex}`, newVal, scriptUrl);
           toast(newVal ? `Added ${recipe.name} to shopping list` : `Removed ${recipe.name} from shopping list`);
-          setTimeout(() => loadShoppingData(), 3000);
         } catch {
           toast("Failed to save — check your Script URL in Settings.");
           setRecipes(prev => prev.map(r => r.id === recipe.id ? { ...r, inShoppingList: !newVal } : r));
