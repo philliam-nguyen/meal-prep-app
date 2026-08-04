@@ -1,0 +1,149 @@
+/* Self-hosted so a cold start touches nothing off-origin. Every subset Google Fonts served is
+   vendored, in Google's declaration order, with its unicode-range copied verbatim: overlapping
+   ranges resolve to the same file they did before, and a Recipe named "Phở Bò" still gets a real
+   glyph. unicode-range means the browser only downloads the subsets a page actually uses.
+   Nunito is variable, so one file covers 400-700 rather than four files. */
+
+@font-face {
+  font-family: 'DM Serif Display';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/dm-serif-display-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'DM Serif Display';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/dm-serif-display-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('./fonts/nunito-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('./fonts/nunito-cyrillic.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('./fonts/nunito-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('./fonts/nunito-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('./fonts/nunito-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Nunito', sans-serif; background: #FAF6F1; color: #2C2C2C; -webkit-font-smoothing: antialiased; }
+#root { min-height: 100vh; }
+
+.fade-in { animation: fadeIn 0.35s ease-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.slide-up { animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes slideUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+.stagger-1 { animation-delay: 0.05s; animation-fill-mode: both; }
+.stagger-2 { animation-delay: 0.1s; animation-fill-mode: both; }
+.stagger-3 { animation-delay: 0.15s; animation-fill-mode: both; }
+.stagger-4 { animation-delay: 0.2s; animation-fill-mode: both; }
+
+input:focus, textarea:focus, select:focus { outline: 2px solid #5B7C5A; outline-offset: -1px; }
+
+.checkbox-btn { width: 26px; height: 26px; border-radius: 8px; border: 2px solid #E5DED3; background: white; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; }
+.checkbox-btn.checked { background: #5B7C5A; border-color: #5B7C5A; color: white; }
+.checkbox-btn:hover { border-color: #5B7C5A; }
+
+.recipe-card { background: white; border-radius: 16px; padding: 18px 20px; border: 1px solid #F0EBE3; cursor: pointer; transition: all 0.2s; }
+.recipe-card:hover { border-color: #5B7C5A; box-shadow: 0 4px 20px rgba(91,124,90,0.08); transform: translateY(-1px); }
+.recipe-card:active { transform: translateY(0); }
+
+.btn-primary { background: #5B7C5A; color: white; border: none; border-radius: 12px; padding: 12px 24px; font-family: 'Nunito', sans-serif; font-weight: 600; font-size: 15px; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; }
+.btn-primary:hover { background: #3D5A3C; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-secondary { background: #F5EDE3; color: #2C2C2C; border: 1px solid #E5DED3; border-radius: 12px; padding: 10px 20px; font-family: 'Nunito', sans-serif; font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; }
+.btn-secondary:hover { background: #EDE5D8; }
+
+.input-field { width: 100%; padding: 12px 16px; border: 1.5px solid #E5DED3; border-radius: 12px; font-family: 'Nunito', sans-serif; font-size: 15px; background: white; color: #2C2C2C; transition: border-color 0.2s; }
+.input-field::placeholder { color: #A39E93; }
+
+.select-field { width: 100%; padding: 12px 16px; border: 1.5px solid #E5DED3; border-radius: 12px; font-family: 'Nunito', sans-serif; font-size: 15px; background: white; color: #2C2C2C; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237A7568' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; }
+
+.tab-pill { padding: 8px 18px; border-radius: 100px; font-weight: 600; font-size: 13px; border: none; cursor: pointer; transition: all 0.2s; font-family: 'Nunito', sans-serif; white-space: nowrap; }
+.tab-pill.active { background: #5B7C5A; color: white; }
+.tab-pill:not(.active) { background: transparent; color: #7A7568; }
+.tab-pill:not(.active):hover { background: #EDE5D8; }
+
+.badge { display: inline-flex; padding: 4px 12px; border-radius: 100px; font-size: 12px; font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase; }
+
+.shopping-item { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid #F0EBE3; }
+.shopping-item:last-child { border-bottom: none; }
+.shopping-item.got-it { opacity: 0.5; }
+.shopping-item.got-it .item-name { text-decoration: line-through; }
+
+.nav-bar { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,0.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 1px solid #F0EBE3; padding: 6px 0 env(safe-area-inset-bottom, 8px); z-index: 100; display: flex; justify-content: space-around; }
+.nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 12px; border-radius: 12px; cursor: pointer; transition: all 0.2s; border: none; background: none; color: #A39E93; font-size: 11px; font-weight: 600; font-family: 'Nunito', sans-serif; }
+.nav-item.active { color: #5B7C5A; }
+
+.empty-state { text-align: center; padding: 48px 24px; }
+.empty-state p { color: #7A7568; font-size: 15px; margin-top: 12px; line-height: 1.5; }
+
+.ingredient-row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+.ingredient-row input { flex: 1; }
+.ingredient-row .qty-input { width: 70px; flex: none; }
+.ingredient-row .unit-input { width: 90px; flex: none; }
+
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200; display: flex; align-items: flex-end; justify-content: center; }
+.modal-content { background: #FAF6F1; border-radius: 24px 24px 0 0; width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto; padding: 24px; }
+.modal-handle { width: 40px; height: 4px; background: #E5DED3; border-radius: 4px; margin: 0 auto 20px; }
+
+@media (min-width: 768px) {
+  .modal-content { border-radius: 24px; margin-bottom: 40px; max-height: 80vh; }
+  .nav-bar { position: fixed; top: 0; bottom: auto; border-top: none; border-bottom: 1px solid #F0EBE3; padding: 0; }
+  .nav-item { flex-direction: row; gap: 8px; padding: 14px 20px; font-size: 14px; }
+  .page-content { padding-top: 60px !important; }
+}
+
+.loading-spinner { width: 32px; height: 32px; border: 3px solid #F0EBE3; border-top-color: #5B7C5A; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.match-card { background: white; border-radius: 16px; padding: 18px 20px; border: 1px solid #F0EBE3; margin-bottom: 12px; }
+.match-bar { height: 6px; border-radius: 3px; background: #EDE5D8; overflow: hidden; margin-top: 8px; }
+.match-bar-fill { height: 100%; border-radius: 3px; background: #5B7C5A; transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+
+.toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: #3D5A3C; color: white; padding: 12px 24px; border-radius: 12px; font-weight: 600; font-size: 14px; z-index: 300; animation: toastIn 0.3s ease-out, toastOut 0.3s ease-in 2.2s forwards; box-shadow: 0 8px 30px rgba(0,0,0,0.15); }
+@keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(-16px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+@keyframes toastOut { from { opacity: 1; } to { opacity: 0; } }

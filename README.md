@@ -9,9 +9,33 @@ A mobile-friendly web app for meal prepping, powered by Google Sheets.
 - "What Can I Make?" — match recipes to ingredients you have on hand
 - Add new recipes with ingredients directly from the app
 
+## Development
+
+Requires Node 20 or newer.
+
+```
+npm install
+npm run dev      # dev server with hot reload
+npm run build    # static bundle into packages/web/dist
+npm run preview  # serve the built bundle
+```
+
+`packages/web/dist` is build output and is not committed, so build it after cloning.
+
+The repository is an npm workspace:
+
+| Package | Contents |
+| --- | --- |
+| `packages/web` | the frontend: React, compiled ahead of time, no CDN at runtime |
+| `packages/shared` | domain constants and validation the frontend and the API both import |
+
 ## Setup
 
 ### 1. Enable GitHub Pages
+GitHub Pages serves the pre-migration app from **main**, which still keeps the whole app in a
+single root `index.html`. This branch has no root `index.html`; the bundle comes out of
+`packages/web/dist` instead. Pages hosting goes away when the app moves to Postgres.
+
 1. Go to your repo **Settings → Pages**
 2. Under "Source", select **Deploy from a branch**
 3. Select **main** branch and **/ (root)** folder

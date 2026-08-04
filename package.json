@@ -1,0 +1,14 @@
+{
+  "name": "meal-prep-app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @meal-prep/web",
+    "build": "npm run build --workspace @meal-prep/web",
+    "preview": "npm run preview --workspace @meal-prep/web"
+  }
+}
