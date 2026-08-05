@@ -1,0 +1,14 @@
+node_modules
+**/node_modules
+**/dist
+.git
+.gitignore
+.github
+.env
+.scratch
+.claude
+docs
+*.md
+skills-lock.json
+Dockerfile
+compose.yaml

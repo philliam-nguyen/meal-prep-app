@@ -1,0 +1,21 @@
+{
+  "name": "@meal-prep/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "migrate": "node src/migrate.js",
+    "test": "node --test-global-setup=./test/global-setup.js --test-concurrency=1 --test \"test/**/*.test.js\""
+  },
+  "dependencies": {
+    "@fastify/static": "^10.1.2",
+    "@meal-prep/shared": "*",
+    "fastify": "^5.2.0",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@testcontainers/postgresql": "^12.1.0"
+  }
+}

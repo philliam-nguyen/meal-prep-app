@@ -11,7 +11,8 @@ A mobile-friendly web app for meal prepping, powered by Google Sheets.
 
 ## Development
 
-Requires Node 20 or newer.
+Requires Node 24 or newer, because the test command uses the test runner's global-setup hook.
+Running the tests also needs a Docker daemon.
 
 ```
 npm install
@@ -27,7 +28,37 @@ The repository is an npm workspace:
 | Package | Contents |
 | --- | --- |
 | `packages/web` | the frontend: React, compiled ahead of time, no CDN at runtime |
+| `packages/api` | the API: Fastify, Postgres, and the migrations |
 | `packages/shared` | domain constants and validation the frontend and the API both import |
+
+## Local stack
+
+Postgres and the API, with the API serving the frontend bundle from its own origin so the frontend
+calls relative paths and needs no configuration of its own.
+
+```
+cp .env.example .env   # then fill in the two passwords
+docker compose up --build
+```
+
+That brings up three services: Postgres, a migration step that runs to completion, and the API on
+`http://localhost:8080`. Health is at `/api/health`. `.env` holds the only passwords and connection
+strings in the project and is gitignored.
+
+Migrations run as an owner role. The API connects as a restricted role with no ownership and no DDL
+rights, created by the migration step, so a permission problem surfaces locally rather than at
+deployment.
+
+## Tests
+
+```
+npm test
+```
+
+Every test is an HTTP request against the API backed by a real Postgres — one throwaway container
+per run, provisioned and torn down by the suite, no mocks. See
+`docs/adr/0005-http-tests-against-real-postgres.md`. The suite needs a running Docker daemon and
+fails rather than degrades without one.
 
 ## Setup
 

@@ -3,12 +3,18 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
     "dev": "npm run dev --workspace @meal-prep/web",
     "build": "npm run build --workspace @meal-prep/web",
-    "preview": "npm run preview --workspace @meal-prep/web"
+    "preview": "npm run preview --workspace @meal-prep/web",
+    "start": "npm start --workspace @meal-prep/api",
+    "migrate": "npm run migrate --workspace @meal-prep/api",
+    "test": "npm test --workspace @meal-prep/api"
   }
 }

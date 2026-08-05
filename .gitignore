@@ -9,3 +9,15 @@ Thumbs.db
 # Editor
 .vscode/
 *.swp
+
+# Local configuration: passwords and connection strings live here and nowhere else
+.env
+
+# Local issue tracker
+.scratch/
+
+docs/drafts/*
+docs/agents/
+.claude/
+skills-lock.json
+CLAUDE.md
