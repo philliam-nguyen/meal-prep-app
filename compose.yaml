@@ -7,13 +7,6 @@
 
 name: meal-prep
 
-x-app-image: &app-image
-  build:
-    context: .
-    secrets:
-      - npm_ca
-  image: meal-prep-app:local
-
 services:
   db:
     image: postgres:17-alpine
@@ -31,9 +24,11 @@ services:
     restart: unless-stopped
 
   # Runs to completion as the owner role, then the API starts. The only container that holds owner
-  # credentials or has any DDL rights.
+  # credentials or has any DDL rights. Runs the api service's image with a different command, so the
+  # image is built once and there is no second artifact to keep in step.
   migrate:
-    <<: *app-image
+    image: meal-prep-app:local
+    pull_policy: never
     command: ['node', 'packages/api/src/migrate.js']
     environment:
       MIGRATION_DATABASE_URL: postgres://${POSTGRES_OWNER_ROLE:-meal_prep_owner}:${POSTGRES_OWNER_PASSWORD}@db:5432/${POSTGRES_DB:-meal_prep}
@@ -44,8 +39,11 @@ services:
         condition: service_healthy
     restart: 'no'
 
+  # The only service that builds. Compose builds before it creates any container, so the migrate
+  # service finds this image even though it starts first.
   api:
-    <<: *app-image
+    build: .
+    image: meal-prep-app:local
     environment:
       DATABASE_URL: postgres://${APP_DB_ROLE:-meal_prep_app}:${APP_DB_PASSWORD}@db:5432/${POSTGRES_DB:-meal_prep}
       PORT: 8080
@@ -73,9 +71,3 @@ services:
 
 volumes:
   database:
-
-# Empty unless NPM_CA_FILE points somewhere, and only ever read during an image build. See the
-# Dockerfile for why it exists.
-secrets:
-  npm_ca:
-    file: ${NPM_CA_FILE:-./.docker/no-extra-ca.pem}
