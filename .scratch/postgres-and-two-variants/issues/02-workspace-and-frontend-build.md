@@ -1,5 +1,7 @@
 # 02 - Workspace layout and a real frontend build
 
+Status: done
+
 **What to build:** The app loads from a bundle built in this repository. A cook opening it on a
 phone gets first paint without waiting on roughly three megabytes of React and babel-standalone from
 a public CDN and an in-browser compile of the whole app.

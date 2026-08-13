@@ -2,7 +2,9 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import fastifyStatic from '@fastify/static';
 import Fastify from 'fastify';
+import { ajvOptions } from '@meal-prep/shared';
 import { defaultWebDist } from './config.js';
+import { registerRecipeRoutes } from './recipes.js';
 import { readState, stateResponse } from './state.js';
 
 // The frontend is served from the API's own origin in both Variants, which is what lets it call
@@ -23,7 +25,9 @@ const healthResponse = {
 export const bundleExists = (staticRoot) => existsSync(join(staticRoot, 'index.html'));
 
 export function buildApp({ pool, staticRoot = defaultWebDist, logger = true }) {
-  const app = Fastify({ logger });
+  // The Add form compiles the same schema with the same options, so neither side is the stricter
+  // of the two.
+  const app = Fastify({ logger, ajv: { customOptions: ajvOptions } });
   app.decorate('db', pool);
 
   app.get(
@@ -45,6 +49,8 @@ export function buildApp({ pool, staticRoot = defaultWebDist, logger = true }) {
   app.get('/api/state', { schema: { response: { 200: stateResponse } } }, async () =>
     readState(pool),
   );
+
+  registerRecipeRoutes(app);
 
   if (bundleExists(staticRoot)) {
     app.register(fastifyStatic, { root: staticRoot });

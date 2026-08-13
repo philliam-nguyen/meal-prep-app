@@ -97,7 +97,9 @@ export function MealPrepApp() {
             {tab === 'recipes' && <RecipesPage recipes={recipes} />}
             {tab === 'shopping' && <ShoppingListPage />}
             {tab === 'pantry' && <PantryPage />}
-            {tab === 'add' && <AddRecipePage />}
+            {tab === 'add' && (
+              <AddRecipePage onRecipeAdded={() => loadData(true)} toast={toast} />
+            )}
             {tab === 'settings' && <SettingsPage onRefresh={handleRefresh} refreshing={refreshing} />}
           </>
         )}

@@ -73,6 +73,13 @@ insert rows through `test/helpers/rows.js` instead. Assertions still read HTTP r
 nothing about the seam changes. The exception closes when the matching write endpoint exists, and
 the helper is deleted rather than kept for convenience.
 
+`POST /api/recipes` closed most of it. `test/helpers/rows.js` is gone, and Recipes are arranged by
+creating them through the API, so no test can now set up a Recipe the application would have
+refused. What survives is narrower and is `test/helpers/flags.js`: the Selected Recipe flag and the
+Protected flag are columns on a Recipe the browse payload reports and no endpoint yet sets, waiting
+on ticket 06 for the toggle and ticket 12 for the Seed. The helper updates those two columns on a
+Recipe the API created rather than inserting anything, and it goes when those tickets land.
+
 Every test reaches Postgres as the restricted role, so a missing grant surfaces on the first run
 that needs it instead of at deployment.
 

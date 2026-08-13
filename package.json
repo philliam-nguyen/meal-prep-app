@@ -15,6 +15,6 @@
     "preview": "npm run preview --workspace @meal-prep/web",
     "start": "npm start --workspace @meal-prep/api",
     "migrate": "npm run migrate --workspace @meal-prep/api",
-    "test": "npm test --workspace @meal-prep/api"
+    "test": "npm test --workspaces --if-present"
   }
 }

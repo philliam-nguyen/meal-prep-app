@@ -5,7 +5,7 @@
 // own: it exists only as part of one Recipe. Ingredient does not nest, because it has an identity
 // of its own that two Recipes share.
 
-const RECIPES_QUERY = `
+const recipesQuery = (where = '') => `
   select
     r.id,
     r.name,
@@ -34,11 +34,18 @@ const RECIPES_QUERY = `
       '[]'::json
     ) as ingredients
   from recipes r
+  ${where}
   -- By name, because this is a browse list and the cook is looking for one they half-remember.
   -- Ordering by id would sort R1000 above R999, and the extract carries whatever ids the
   -- spreadsheet held rather than a format this could rely on (ADR-0006).
   order by r.name, r.id
 `;
+
+const RECIPES_QUERY = recipesQuery();
+
+// The write path answers with this rather than assembling a reply from what it just inserted, so a
+// created Recipe and a browsed one cannot describe the same row differently.
+const RECIPE_BY_ID_QUERY = recipesQuery('where r.id = $1');
 
 const recipeIngredient = {
   type: 'object',
@@ -54,7 +61,7 @@ const recipeIngredient = {
   },
 };
 
-const recipe = {
+export const recipeSchema = {
   type: 'object',
   required: ['id', 'name', 'type', 'cardUrl', 'selected', 'protected', 'ingredients'],
   additionalProperties: false,
@@ -75,7 +82,7 @@ export const stateResponse = {
   required: ['recipes'],
   additionalProperties: false,
   properties: {
-    recipes: { type: 'array', items: recipe },
+    recipes: { type: 'array', items: recipeSchema },
   },
 };
 
@@ -87,4 +94,10 @@ export const stateResponse = {
 export async function readState(db) {
   const { rows } = await db.query(RECIPES_QUERY);
   return { recipes: rows };
+}
+
+/** One Recipe in the same shape the browse list gives it. */
+export async function readRecipe(db, id) {
+  const { rows } = await db.query(RECIPE_BY_ID_QUERY, [id]);
+  return rows[0];
 }

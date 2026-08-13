@@ -1,5 +1,7 @@
 # 03 - Walking skeleton: Postgres, Fastify, same-origin serving, test harness
 
+Status: done
+
 **What to build:** One command brings up Postgres and the API on a developer machine, and the API
 serves the built frontend bundle from its own origin. The frontend therefore calls relative paths and
 carries no per-Variant configuration at all (ADR-0002). A test command runs HTTP requests against a

@@ -65,6 +65,10 @@ precompiled bundle instead of a CDN download and an in-browser compile.
 
 ## User Stories
 
+Story numbers are stable once assigned. A story added after the first review takes the next free
+number and stays in the section it belongs to, rather than renumbering the list, because the ADRs
+cite these numbers.
+
 ### Browsing and cooking
 
 1. As a Cook, I want to browse all my Recipes, so that I can decide what to make this week.
@@ -109,6 +113,12 @@ precompiled bundle instead of a CDN download and an in-browser compile.
 31. As a Cook, I want to delete a Recipe, so that things I'll never cook again stop cluttering the list.
 32. As a Cook, I want deleting a Recipe to remove it from my Shopping List too, so that I'm not buying for a Recipe that no longer exists.
 33. As a Cook, I want two spellings of the same food treated as one Ingredient, so that Aisle and Pantry state don't fragment across near-duplicates.
+67. As a Cook, I want to add a Recipe by uploading a CSV or text file of its ingredient lines, so that I can capture a Recipe I already hold as a file without retyping it.
+68. As a Cook, I want an uploaded file to fill in the Add form for me to check and correct before I save, so that a parser's guess never reaches my Recipes unreviewed.
+
+Stories 67 and 68 describe behaviour the app offered before the migration. They were absent from
+the first draft of this list, which is a gap in the record rather than a decision, and the
+mechanics beneath them change with the write path while the interaction does not.
 
 ### Access
 
