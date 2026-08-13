@@ -29,6 +29,19 @@ const INSERT_RECIPE_INGREDIENT = `
   values ($1, $2, $3, $4)
 `;
 
+// The absolute ceiling on total Recipes (ADR-0001). Counting and then inserting is only an
+// approximate cap: two creates arriving together both read a count below the ceiling and both
+// insert. Taking a lock first is what makes it exact. The lock is released when the transaction
+// ends, and it is advisory rather than a lock on the table, so it serializes creating a Recipe
+// without standing in the way of any other write to one. Creating a Recipe is a rare, human-paced
+// write, so serializing it costs nothing worth measuring.
+//
+// The key is arbitrary. All that matters is that every session contending for the ceiling names the
+// same number, and this is the only advisory lock the application takes.
+const RECIPE_CAP_LOCK_KEY = 831_071;
+const LOCK_RECIPE_CAP = 'select pg_advisory_xact_lock($1)';
+const COUNT_RECIPES = 'select count(*)::int as total from recipes';
+
 const UNIQUE_VIOLATION = '23505';
 
 /**
@@ -57,6 +70,16 @@ function findRepeatedIngredient(ingredients) {
     seen.add(canonical);
     return false;
   });
+}
+
+/**
+ * Whether this instance is already holding every Recipe it is configured for. Call inside the
+ * transaction that inserts: the lock it takes is what makes the answer still true a moment later.
+ */
+async function atRecipeCap(client, recipesMax) {
+  await client.query(LOCK_RECIPE_CAP, [RECIPE_CAP_LOCK_KEY]);
+  const { rows } = await client.query(COUNT_RECIPES);
+  return rows[0].total >= recipesMax;
 }
 
 async function insertRecipe(client, recipe) {
@@ -90,12 +113,22 @@ export function registerRecipeRoutes(app) {
           .send({ message: `This Recipe lists ${repeated.name} as an Ingredient twice.` });
       }
 
+      const { recipesMax } = app.guardrails;
+
       let recipeId;
       const client = await app.db.connect();
       try {
         // One transaction, so a Recipe refused partway through leaves neither a half-written Recipe
         // nor an Ingredient nothing references.
         await client.query('begin');
+
+        if (await atRecipeCap(client, recipesMax)) {
+          await client.query('rollback');
+          return reply.code(409).send({
+            message: `This instance has room for ${recipesMax} Recipes and is holding all of them. Delete one to add another.`,
+          });
+        }
+
         recipeId = await insertRecipe(client, recipe);
         await client.query('commit');
       } catch (cause) {

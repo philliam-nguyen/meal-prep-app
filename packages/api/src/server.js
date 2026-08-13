@@ -12,10 +12,11 @@ if (!bundleExists(defaultWebDist)) {
 }
 
 const pool = createPool(config.databaseUrl);
-const app = buildApp({
+const app = await buildApp({
   pool,
   staticRoot: defaultWebDist,
   logger: { level: config.logLevel },
+  guardrails: config.guardrails,
 });
 
 // Compose and the Demo Variant's scheduler both stop this with a signal, so draining beats being

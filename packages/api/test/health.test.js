@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { buildApp } from '../src/app.js';
 import { createPool } from '../src/db.js';
 import { appDatabaseUrl } from './helpers/database.js';
-import { startApp } from './helpers/app.js';
+import { startApp, TEST_GUARDRAILS } from './helpers/app.js';
 
 test('the health path reports success and a reachable database', async (t) => {
   const app = await startApp(t);
@@ -17,7 +17,7 @@ test('the health path reports success and a reachable database', async (t) => {
 // Owns its pool rather than borrowing the shared helper's, because it has to break it.
 test('the health path reports failure when the database is unreachable', async (t) => {
   const pool = createPool(appDatabaseUrl());
-  const app = buildApp({ pool, logger: false });
+  const app = await buildApp({ pool, logger: false, guardrails: TEST_GUARDRAILS });
   t.after(() => app.close());
   await app.ready();
   await pool.end();

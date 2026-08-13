@@ -10,6 +10,8 @@
     "test": "node --test-global-setup=./test/global-setup.js --test-concurrency=1 --test \"test/**/*.test.js\""
   },
   "dependencies": {
+    "@fastify/cors": "^11.3.0",
+    "@fastify/rate-limit": "^11.2.0",
     "@fastify/static": "^10.1.2",
     "@meal-prep/shared": "*",
     "fastify": "^5.2.0",

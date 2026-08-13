@@ -48,6 +48,15 @@ services:
       DATABASE_URL: postgres://${APP_DB_ROLE:-meal_prep_app}:${APP_DB_PASSWORD}@db:5432/${POSTGRES_DB:-meal_prep}
       PORT: 8080
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Guardrail limits, passed through rather than defaulted here: the defaults live in
+      # packages/api/src/config.js so this file and the Demo Variant's Terraform cannot drift apart
+      # from each other or from the code. Only the allowed origin has no default to fall back to.
+      CORS_ORIGIN: ${CORS_ORIGIN:?set CORS_ORIGIN in .env to however you reach the app}
+      BODY_LIMIT_BYTES: ${BODY_LIMIT_BYTES}
+      WRITE_RATE_LIMIT: ${WRITE_RATE_LIMIT}
+      WRITE_RATE_WINDOW_MS: ${WRITE_RATE_WINDOW_MS}
+      RECIPES_MAX: ${RECIPES_MAX}
+      TRUST_PROXY: ${TRUST_PROXY}
     ports:
       - '${API_PORT:-8080}:8080'
     depends_on:

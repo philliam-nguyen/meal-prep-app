@@ -4,6 +4,7 @@ import fastifyStatic from '@fastify/static';
 import Fastify from 'fastify';
 import { ajvOptions } from '@meal-prep/shared';
 import { defaultWebDist } from './config.js';
+import { registerGuardrails } from './guardrails.js';
 import { registerRecipeRoutes } from './recipes.js';
 import { readState, stateResponse } from './state.js';
 
@@ -24,11 +25,44 @@ const healthResponse = {
 /** Whether a directory holds a built frontend. The entrypoint refuses to start without one. */
 export const bundleExists = (staticRoot) => existsSync(join(staticRoot, 'index.html'));
 
-export function buildApp({ pool, staticRoot = defaultWebDist, logger = true }) {
-  // The Add form compiles the same schema with the same options, so neither side is the stricter
-  // of the two.
-  const app = Fastify({ logger, ajv: { customOptions: ajvOptions } });
+// Checked by name rather than for the object's presence. A guardrails object missing one key hands
+// Fastify an undefined bodyLimit, which it silently replaces with its own default - a guardrail off
+// with nothing to show for it, which is the failure ADR-0001 is least able to tolerate.
+const REQUIRED_GUARDRAILS = [
+  'corsOrigin',
+  'bodyLimitBytes',
+  'writeRateLimit',
+  'writeRateWindowMs',
+  'recipesMax',
+  'trustProxy',
+];
+
+// Async because the guardrails have to finish loading before the first route is registered; see
+// registerGuardrails. Every caller awaits it.
+export async function buildApp({ pool, staticRoot = defaultWebDist, logger = true, guardrails }) {
+  const missing = REQUIRED_GUARDRAILS.filter((limit) => guardrails?.[limit] === undefined);
+  if (missing.length > 0) {
+    throw new Error(`buildApp needs every guardrail, missing: ${missing.join(', ')}`);
+  }
+
+  const app = Fastify({
+    // The Add form compiles the same schema with the same options, so neither side is the stricter
+    // of the two.
+    ajv: { customOptions: ajvOptions },
+    logger,
+    // Enforced against content-length before a parser is chosen, so an oversized body is refused
+    // rather than read.
+    bodyLimit: guardrails.bodyLimitBytes,
+    // What makes request.ip the visitor rather than the CDN in front of it, and so what makes
+    // rate limiting per-IP wherever the deployment puts a proxy in the path.
+    trustProxy: guardrails.trustProxy,
+  });
   app.decorate('db', pool);
+  // Read by the write paths that enforce a row cap, in the same way they reach the pool.
+  app.decorate('guardrails', guardrails);
+
+  // Before every route below, so a route added later is covered without opting in.
+  await registerGuardrails(app, guardrails);
 
   app.get(
     '/api/health',

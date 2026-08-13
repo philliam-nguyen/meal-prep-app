@@ -40,7 +40,7 @@ Postgres and the API, with the API serving the frontend bundle from its own orig
 calls relative paths and needs no configuration of its own.
 
 ```
-cp .env.example .env   # then fill in the two passwords
+cp .env.example .env   # fill in the two passwords and check CORS_ORIGIN
 docker compose up --build
 ```
 
@@ -51,6 +51,25 @@ strings in the project and is gitignored.
 Migrations run as an owner role. The API connects as a restricted role with no ownership and no DDL
 rights, created by the migration step, so a permission problem surfaces locally rather than at
 deployment.
+
+## Guardrails
+
+The API rate-limits writes per client address, caps the request body, answers one configured origin,
+and refuses a Recipe once the instance holds the number it is configured for. See
+`docs/adr/0001-app-level-demo-guardrails.md` for what these defend against and what was left out.
+
+None of it checks which Variant is running. The same code enforces the same guardrails everywhere,
+and a tighter public instance is a different `.env` rather than a different build. The values, their
+defaults and why each number was picked are in `.env.example` and `packages/api/src/config.js`.
+
+Two of them will bite you if you get them wrong:
+
+- `CORS_ORIGIN` has no default and must match how the browser reaches the app, port included.
+  Browsers attach an `Origin` to same-origin writes too, so a wrong value refuses the app's own
+  saves rather than only refusing other sites.
+- `TRUST_PROXY` decides whether the client address comes from `X-Forwarded-For`. Turn it on only
+  when something you control terminates in front of the API. Off behind a CDN buckets every visitor
+  together; on when nothing sets the header lets a caller claim any address.
 
 ## Tests
 

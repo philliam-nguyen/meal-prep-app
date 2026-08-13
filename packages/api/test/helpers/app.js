@@ -5,12 +5,30 @@ import { buildApp } from '../../src/app.js';
 import { createPool } from '../../src/db.js';
 import { appDatabaseUrl, truncateAllTables } from './database.js';
 
-export async function startApp(t, { staticRoot } = {}) {
+// Guardrail limits are configuration, so a test that is not about them passes values loose enough
+// to stay out of the way, and a test that is about one passes its own. Deliberately not the
+// deployed defaults: a suite that tripped a real limit by accident would be asserting on a number
+// nobody chose.
+export const TEST_GUARDRAILS = {
+  corsOrigin: 'https://meal-prep.test',
+  bodyLimitBytes: 64 * 1024,
+  writeRateLimit: 1000,
+  writeRateWindowMs: 60_000,
+  recipesMax: 1000,
+  trustProxy: false,
+};
+
+export async function startApp(t, { staticRoot, guardrails } = {}) {
   // Before, not after: a test that fails halfway through cannot leave rows for the next one.
   await truncateAllTables();
 
   const pool = createPool(appDatabaseUrl());
-  const app = buildApp({ pool, staticRoot, logger: false });
+  const app = await buildApp({
+    pool,
+    staticRoot,
+    logger: false,
+    guardrails: { ...TEST_GUARDRAILS, ...guardrails },
+  });
   await app.ready();
 
   t.after(async () => {
