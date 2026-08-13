@@ -13,11 +13,8 @@ Thumbs.db
 # Local configuration: passwords and connection strings live here and nowhere else
 .env
 
-# Local issue tracker
-.scratch/
-
+# Draft designs: ephemeral, superseded by the spec they become
 docs/drafts/*
-docs/agents/
+
+# Vendored agent skills, restorable from the committed skills-lock.json
 .claude/
-skills-lock.json
-CLAUDE.md
