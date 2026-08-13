@@ -1,8 +1,9 @@
+import { formatAmount } from '../format.js';
 import { getTypeBadge } from '../typeBadge.js';
 import { I } from '../icons.jsx';
 
-export function RecipeDetail({ recipe, ingredients, onClose, onToggleShoppingList }) {
-  const recipeIngredients = ingredients.filter(i => i.recipeId === recipe.id);
+export function RecipeDetail({ recipe, onClose }) {
+  const { ingredients } = recipe;
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content slide-up" onClick={e => e.stopPropagation()}>
@@ -19,21 +20,26 @@ export function RecipeDetail({ recipe, ingredients, onClose, onToggleShoppingLis
           )}
         </div>
         <h3 style={{ fontSize: 14, fontWeight: 700, color: '#7A7568', letterSpacing: 0.5, marginBottom: 12 }}>INGREDIENTS</h3>
-        {recipeIngredients.length === 0 ? (
+        {ingredients.length === 0 ? (
           <p style={{ color: '#7A7568', fontSize: 14 }}>No ingredients listed yet.</p>
         ) : (
           <div style={{ background: '#F5EDE3', borderRadius: 14, padding: 16, marginBottom: 20 }}>
-            {recipeIngredients.map((ing, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: i < recipeIngredients.length - 1 ? '1px solid #E5DED3' : 'none' }}>
-                <span style={{ fontWeight: 600, fontSize: 15 }}>{ing.ingredient}</span>
-                <span style={{ color: '#7A7568', fontSize: 14, fontWeight: 500 }}>{ing.quantity} {ing.unit}</span>
+            {ingredients.map((ing, i) => (
+              <div key={ing.ingredientId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: i < ingredients.length - 1 ? '1px solid #E5DED3' : 'none' }}>
+                <span style={{ fontWeight: 600, fontSize: 15 }}>{ing.name}</span>
+                <span style={{ color: '#7A7568', fontSize: 14, fontWeight: 500 }}>{formatAmount(ing)}</span>
               </div>
             ))}
           </div>
         )}
-        <button className="btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => onToggleShoppingList(recipe)}>
-          {I.cart} <span>{recipe.inShoppingList ? 'Remove from Shopping List' : 'Add to Shopping List'}</span>
+        {/* Selecting a Recipe is a write, and writes still point at the spreadsheet the database is
+            replacing. Disabled rather than live, so nothing here looks like it saved. */}
+        <button className="btn-primary" style={{ width: '100%', justifyContent: 'center' }} disabled>
+          {I.cart} <span>{recipe.selected ? 'Remove from Shopping List' : 'Add to Shopping List'}</span>
         </button>
+        <p style={{ fontSize: 12, color: '#A39E93', textAlign: 'center', marginTop: 8 }}>
+          Selecting a Recipe returns with the write path.
+        </p>
       </div>
     </div>
   );

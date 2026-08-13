@@ -67,6 +67,12 @@ client, or the drift this arrangement prevents comes back.
 Tests arrange state through the API rather than by inserting rows, which the spec asks for anyway,
 and truncation makes it compulsory: no test can lean on data another test left behind.
 
+One bounded exception, added when the browse endpoint landed ahead of any write endpoint: tests for
+a read path that ships before the write path that fills it have no API to arrange through, so they
+insert rows through `test/helpers/rows.js` instead. Assertions still read HTTP responses only, so
+nothing about the seam changes. The exception closes when the matching write endpoint exists, and
+the helper is deleted rather than kept for convenience.
+
 Every test reaches Postgres as the restricted role, so a missing grant surfaces on the first run
 that needs it instead of at deployment.
 

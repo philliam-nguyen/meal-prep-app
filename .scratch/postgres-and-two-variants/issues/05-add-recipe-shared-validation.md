@@ -23,6 +23,11 @@ validation, and rendered into an anchor's `href`, which React's text escaping do
 upload of ingredient lines. No user story in the spec covers it. Either keep it working through the
 same validation module or drop it, and record which in this file.
 
+Ticket 04 deleted `packages/web/src/recipeFiles.js` along with the form that called it, because the
+Add page became a placeholder and the parser had no caller left. That was housekeeping, not an
+answer: this question is still open, and keeping the upload means restoring the file from git rather
+than writing a parser again.
+
 **Blocked by:** 04 (browse Recipes from Postgres).
 
 - [ ] A Recipe with its Recipe Ingredients is created from the app and appears in the browse list

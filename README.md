@@ -1,6 +1,6 @@
 # Meal Prep App
 
-A mobile-friendly web app for meal prepping, powered by Google Sheets.
+A mobile-friendly web app for meal prepping, backed by Postgres behind a small API.
 
 ## Features
 - Browse and search recipes by type
@@ -22,6 +22,9 @@ npm run preview  # serve the built bundle
 ```
 
 `packages/web/dist` is build output and is not committed, so build it after cloning.
+
+`npm run dev` proxies `/api` to `http://localhost:8080`, so bring the local stack up alongside it or
+the app loads with no recipes. Nothing else in the frontend knows an origin.
 
 The repository is an npm workspace:
 
@@ -60,7 +63,11 @@ per run, provisioned and torn down by the suite, no mocks. See
 `docs/adr/0005-http-tests-against-real-postgres.md`. The suite needs a running Docker daemon and
 fails rather than degrades without one.
 
-## Setup
+## Setup for the pre-migration app
+
+Everything below describes the app still running from **main**, which reads Google Sheets and is
+what the phones use until cutover. This branch's app reads Postgres, calls its own origin, and asks
+for no key at all. These steps go when Pages hosting does.
 
 ### 1. Enable GitHub Pages
 GitHub Pages serves the pre-migration app from **main**, which still keeps the whole app in a
@@ -84,5 +91,8 @@ single root `index.html`. This branch has no root `index.html`; the bundle comes
 2. Tap the **Share** button → **"Add to Home Screen"**
 3. It launches full-screen like a native app
 
-## Sharing
-Send the URL to anyone — they enter the same API key and both see the same Google Sheet data.
+### 4. Sharing
+Send the URL to anyone. They enter the same API key and both see the same Google Sheet data. That
+sharing model is what makes the spreadsheet readable by anyone holding the link, which
+`docs/adr/0004-accept-spreadsheet-exposure-until-cutover.md` accepts until cutover retires it. This
+branch's app shares nothing and asks for no key: reaching it means being on the Tailscale network.

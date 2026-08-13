@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import fastifyStatic from '@fastify/static';
 import Fastify from 'fastify';
 import { defaultWebDist } from './config.js';
+import { readState, stateResponse } from './state.js';
 
 // The frontend is served from the API's own origin in both Variants, which is what lets it call
 // relative paths and carry no per-Variant configuration (ADR-0002). API routes sit under /api so
@@ -37,6 +38,12 @@ export function buildApp({ pool, staticRoot = defaultWebDist, logger = true }) {
       }
       return { status: 'ok', database: 'up' };
     },
+  );
+
+  // One request for the whole first paint, replacing the four parallel spreadsheet calls the
+  // Sheets-era client opened on load.
+  app.get('/api/state', { schema: { response: { 200: stateResponse } } }, async () =>
+    readState(pool),
   );
 
   if (bundleExists(staticRoot)) {
