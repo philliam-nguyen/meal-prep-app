@@ -4,15 +4,15 @@
 // whole collection arrives in this one response and the client narrows it, which is what makes a
 // keystroke in the search box cost nothing.
 //
-// State is arranged through POST /api/recipes. Only the Selected Recipe and Protected flags are set
-// directly, because no endpoint owns either until tickets 06 and 12.
+// State is arranged through the API. Only the Protected flag is still set directly, because nothing
+// owns it until the Seed lands in ticket 12.
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { startApp } from './helpers/app.js';
 import { connect } from './helpers/database.js';
 import { markRecipe } from './helpers/flags.js';
-import { createRecipe, readRecipes } from './helpers/recipes.js';
+import { createRecipe, readRecipes, setSelected } from './helpers/recipes.js';
 
 describe('browsing Recipes', () => {
   it('returns an empty collection when nothing has been added', async (t) => {
@@ -47,10 +47,9 @@ describe('browsing Recipes', () => {
 
   it('reports whether a Recipe is a Selected Recipe', async (t) => {
     const app = await startApp(t);
-    const client = await connect(t);
     const chosen = await createRecipe(app, { name: 'Chosen', type: 'Dinner' });
     await createRecipe(app, { name: 'Not chosen', type: 'Dinner' });
-    await markRecipe(client, chosen.id, { selected: true });
+    await setSelected(app, chosen.id, true);
 
     const selectedByName = Object.fromEntries(
       (await readRecipes(app)).map((recipe) => [recipe.name, recipe.selected]),
@@ -141,14 +140,13 @@ describe('browsing Recipes', () => {
 
   it('answers the whole first paint from a single request', async (t) => {
     const app = await startApp(t);
-    const client = await connect(t);
     const created = await createRecipe(app, {
       name: 'Leek and Potato Soup',
       type: 'Soup',
       cardUrl: 'https://example.com/leek-and-potato',
       ingredients: [{ name: 'Leek', quantity: 3, unit: '' }],
     });
-    await markRecipe(client, created.id, { selected: true });
+    await setSelected(app, created.id, true);
 
     const response = await app.inject({ method: 'GET', url: '/api/state' });
 

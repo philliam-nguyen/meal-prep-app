@@ -1,11 +1,16 @@
-// Writing a Recipe. The rules live in the shared schema module, which Fastify enforces here and the
-// Add form compiles in the browser, so there is no server copy to drift from a client copy
-// (ADR-0005). What is left in this file is the part JSON Schema cannot state: that two Recipe
-// Ingredients in one request must not name the same food.
+// Writing a Recipe, and marking one as a Selected Recipe. The rules for the Recipe a cook types live
+// in the shared schema module, which Fastify enforces here and the Add form compiles in the browser,
+// so there is no server copy to drift from a client copy (ADR-0005). What is left in this file is
+// the part JSON Schema cannot state: that two Recipe Ingredients in one request must not name the
+// same food.
+//
+// The Selected Recipe route validates against a schema declared here instead, because no form
+// compiles it: a checkbox has nothing to validate before it sends, so shared would gain a rule with
+// one importer.
 //
 // Every statement is parameterized. Nothing on this path builds SQL from a string.
 
-import { createRecipeBody } from '@meal-prep/shared';
+import { RECIPE_ID_MAX, createRecipeBody } from '@meal-prep/shared';
 import { readRecipe, recipeSchema } from './state.js';
 
 const INSERT_RECIPE = `
@@ -29,6 +34,12 @@ const INSERT_RECIPE_INGREDIENT = `
   values ($1, $2, $3, $4)
 `;
 
+// No "returning", because the row count already answers the only question the handler asks: whether
+// a Recipe by that id was there to update.
+const SET_SELECTED = `
+  update recipes set selected = $2 where id = $1
+`;
+
 // The absolute ceiling on total Recipes (ADR-0001). Counting and then inserting is only an
 // approximate cap: two creates arriving together both read a count below the ceiling and both
 // insert. Taking a lock first is what makes it exact. The lock is released when the transaction
@@ -43,6 +54,23 @@ const LOCK_RECIPE_CAP = 'select pg_advisory_xact_lock($1)';
 const COUNT_RECIPES = 'select count(*)::int as total from recipes';
 
 const UNIQUE_VIOLATION = '23505';
+
+// Setting the flag rather than flipping it. Both phones on one instance can send a toggle, and a
+// flip would land in whatever order they arrived; a set is idempotent, so last-write-wins is
+// correct here rather than a compromise, and a retry after a dropped response cannot undo itself.
+const selectedBody = {
+  type: 'object',
+  required: ['selected'],
+  additionalProperties: false,
+  properties: { selected: { type: 'boolean' } },
+};
+
+const recipeIdParams = {
+  type: 'object',
+  required: ['id'],
+  additionalProperties: false,
+  properties: { id: { type: 'string', minLength: 1, maxLength: RECIPE_ID_MAX } },
+};
 
 /**
  * Trims what the cook typed or a parsed file produced, so a stored name never carries the
@@ -148,6 +176,26 @@ export function registerRecipeRoutes(app) {
       // Outside the transaction on purpose. Reading back is not part of the write, and a failure
       // here must not roll back a Recipe that is already committed.
       return reply.code(201).send(await readRecipe(app.db, recipeId));
+    },
+  );
+
+  // No body comes back. The caller already knows what it set, and the Shopping List this changes is
+  // derived rather than stored, so the only honest way to read it is the state request the client
+  // makes next. Returning a stale-by-construction rollup from a write would be worse than silence.
+  app.put(
+    '/api/recipes/:id/selected',
+    { schema: { params: recipeIdParams, body: selectedBody } },
+    async (request, reply) => {
+      const { rowCount } = await app.db.query(SET_SELECTED, [
+        request.params.id,
+        request.body.selected,
+      ]);
+
+      if (rowCount === 0) {
+        return reply.code(404).send({ message: `There is no Recipe ${request.params.id}.` });
+      }
+
+      return reply.code(204).send();
     },
   );
 }

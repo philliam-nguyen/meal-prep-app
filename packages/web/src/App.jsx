@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { fetchState } from './api.js';
+import { fetchState, setIngredientPantry, setIngredientStaple, setRecipeSelected } from './api.js';
 import { loadCache, saveCache } from './cache.js';
 import { formatSince } from './format.js';
 import { I } from './icons.jsx';
@@ -33,6 +33,10 @@ const PAGE_TITLES = {
 export function MealPrepApp() {
   const [tab, setTab] = useState('recipes');
   const [recipes, setRecipes] = useState([]);
+  const [shoppingList, setShoppingList] = useState([]);
+  const [pantryChecklist, setPantryChecklist] = useState([]);
+  const [staples, setStaples] = useState([]);
+  const [bestMatches, setBestMatches] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [bgSyncing, setBgSyncing] = useState(false);
@@ -44,10 +48,14 @@ export function MealPrepApp() {
   const loadData = useCallback(async (silent = false) => {
     if (silent) setBgSyncing(true); else setLoading(true);
     try {
-      const { recipes: loaded } = await fetchState();
-      setRecipes(loaded);
+      const state = await fetchState();
+      setRecipes(state.recipes);
+      setShoppingList(state.shoppingList);
+      setPantryChecklist(state.pantryChecklist);
+      setStaples(state.staples);
+      setBestMatches(state.bestMatches);
       setLastSynced(Date.now());
-      saveCache({ recipes: loaded });
+      saveCache(state);
     } catch {
       if (!silent) toast('Could not load your recipes. Check your connection.');
     }
@@ -58,6 +66,12 @@ export function MealPrepApp() {
     const cache = loadCache();
     if (cache?.savedAt) {
       if (cache.recipes) setRecipes(cache.recipes);
+      // A cache written before the Shopping List moved into the payload has no list in it. The
+      // silent reload below is what fills it, so an old cache costs a paint rather than an error.
+      if (cache.shoppingList) setShoppingList(cache.shoppingList);
+      if (cache.pantryChecklist) setPantryChecklist(cache.pantryChecklist);
+      if (cache.staples) setStaples(cache.staples);
+      if (cache.bestMatches) setBestMatches(cache.bestMatches);
       setLastSynced(cache.savedAt);
       loadData(true);
     } else {
@@ -71,6 +85,59 @@ export function MealPrepApp() {
     setRefreshing(false);
     toast('Data refreshed!');
   };
+
+  // The toggle lands on screen before the write does, because a cook changing their mind about four
+  // Recipes should not wait four times. A write that fails puts the Recipe back the way it was and
+  // says so, so nothing stays ticked that never saved.
+  const handleToggleSelected = useCallback(async recipe => {
+    const selected = !recipe.selected;
+    const show = value => setRecipes(prev => prev.map(r => (r.id === recipe.id ? { ...r, selected: value } : r)));
+
+    show(selected);
+    try {
+      await setRecipeSelected(recipe.id, selected);
+    } catch {
+      show(!selected);
+      toast(`Could not ${selected ? 'add' : 'remove'} ${recipe.name}. Nothing was saved.`);
+      return;
+    }
+    toast(selected ? `Added ${recipe.name} to your shopping list` : `Removed ${recipe.name} from your shopping list`);
+    // The Shopping List is a query now, not a calculation this app can redo, so what changed comes
+    // back from the server rather than from here.
+    loadData(true);
+  }, [loadData, toast]);
+
+  // Same shape as the toggle above, and no toast on success: a cook works down the checklist a dozen
+  // items at a time, and a dozen confirmations would be noise. Best Matches reranks from the server
+  // afterwards, because keeping a copy of the match rule here is the drift this migration removed.
+  const handleTogglePantry = useCallback(async ingredient => {
+    const inPantry = !ingredient.inPantry;
+    const show = value => setPantryChecklist(prev => prev.map(i => (i.id === ingredient.id ? { ...i, inPantry: value } : i)));
+
+    show(inPantry);
+    try {
+      await setIngredientPantry(ingredient.id, inPantry);
+    } catch {
+      show(!inPantry);
+      toast(`Could not update ${ingredient.name}. Nothing was saved.`);
+      return;
+    }
+    loadData(true);
+  }, [loadData, toast]);
+
+  // This one waits for its write, unlike the two above. It moves an Ingredient between two lists
+  // rather than flipping a field, and a cook does it when they notice one rather than twelve times
+  // down an aisle, so it lets the reload place the row.
+  const handleSetStaple = useCallback(async (ingredient, staple) => {
+    try {
+      await setIngredientStaple(ingredient.id, staple);
+    } catch {
+      toast(`Could not update ${ingredient.name}. Nothing was saved.`);
+      return;
+    }
+    toast(staple ? `${ingredient.name} is a staple now` : `${ingredient.name} is back on your pantry list`);
+    loadData(true);
+  }, [loadData, toast]);
 
   return (
     <div style={{ minHeight: '100vh', background: '#FAF6F1' }}>
@@ -94,9 +161,19 @@ export function MealPrepApp() {
           <div style={{ padding: '60px 0', textAlign: 'center' }}><div className="loading-spinner" /><p style={{ color: '#7A7568', marginTop: 16, fontSize: 14 }}>Loading your meal prep data...</p></div>
         ) : (
           <>
-            {tab === 'recipes' && <RecipesPage recipes={recipes} />}
-            {tab === 'shopping' && <ShoppingListPage />}
-            {tab === 'pantry' && <PantryPage />}
+            {tab === 'recipes' && <RecipesPage recipes={recipes} onToggleSelected={handleToggleSelected} />}
+            {tab === 'shopping' && <ShoppingListPage shoppingList={shoppingList} />}
+            {tab === 'pantry' && (
+              <PantryPage
+                recipes={recipes}
+                pantryChecklist={pantryChecklist}
+                staples={staples}
+                bestMatches={bestMatches}
+                syncing={bgSyncing}
+                onTogglePantry={handleTogglePantry}
+                onSetStaple={handleSetStaple}
+              />
+            )}
             {tab === 'add' && (
               <AddRecipePage onRecipeAdded={() => loadData(true)} toast={toast} />
             )}

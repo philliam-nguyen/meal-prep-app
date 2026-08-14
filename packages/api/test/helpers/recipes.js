@@ -10,9 +10,28 @@ export async function createRecipe(app, body) {
   return response.json();
 }
 
+/** Marks a Recipe as a Selected Recipe, or unmarks it. */
+export async function setSelected(app, recipeId, selected) {
+  const response = await app.inject({
+    method: 'PUT',
+    url: `/api/recipes/${recipeId}/selected`,
+    payload: { selected },
+  });
+  assert.equal(response.statusCode, 204, response.body);
+}
+
 /** Every Recipe as the browse list sees it. */
 export async function readRecipes(app) {
+  return (await readState(app)).recipes;
+}
+
+/** The Shopping List the Selected Recipes derive to. */
+export async function readShoppingList(app) {
+  return (await readState(app)).shoppingList;
+}
+
+async function readState(app) {
   const response = await app.inject({ method: 'GET', url: '/api/state' });
   assert.equal(response.statusCode, 200);
-  return response.json().recipes;
+  return response.json();
 }

@@ -17,11 +17,16 @@ function typesPresent(recipes) {
   return [ALL, ...known, ...unknown];
 }
 
-export function RecipesPage({ recipes }) {
+export function RecipesPage({ recipes, onToggleSelected }) {
   const [filter, setFilter] = useState(ALL);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selected, setSelected] = useState(null);
+  // The id of the open card rather than the Recipe itself, so what the card shows is looked up on
+  // every render. Holding the object would freeze it at the moment it was clicked, and the button
+  // inside offers to add or remove based on that copy: a Recipe selected on the other phone in the
+  // meantime would be offered again, and the toggle would send the opposite of what the cook saw.
+  const [openId, setOpenId] = useState(null);
 
+  const open = recipes.find(r => r.id === openId) ?? null;
   const types = typesPresent(recipes);
   const search = searchTerm.trim().toLowerCase();
   const filtered = recipes.filter(r => {
@@ -46,7 +51,7 @@ export function RecipesPage({ recipes }) {
       ) : (
         <div style={{ display: 'grid', gap: 10 }}>
           {filtered.map((r, i) => (
-            <div key={r.id} className={`recipe-card fade-in stagger-${(i % 4) + 1}`} onClick={() => setSelected(r)}>
+            <div key={r.id} className={`recipe-card fade-in stagger-${(i % 4) + 1}`} onClick={() => setOpenId(r.id)}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <h3 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 18, marginBottom: 6 }}>{r.name}</h3>
@@ -61,7 +66,14 @@ export function RecipesPage({ recipes }) {
           ))}
         </div>
       )}
-      {selected && <RecipeDetail recipe={selected} onClose={() => setSelected(null)} />}
+      {/* Closing on the toggle is what the pre-migration app did. */}
+      {open && (
+        <RecipeDetail
+          recipe={open}
+          onClose={() => setOpenId(null)}
+          onToggleSelected={recipe => { onToggleSelected(recipe); setOpenId(null); }}
+        />
+      )}
     </div>
   );
 }

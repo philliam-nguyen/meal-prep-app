@@ -5,6 +5,7 @@ import Fastify from 'fastify';
 import { ajvOptions } from '@meal-prep/shared';
 import { defaultWebDist } from './config.js';
 import { registerGuardrails } from './guardrails.js';
+import { registerIngredientRoutes } from './ingredients.js';
 import { registerRecipeRoutes } from './recipes.js';
 import { readState, stateResponse } from './state.js';
 
@@ -85,6 +86,7 @@ export async function buildApp({ pool, staticRoot = defaultWebDist, logger = tru
   );
 
   registerRecipeRoutes(app);
+  registerIngredientRoutes(app);
 
   if (bundleExists(staticRoot)) {
     app.register(fastifyStatic, { root: staticRoot });

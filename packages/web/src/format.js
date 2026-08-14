@@ -9,6 +9,16 @@ export function formatAmount({ quantity, unit }) {
   return unit ? `${quantity} ${unit}` : String(quantity);
 }
 
+/**
+ * How much of an Ingredient to buy, across every Selected Recipe calling for it. The server sums
+ * within each unit and never across them, so two cups and three hundred grams arrive as two pairs
+ * and read as two pairs. An entry with no pairs at all is one nothing quantified.
+ */
+export function formatAmounts(amounts) {
+  if (amounts.length === 0) return 'to taste';
+  return amounts.map(formatAmount).join(' + ');
+}
+
 export function formatSince(ts) {
   const s = Math.floor((Date.now() - ts) / 1000);
   if (s < 5) return 'just now';

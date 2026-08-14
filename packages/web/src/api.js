@@ -26,3 +26,55 @@ export async function createRecipe(recipe) {
   const refusal = await response.json().catch(() => null);
   throw new Error(refusal?.message ?? `POST /api/recipes returned ${response.status}`);
 }
+
+/**
+ * Marks a Recipe as a Selected Recipe, or unmarks it. Sends the value it wants rather than asking
+ * for a flip, so a retry after a dropped response cannot undo the write it is retrying.
+ *
+ * Nothing comes back. The Shopping List this changes is derived on the server, so the caller reads
+ * it with the next state request rather than from this reply.
+ */
+export async function setRecipeSelected(recipeId, selected) {
+  const response = await fetch(`/api/recipes/${encodeURIComponent(recipeId)}/selected`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ selected }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`PUT /api/recipes/${recipeId}/selected returned ${response.status}`);
+  }
+}
+
+async function putIngredientField(ingredientId, field, body) {
+  const path = `/api/ingredients/${encodeURIComponent(ingredientId)}/${field}`;
+  const response = await fetch(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (response.ok) return;
+
+  // The server names the Ingredient it refused, which is worth showing rather than flattening into
+  // a status code.
+  const refusal = await response.json().catch(() => null);
+  throw new Error(refusal?.message ?? `PUT ${path} returned ${response.status}`);
+}
+
+/**
+ * Puts an Ingredient in the Pantry or takes it out. A value rather than a flip, for the reason the
+ * Selected Recipe toggle sends one: two phones share one Pantry, and a flip sent from a screen that
+ * has gone stale lands on the opposite of what the cook saw.
+ *
+ * Nothing comes back. Best Matches is derived on the server, so the new ranking arrives with the
+ * next state request rather than from this reply.
+ */
+export async function setIngredientPantry(ingredientId, inPantry) {
+  return putIngredientField(ingredientId, 'pantry', { inPantry });
+}
+
+/** Marks an Ingredient a Staple, or stops it being one. */
+export async function setIngredientStaple(ingredientId, staple) {
+  return putIngredientField(ingredientId, 'staple', { staple });
+}

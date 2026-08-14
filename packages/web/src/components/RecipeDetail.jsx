@@ -2,7 +2,7 @@ import { formatAmount } from '../format.js';
 import { getTypeBadge } from '../typeBadge.js';
 import { I } from '../icons.jsx';
 
-export function RecipeDetail({ recipe, onClose }) {
+export function RecipeDetail({ recipe, onClose, onToggleSelected }) {
   const { ingredients } = recipe;
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -32,14 +32,9 @@ export function RecipeDetail({ recipe, onClose }) {
             ))}
           </div>
         )}
-        {/* Selecting a Recipe is a write, and writes still point at the spreadsheet the database is
-            replacing. Disabled rather than live, so nothing here looks like it saved. */}
-        <button className="btn-primary" style={{ width: '100%', justifyContent: 'center' }} disabled>
+        <button className="btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => onToggleSelected(recipe)}>
           {I.cart} <span>{recipe.selected ? 'Remove from Shopping List' : 'Add to Shopping List'}</span>
         </button>
-        <p style={{ fontSize: 12, color: '#A39E93', textAlign: 'center', marginTop: 8 }}>
-          Selecting a Recipe returns with the write path.
-        </p>
       </div>
     </div>
   );
