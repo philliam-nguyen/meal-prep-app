@@ -8,6 +8,7 @@ import { registerGuardrails } from './guardrails.js';
 import { registerIngredientRoutes } from './ingredients.js';
 import { registerRecipeRoutes } from './recipes.js';
 import { readState, stateResponse } from './state.js';
+import { registerVersionRoute } from './version.js';
 
 // The frontend is served from the API's own origin in both Variants, which is what lets it call
 // relative paths and carry no per-Variant configuration (ADR-0002). API routes sit under /api so
@@ -87,6 +88,7 @@ export async function buildApp({ pool, staticRoot = defaultWebDist, logger = tru
 
   registerRecipeRoutes(app);
   registerIngredientRoutes(app);
+  registerVersionRoute(app);
 
   if (bundleExists(staticRoot)) {
     app.register(fastifyStatic, { root: staticRoot });

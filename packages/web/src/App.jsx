@@ -1,6 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
-import { fetchState, setIngredientPantry, setIngredientStaple, setRecipeSelected } from './api.js';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  fetchState,
+  fetchVersion,
+  setIngredientPantry,
+  setIngredientStaple,
+  setRecipeSelected,
+} from './api.js';
 import { loadCache, saveCache } from './cache.js';
+import { startFreshnessPoll } from './freshness.js';
 import { formatSince } from './format.js';
 import { I } from './icons.jsx';
 import { Toast } from './components/Toast.jsx';
@@ -42,6 +49,8 @@ export function MealPrepApp() {
   const [bgSyncing, setBgSyncing] = useState(false);
   const [lastSynced, setLastSynced] = useState(null);
   const [toastMsg, setToastMsg] = useState('');
+  // A ref, not state: the version is never rendered, and it changing should not cost a paint.
+  const version = useRef(null);
 
   const toast = useCallback(msg => { setToastMsg(''); setTimeout(() => setToastMsg(msg), 10); }, []);
 
@@ -56,6 +65,10 @@ export function MealPrepApp() {
       setBestMatches(state.bestMatches);
       setLastSynced(Date.now());
       saveCache(state);
+      // The version this data arrived with, which is what the next poll is compared against. The
+      // payload carries it rather than the poll fetching its own, so there is no window between the
+      // two where a change can land and be mistaken for the version already on screen.
+      version.current = state.version;
     } catch {
       if (!silent) toast('Could not load your recipes. Check your connection.');
     }
@@ -73,11 +86,27 @@ export function MealPrepApp() {
       if (cache.staples) setStaples(cache.staples);
       if (cache.bestMatches) setBestMatches(cache.bestMatches);
       setLastSynced(cache.savedAt);
+      // What the cached payload was current at, so a poll has something to compare against even if
+      // the reload below never lands.
+      version.current = cache.version ?? null;
       loadData(true);
     } else {
       loadData();
     }
   }, [loadData]);
+
+  // Restarted per view, because staleness does not matter on all of them. Which ones is the poll's
+  // own decision, so this hands it the view rather than asking first.
+  useEffect(() => {
+    const watching = startFreshnessPoll({
+      view: tab,
+      versionOnScreen: () => version.current,
+      readVersion: fetchVersion,
+      onStale: () => loadData(true),
+    });
+
+    return () => watching.stop();
+  }, [tab, loadData]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
