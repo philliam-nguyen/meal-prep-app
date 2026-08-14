@@ -42,9 +42,16 @@ const INSERT_RECIPE_INGREDIENT = `
 // no window between checking the flag and writing the row. `selected` and `protected` are absent on
 // purpose: neither is a field the body carries, and an edit that cleared the Selected Recipe flag
 // would take a Recipe off the Shopping List for the sake of fixing a typo in its name.
+//
+// updated_at is set here rather than left to the trigger. The trigger fires only when the recipes
+// row itself differs, and a Recipe is its Ingredients as much as its name: an edit correcting a
+// quantity changes the Recipe while leaving this row identical, so the trigger would not fire and
+// the Recipe would go on claiming it had not been touched. Setting it means a rewrite that changes
+// nothing at all also moves the timestamp, which costs a redundant refetch. Missing a real edit
+// costs a cook shopping from a list that is wrong, which is the worse of the two.
 const UPDATE_RECIPE = `
   update recipes
-  set name = $2, type = $3, card_url = $4
+  set name = $2, type = $3, card_url = $4, updated_at = now()
   where id = $1 and not protected
   returning id
 `;

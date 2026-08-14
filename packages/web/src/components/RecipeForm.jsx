@@ -28,7 +28,7 @@ const labelStyle = {
   marginBottom: 5,
 };
 
-export const cardStyle = {
+const cardStyle = {
   background: 'white',
   borderRadius: 16,
   padding: 20,

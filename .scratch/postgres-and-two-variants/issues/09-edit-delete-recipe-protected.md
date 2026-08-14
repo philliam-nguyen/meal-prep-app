@@ -59,6 +59,21 @@ holding the link. Ticket 01 lists the API key and the Apps Script deployment as 
 in Cloud Console at cutover; neither was ever committed, so neither is a repository change and both
 stay ticket 17's.
 
+**An edit now sets `updated_at` itself rather than leaving it to the trigger.** The trigger fires
+only when the `recipes` row differs, and `recipe_ingredients` carries no timestamp at all, so an
+edit correcting a quantity changed the Recipe while leaving every timestamp where it was. Ticket 10
+polls the maximum update timestamp across mutable state, so without this its first checklist item is
+false for exactly the edits this ticket adds. The cost is that a rewrite changing nothing also moves
+the timestamp, which is a redundant refetch; missing a real edit is a cook shopping from a wrong
+list, and that is worse. Four tests pin it.
+
+**Ticket 10 still has a hole this ticket cannot close: deleting moves no timestamp forward.** A
+maximum over the rows that remain cannot see a row that is gone, so a Recipe deleted on one phone
+will not make a second phone refetch. That is a property of the max-timestamp scheme rather than of
+the delete endpoint, so it belongs to whoever builds the version endpoint — it needs a row count or
+a record of deletions alongside the maximum. Flagged here because this ticket is what makes deletion
+reachable.
+
 **Known sharp edge, not fixed.** A client sending `Content-Type: application/json` with no body on
 `DELETE /api/recipes/:id` gets Fastify's `FST_ERR_CTP_EMPTY_JSON_BODY` 400 rather than the delete.
 The app's own client sends no content-type and is unaffected. Fixing it means replacing the JSON

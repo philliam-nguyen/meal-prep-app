@@ -366,6 +366,77 @@ describe("holding an edit to the rules a create is held to", () => {
   });
 });
 
+// A Recipe is its name, its Recipe Type, its Recipe Card and the Ingredients it calls for, so an
+// edit that changes any of those has changed the Recipe. `recipe_ingredients` carries no timestamp
+// of its own and the trigger on `recipes` only fires when that row differs, so an edit touching
+// only the Recipe Ingredients would move nothing without the write saying so.
+//
+// The column has no API surface yet. It is read directly here because ticket 10's freshness
+// endpoint is going to report the maximum update timestamp across mutable state, and this is what
+// makes that report true of an edit rather than only of a rename.
+describe('recording when a Recipe was last changed', () => {
+  const updatedAt = async (client, recipeId) => {
+    const { rows } = await client.query('select updated_at from recipes where id = $1', [recipeId]);
+    return rows[0].updated_at;
+  };
+
+  it('moves the timestamp when only a Recipe Ingredient changes', async (t) => {
+    const app = await startApp(t);
+    const client = await connect(t);
+    const created = await createRecipe(app, soup);
+    const before = await updatedAt(client, created.id);
+
+    await updateRecipe(app, created.id, {
+      ...soup,
+      ingredients: [
+        { name: 'Leek', quantity: 3, unit: '' },
+        { name: 'Potato', quantity: 750, unit: 'g' },
+      ],
+    });
+
+    assert.ok(
+      (await updatedAt(client, created.id)) > before,
+      'an edit changing only a Recipe Ingredient left the Recipe looking untouched',
+    );
+  });
+
+  it('moves the timestamp when a Recipe Ingredient is removed', async (t) => {
+    const app = await startApp(t);
+    const client = await connect(t);
+    const created = await createRecipe(app, soup);
+    const before = await updatedAt(client, created.id);
+
+    await updateRecipe(app, created.id, {
+      ...soup,
+      ingredients: [{ name: 'Leek', quantity: 3, unit: '' }],
+    });
+
+    assert.ok((await updatedAt(client, created.id)) > before);
+  });
+
+  it('moves the timestamp when the name changes', async (t) => {
+    const app = await startApp(t);
+    const client = await connect(t);
+    const created = await createRecipe(app, soup);
+    const before = await updatedAt(client, created.id);
+
+    await updateRecipe(app, created.id, { ...soup, name: 'Leek and Potato' });
+
+    assert.ok((await updatedAt(client, created.id)) > before);
+  });
+
+  it('leaves the timestamp alone when an edit is refused', async (t) => {
+    const app = await startApp(t);
+    const client = await connect(t);
+    const created = await createRecipe(app, soup);
+    const before = await updatedAt(client, created.id);
+
+    await refuseEdit(app, created.id, { ...soup, name: '   ' }, 400);
+
+    assert.deepEqual(await updatedAt(client, created.id), before);
+  });
+});
+
 describe('deleting a Recipe', () => {
   it('takes it out of the browse list', async (t) => {
     const app = await startApp(t);
