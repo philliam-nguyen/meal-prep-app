@@ -1,8 +1,12 @@
-// Writing a Recipe, and marking one as a Selected Recipe. The rules for the Recipe a cook types live
-// in the shared schema module, which Fastify enforces here and the Add form compiles in the browser,
-// so there is no server copy to drift from a client copy (ADR-0005). What is left in this file is
-// the part JSON Schema cannot state: that two Recipe Ingredients in one request must not name the
-// same food.
+// Writing a Recipe, editing one, deleting one, and marking one as a Selected Recipe. The rules for
+// the Recipe a cook types live in the shared schema module, which Fastify enforces here and the
+// Recipe form compiles in the browser, so there is no server copy to drift from a client copy
+// (ADR-0005). What is left in this file is the part JSON Schema cannot state: that two Recipe
+// Ingredients in one request must not name the same food.
+//
+// An edit is held to `createRecipeBody` unchanged, because a Recipe a cook may not create is a
+// Recipe they may not edit their way into. The name says "create" for the route that came first;
+// what it describes is the body of any request writing a Recipe.
 //
 // The Selected Recipe route validates against a schema declared here instead, because no form
 // compiles it: a checkbox has nothing to validate before it sends, so shared would gain a rule with
@@ -33,6 +37,35 @@ const INSERT_RECIPE_INGREDIENT = `
   insert into recipe_ingredients (recipe_id, ingredient_id, quantity, unit)
   values ($1, $2, $3, $4)
 `;
+
+// The Protected guard is in the statement rather than in a read the handler does first, so there is
+// no window between checking the flag and writing the row. `selected` and `protected` are absent on
+// purpose: neither is a field the body carries, and an edit that cleared the Selected Recipe flag
+// would take a Recipe off the Shopping List for the sake of fixing a typo in its name.
+const UPDATE_RECIPE = `
+  update recipes
+  set name = $2, type = $3, card_url = $4
+  where id = $1 and not protected
+  returning id
+`;
+
+// Its Recipe Ingredients are replaced rather than reconciled: the request carries the whole set, so
+// what is here now is what the cook is looking at. Reconciling would be three statements deciding
+// which rows to keep, to answer a question the request has already answered.
+const DELETE_RECIPE_INGREDIENTS = 'delete from recipe_ingredients where recipe_id = $1';
+
+// recipe_ingredients cascades and the Shopping List is derived, so this is the whole of removing a
+// Recipe from the app. The Ingredients it named stay: each has an identity of its own carrying
+// Pantry membership, an Aisle and a Got It mark that no Recipe owns.
+const DELETE_RECIPE = `
+  delete from recipes
+  where id = $1 and not protected
+  returning id
+`;
+
+// Only read when a write has already matched no row, so the ordinary edit stays on one path and
+// only a refusal pays for the explanation.
+const FIND_RECIPE = 'select name, protected from recipes where id = $1';
 
 // No "returning", because the row count already answers the only question the handler asks: whether
 // a Recipe by that id was there to update.
@@ -110,21 +143,47 @@ async function atRecipeCap(client, recipesMax) {
   return rows[0].total >= recipesMax;
 }
 
-async function insertRecipe(client, recipe) {
-  const { rows } = await client.query(INSERT_RECIPE, [recipe.name, recipe.type, recipe.cardUrl]);
-  const recipeId = rows[0].id;
-
-  for (const ingredient of recipe.ingredients) {
-    const { rows: ingredientRows } = await client.query(UPSERT_INGREDIENT, [ingredient.name]);
+/**
+ * Attaches each Recipe Ingredient to the Ingredient it names, creating that Ingredient only if no
+ * Recipe has named the food before. Shared by the create and the edit, so the two cannot disagree
+ * about when a second spelling becomes a second Ingredient.
+ */
+async function insertRecipeIngredients(client, recipeId, ingredients) {
+  for (const ingredient of ingredients) {
+    const { rows } = await client.query(UPSERT_INGREDIENT, [ingredient.name]);
     await client.query(INSERT_RECIPE_INGREDIENT, [
       recipeId,
-      ingredientRows[0].id,
+      rows[0].id,
       ingredient.quantity,
       ingredient.unit,
     ]);
   }
+}
+
+async function insertRecipe(client, recipe) {
+  const { rows } = await client.query(INSERT_RECIPE, [recipe.name, recipe.type, recipe.cardUrl]);
+  const recipeId = rows[0].id;
+
+  await insertRecipeIngredients(client, recipeId, recipe.ingredients);
 
   return recipeId;
+}
+
+/**
+ * Why a write naming a Recipe matched no row: either there is no such Recipe, or there is one that
+ * is Protected. The refusal names the Recipe, so a visitor meeting it knows which row refused
+ * rather than only that something did.
+ *
+ * It says Protected rather than naming a Variant. Nothing here knows which deployment it is
+ * (ADR-0002); it knows the flag is set, and the flag is the reason.
+ */
+async function explainRefusal(db, id) {
+  const { rows } = await db.query(FIND_RECIPE, [id]);
+  if (rows.length === 0) return { code: 404, message: `There is no Recipe ${id}.` };
+  return {
+    code: 403,
+    message: `${rows[0].name} is Protected, so it cannot be changed or deleted.`,
+  };
 }
 
 export function registerRecipeRoutes(app) {
@@ -176,6 +235,89 @@ export function registerRecipeRoutes(app) {
       // Outside the transaction on purpose. Reading back is not part of the write, and a failure
       // here must not roll back a Recipe that is already committed.
       return reply.code(201).send(await readRecipe(app.db, recipeId));
+    },
+  );
+
+  // The whole Recipe, not the field that changed. The form has all of it on screen, so sending all
+  // of it makes the write idempotent and last-write-wins in the same way every other write in this
+  // app is: two phones editing one Recipe end on what the later one saw, rather than on a merge
+  // neither cook asked for.
+  app.put(
+    '/api/recipes/:id',
+    {
+      schema: {
+        params: recipeIdParams,
+        body: createRecipeBody,
+        response: { 200: recipeSchema },
+      },
+    },
+    async (request, reply) => {
+      const { id } = request.params;
+      const recipe = normalize(request.body);
+
+      const repeated = findRepeatedIngredient(recipe.ingredients);
+      if (repeated) {
+        return reply
+          .code(400)
+          .send({ message: `This Recipe lists ${repeated.name} as an Ingredient twice.` });
+      }
+
+      const client = await app.db.connect();
+      try {
+        // One transaction, so an edit refused partway through leaves the Recipe as it was rather
+        // than holding its old name beside its new Recipe Ingredients.
+        await client.query('begin');
+
+        const { rowCount } = await client.query(UPDATE_RECIPE, [
+          id,
+          recipe.name,
+          recipe.type,
+          recipe.cardUrl,
+        ]);
+
+        if (rowCount === 0) {
+          await client.query('rollback');
+          const refusal = await explainRefusal(app.db, id);
+          return reply.code(refusal.code).send({ message: refusal.message });
+        }
+
+        await client.query(DELETE_RECIPE_INGREDIENTS, [id]);
+        await insertRecipeIngredients(client, id, recipe.ingredients);
+        await client.query('commit');
+      } catch (cause) {
+        await client.query('rollback');
+        // The same folding disagreement the create guards against: two spellings JavaScript reads
+        // as different Ingredients and Postgres resolves to one row.
+        if (cause.code === UNIQUE_VIOLATION) {
+          return reply.code(400).send({ message: 'This Recipe lists one Ingredient twice.' });
+        }
+        throw cause;
+      } finally {
+        client.release();
+      }
+
+      // Outside the transaction, for the reason the create reads back outside its own: reading is
+      // not part of the write, and a failure here must not undo an edit that is already committed.
+      return reply.code(200).send(await readRecipe(app.db, id));
+    },
+  );
+
+  // No body comes back, and none is wanted: what a caller would do with a copy of a Recipe that no
+  // longer exists is nothing. The Shopping List it was on is derived, so it loses the Recipe on the
+  // next read without a second write.
+  app.delete(
+    '/api/recipes/:id',
+    { schema: { params: recipeIdParams } },
+    async (request, reply) => {
+      const { id } = request.params;
+      const { rowCount } = await app.db.query(DELETE_RECIPE, [id]);
+
+      if (rowCount === 0) {
+        const refusal = await explainRefusal(app.db, id);
+        return reply.code(refusal.code).send({ message: refusal.message });
+      }
+
+      return reply.code(204).send();
     },
   );
 
