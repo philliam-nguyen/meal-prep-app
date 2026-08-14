@@ -8,6 +8,7 @@
 
 export { RECIPE_TYPES } from './recipeTypes.js';
 export {
+  AISLE_MAX,
   CARD_URL_MAX,
   INGREDIENT_NAME_MAX,
   QUANTITY_MAX,

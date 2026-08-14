@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import { fetchState, setIngredientPantry, setIngredientStaple, setRecipeSelected } from './api.js';
+import {
+  clearGotItMarks,
+  fetchState,
+  setIngredientAisle,
+  setIngredientGotIt,
+  setIngredientPantry,
+  setIngredientStaple,
+  setRecipeSelected,
+} from './api.js';
 import { loadCache, saveCache } from './cache.js';
 import { formatSince } from './format.js';
 import { I } from './icons.jsx';
@@ -125,6 +133,60 @@ export function MealPrepApp() {
     loadData(true);
   }, [loadData, toast]);
 
+  // Same shape as the Pantry toggle, and no toast on success for the same reason: a cook ticks a
+  // dozen entries walking one aisle, and a dozen confirmations would be noise. The reload that
+  // follows is what puts the mark in the offline cache and brings the other phone's ticks over.
+  const handleToggleGotIt = useCallback(async entry => {
+    const gotIt = !entry.gotIt;
+    const show = value => setShoppingList(prev => prev.map(e => (e.ingredientId === entry.ingredientId ? { ...e, gotIt: value } : e)));
+
+    show(gotIt);
+    try {
+      await setIngredientGotIt(entry.ingredientId, gotIt);
+    } catch {
+      show(!gotIt);
+      toast(`Could not update ${entry.name}. Nothing was saved.`);
+      return;
+    }
+    loadData(true);
+  }, [loadData, toast]);
+
+  // The Aisle is the Ingredient's rather than this list's, so the reload is what carries a
+  // correction to wherever else that Ingredient shows up.
+  const handleSetAisle = useCallback(async (entry, aisle) => {
+    const previous = entry.aisle;
+    const next = aisle.trim() ? aisle.trim() : null;
+    if (next === previous) return;
+    const show = value => setShoppingList(prev => prev.map(e => (e.ingredientId === entry.ingredientId ? { ...e, aisle: value } : e)));
+
+    show(next);
+    try {
+      await setIngredientAisle(entry.ingredientId, next);
+    } catch {
+      show(previous);
+      toast(`Could not set the aisle for ${entry.name}. Nothing was saved.`);
+      return;
+    }
+    loadData(true);
+  }, [loadData, toast]);
+
+  // Deliberate, and the only thing that clears a mark. Nothing else does: adding a forgotten Recipe
+  // mid-trip has to leave the ticks already earned in the store.
+  const handleClearGotIt = useCallback(async () => {
+    const previous = shoppingList;
+
+    setShoppingList(prev => prev.map(entry => ({ ...entry, gotIt: false })));
+    try {
+      await clearGotItMarks();
+    } catch {
+      setShoppingList(previous);
+      toast('Could not clear your marks. Nothing was saved.');
+      return;
+    }
+    toast('Cleared every Got It mark');
+    loadData(true);
+  }, [loadData, shoppingList, toast]);
+
   // This one waits for its write, unlike the two above. It moves an Ingredient between two lists
   // rather than flipping a field, and a cook does it when they notice one rather than twelve times
   // down an aisle, so it lets the reload place the row.
@@ -162,7 +224,14 @@ export function MealPrepApp() {
         ) : (
           <>
             {tab === 'recipes' && <RecipesPage recipes={recipes} onToggleSelected={handleToggleSelected} />}
-            {tab === 'shopping' && <ShoppingListPage shoppingList={shoppingList} />}
+            {tab === 'shopping' && (
+              <ShoppingListPage
+                shoppingList={shoppingList}
+                onToggleGotIt={handleToggleGotIt}
+                onSetAisle={handleSetAisle}
+                onClearGotIt={handleClearGotIt}
+              />
+            )}
             {tab === 'pantry' && (
               <PantryPage
                 recipes={recipes}

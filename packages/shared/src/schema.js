@@ -15,6 +15,12 @@ export const INGREDIENT_NAME_MAX = 80;
 export const CARD_URL_MAX = 500;
 export const UNIT_MAX = 20;
 
+// A store section, as written on the shelf edge: "Produce", "Aisle 12 - Dairy & eggs". Capped
+// rather than enumerated, because every store lays itself out differently and an allowlist would
+// refuse the sections a real one uses. It lives here because the cook types it into a box on the
+// Shopping List, so the input and the route have to agree on one number.
+export const AISLE_MAX = 40;
+
 // Not a rule about what a caller may send but about what the schema can hold: ids are minted by a
 // sequence and checked at this length by `recipes_id_length`. A route naming a Recipe in its path
 // refuses anything longer here, so a string no row could carry never reaches a query. It lives with

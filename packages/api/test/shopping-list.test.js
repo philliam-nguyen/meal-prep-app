@@ -9,9 +9,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { startApp } from './helpers/app.js';
-import { connect } from './helpers/database.js';
-import { markIngredient } from './helpers/flags.js';
 import { createRecipe, readShoppingList, setSelected } from './helpers/recipes.js';
+import { setAisle, setGotIt } from './helpers/shopping.js';
 
 /** The list as a cook reads it: what to buy, and how much of it. */
 async function amountsByIngredient(app) {
@@ -239,14 +238,14 @@ describe('the Shopping List', () => {
 
   it('carries the Got It mark and Aisle the Ingredient itself holds onto the entry', async (t) => {
     const app = await startApp(t);
-    const client = await connect(t);
     await selectRecipe(app, {
       name: 'Minestrone',
       type: 'Soup',
       ingredients: [{ name: 'Onion', quantity: 2, unit: '' }],
     });
     const [{ ingredientId }] = await readShoppingList(app);
-    await markIngredient(client, ingredientId, { gotIt: true, aisle: 'Produce' });
+    await setGotIt(app, ingredientId, true);
+    await setAisle(app, ingredientId, 'Produce');
 
     const [entry] = await readShoppingList(app);
 

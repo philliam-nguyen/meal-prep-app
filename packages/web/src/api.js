@@ -78,3 +78,27 @@ export async function setIngredientPantry(ingredientId, inPantry) {
 export async function setIngredientStaple(ingredientId, staple) {
   return putIngredientField(ingredientId, 'staple', { staple });
 }
+
+/**
+ * Marks a Shopping List entry Got It, or unmarks it. The mark belongs to the Ingredient rather than
+ * to the row, which is what lets the list be derived again without losing what the cook ticked.
+ */
+export async function setIngredientGotIt(ingredientId, gotIt) {
+  return putIngredientField(ingredientId, 'got-it', { gotIt });
+}
+
+/** Sets the Aisle an Ingredient is found in. Null clears it, and so does an emptied box. */
+export async function setIngredientAisle(ingredientId, aisle) {
+  return putIngredientField(ingredientId, 'aisle', { aisle });
+}
+
+/**
+ * The one action that clears every Got It mark, for a cook starting a new list. Nothing else clears
+ * them: adding a forgotten Recipe mid-trip has to leave the ticks already earned in the store.
+ */
+export async function clearGotItMarks() {
+  const response = await fetch('/api/shopping-list/got-it', { method: 'DELETE' });
+  if (!response.ok) {
+    throw new Error(`DELETE /api/shopping-list/got-it returned ${response.status}`);
+  }
+}
