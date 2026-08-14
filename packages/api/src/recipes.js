@@ -53,7 +53,6 @@ const UPDATE_RECIPE = `
   update recipes
   set name = $2, type = $3, card_url = $4, updated_at = now()
   where id = $1 and not protected
-  returning id
 `;
 
 // Its Recipe Ingredients are replaced rather than reconciled: the request carries the whole set, so
@@ -64,10 +63,11 @@ const DELETE_RECIPE_INGREDIENTS = 'delete from recipe_ingredients where recipe_i
 // recipe_ingredients cascades and the Shopping List is derived, so this is the whole of removing a
 // Recipe from the app. The Ingredients it named stay: each has an identity of its own carrying
 // Pantry membership, an Aisle and a Got It mark that no Recipe owns.
+// No "returning" here or on the update above, for the reason SET_SELECTED gives below: the row
+// count already answers the only question the handler asks.
 const DELETE_RECIPE = `
   delete from recipes
   where id = $1 and not protected
-  returning id
 `;
 
 // Only read when a write has already matched no row, so the ordinary edit stays on one path and
@@ -154,9 +154,19 @@ async function atRecipeCap(client, recipesMax) {
  * Attaches each Recipe Ingredient to the Ingredient it names, creating that Ingredient only if no
  * Recipe has named the food before. Shared by the create and the edit, so the two cannot disagree
  * about when a second spelling becomes a second Ingredient.
+ *
+ * In canonical name order rather than the order the cook typed. The upsert takes a row lock it
+ * holds for the rest of the transaction, so two Recipes being written at once that both name butter
+ * and flour, in opposite orders, would each hold one and wait for the other until Postgres broke
+ * the tie by aborting one of them. Every transaction taking these locks in the same order is what
+ * makes that impossible rather than rare.
  */
 async function insertRecipeIngredients(client, recipeId, ingredients) {
-  for (const ingredient of ingredients) {
+  const inLockOrder = [...ingredients].sort((a, b) =>
+    a.name.toLowerCase() < b.name.toLowerCase() ? -1 : 1,
+  );
+
+  for (const ingredient of inLockOrder) {
     const { rows } = await client.query(UPSERT_INGREDIENT, [ingredient.name]);
     await client.query(INSERT_RECIPE_INGREDIENT, [
       recipeId,
@@ -183,13 +193,24 @@ async function insertRecipe(client, recipe) {
  *
  * It says Protected rather than naming a Variant. Nothing here knows which deployment it is
  * (ADR-0002); it knows the flag is set, and the flag is the reason.
+ *
+ * The flag is read rather than assumed from the row existing. Those two are the same thing only
+ * while the guarded statements carry exactly the one condition they carry today, and a 403 is a
+ * confident answer to give on the strength of a condition somebody may add later. The last branch
+ * is unreachable now: it is what stops this from inventing a reason it has not checked.
  */
 async function explainRefusal(db, id) {
   const { rows } = await db.query(FIND_RECIPE, [id]);
   if (rows.length === 0) return { code: 404, message: `There is no Recipe ${id}.` };
+  if (rows[0].protected) {
+    return {
+      code: 403,
+      message: `${rows[0].name} is Protected, so it cannot be changed or deleted.`,
+    };
+  }
   return {
-    code: 403,
-    message: `${rows[0].name} is Protected, so it cannot be changed or deleted.`,
+    code: 409,
+    message: `${rows[0].name} changed while this was being saved. Open it again and retry.`,
   };
 }
 

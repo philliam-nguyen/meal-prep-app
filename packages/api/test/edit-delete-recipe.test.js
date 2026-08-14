@@ -8,10 +8,11 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { RECIPE_INGREDIENTS_MAX } from '@meal-prep/shared';
+import { RECIPE_ID_MAX, RECIPE_INGREDIENTS_MAX } from '@meal-prep/shared';
 import { startApp } from './helpers/app.js';
 import { connect } from './helpers/database.js';
-import { markRecipe } from './helpers/flags.js';
+import { markIngredient, markRecipe } from './helpers/flags.js';
+import { setPantry } from './helpers/pantry.js';
 import {
   createRecipe,
   deleteRecipe,
@@ -499,6 +500,87 @@ describe('deleting a Recipe', () => {
     const refusal = await refuseDelete(app, 'R404', 404);
 
     assert.deepEqual(refusal, { message: 'There is no Recipe R404.' });
+  });
+});
+
+// The refusal a full instance gives says "Delete one to add another". Nothing made that true until
+// this ticket, and nothing proved it.
+describe('deleting a Recipe to make room for another', () => {
+  it('frees a slot under the Recipe cap', async (t) => {
+    const app = await startApp(t, { guardrails: { recipesMax: 1 } });
+    const created = await createRecipe(app, soup);
+
+    const refused = await app.inject({
+      method: 'POST',
+      url: '/api/recipes',
+      payload: { name: 'Shortbread', type: 'Dessert' },
+    });
+    assert.equal(refused.statusCode, 409);
+
+    await deleteRecipe(app, created.id);
+
+    const shortbread = await createRecipe(app, { name: 'Shortbread', type: 'Dessert' });
+    assert.equal(shortbread.name, 'Shortbread');
+  });
+});
+
+// What the upsert is for. A Recipe dropping an Ingredient and picking it up again must land on the
+// row that already exists, or the Aisle and the Got It mark the cook set go with the old one and
+// the Shopping List starts asking them to buy something they have already got.
+describe('an Ingredient outliving the Recipe Ingredient that named it', () => {
+  it('keeps its Aisle and Got It mark across a removal and a re-add', async (t) => {
+    const app = await startApp(t);
+    const client = await connect(t);
+    const created = await createRecipe(app, soup);
+    const potato = created.ingredients.find(({ name }) => name === 'Potato');
+    await markIngredient(client, potato.ingredientId, { gotIt: true, aisle: 'Produce' });
+
+    await updateRecipe(app, created.id, {
+      ...soup,
+      ingredients: [{ name: 'Leek', quantity: 3, unit: '' }],
+    });
+    const readded = await updateRecipe(app, created.id, soup);
+
+    const restored = readded.ingredients.find(({ name }) => name === 'Potato');
+    assert.equal(restored.ingredientId, potato.ingredientId);
+
+    await setSelected(app, created.id, true);
+    const entry = (await readShoppingList(app)).find(({ name }) => name === 'Potato');
+    assert.equal(entry.gotIt, true);
+    assert.equal(entry.aisle, 'Produce');
+  });
+
+  it('keeps its Pantry membership across a removal', async (t) => {
+    const app = await startApp(t);
+    const created = await createRecipe(app, soup);
+    const potato = created.ingredients.find(({ name }) => name === 'Potato');
+    await setPantry(app, potato.ingredientId, true);
+
+    await updateRecipe(app, created.id, {
+      ...soup,
+      ingredients: [{ name: 'Leek', quantity: 3, unit: '' }],
+    });
+
+    const { pantryChecklist } = await readState(app);
+    assert.equal(pantryChecklist.find(({ id }) => id === potato.ingredientId).inPantry, true);
+  });
+});
+
+// The id cap keeps a long string out of a query and out of a refusal that echoes it back. Asserted
+// on these routes rather than assumed from the schema object being shared.
+describe('refusing an id no Recipe could carry', () => {
+  const tooLong = 'R'.repeat(RECIPE_ID_MAX + 1);
+
+  it('refuses it on an edit', async (t) => {
+    const app = await startApp(t);
+
+    await refuseEdit(app, tooLong, soup, 400);
+  });
+
+  it('refuses it on a delete', async (t) => {
+    const app = await startApp(t);
+
+    await refuseDelete(app, tooLong, 400);
   });
 });
 
