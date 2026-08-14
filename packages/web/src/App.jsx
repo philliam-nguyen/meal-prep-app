@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { fetchState, setIngredientPantry, setIngredientStaple, setRecipeSelected } from './api.js';
+import { deleteRecipe, fetchState, setIngredientPantry, setIngredientStaple, setRecipeSelected } from './api.js';
 import { loadCache, saveCache } from './cache.js';
 import { formatSince } from './format.js';
 import { I } from './icons.jsx';
@@ -8,6 +8,7 @@ import { RecipesPage } from './components/RecipesPage.jsx';
 import { ShoppingListPage } from './components/ShoppingListPage.jsx';
 import { PantryPage } from './components/PantryPage.jsx';
 import { AddRecipePage } from './components/AddRecipePage.jsx';
+import { EditRecipePage } from './components/EditRecipePage.jsx';
 import { SettingsPage } from './components/SettingsPage.jsx';
 
 // There is no setup screen and no key to paste. The API is on this same origin and the homelab
@@ -32,6 +33,11 @@ const PAGE_TITLES = {
 
 export function MealPrepApp() {
   const [tab, setTab] = useState('recipes');
+  // The id of the Recipe being edited rather than the Recipe itself, so that a Recipe deleted on
+  // the other phone closes the form instead of leaving a cook typing into a row that is gone. The
+  // form keeps its own copy of the fields once it opens, so a background reload cannot overwrite a
+  // half-typed correction.
+  const [editingId, setEditingId] = useState(null);
   const [recipes, setRecipes] = useState([]);
   const [shoppingList, setShoppingList] = useState([]);
   const [pantryChecklist, setPantryChecklist] = useState([]);
@@ -107,6 +113,21 @@ export function MealPrepApp() {
     loadData(true);
   }, [loadData, toast]);
 
+  // This one waits for the server and shows nothing optimistically. A Recipe removed from the list
+  // before the write lands would have to be put back if it failed, and a Recipe reappearing after a
+  // cook watched it go is worse than a moment's wait. A Protected Recipe refuses here, and the
+  // server's refusal names it rather than being flattened into "could not delete".
+  const handleDelete = useCallback(async recipe => {
+    try {
+      await deleteRecipe(recipe.id);
+    } catch (error) {
+      toast(error.message);
+      return;
+    }
+    toast(`Deleted ${recipe.name}`);
+    loadData(true);
+  }, [loadData, toast]);
+
   // Same shape as the toggle above, and no toast on success: a cook works down the checklist a dozen
   // items at a time, and a dozen confirmations would be noise. Best Matches reranks from the server
   // afterwards, because keeping a copy of the match rule here is the drift this migration removed.
@@ -139,29 +160,41 @@ export function MealPrepApp() {
     loadData(true);
   }, [loadData, toast]);
 
+  // Looked up on every render rather than held, so a Recipe that disappears takes its form with it.
+  const editing = recipes.find(r => r.id === editingId) ?? null;
+
   return (
     <div style={{ minHeight: '100vh', background: '#FAF6F1' }}>
       {toastMsg && <Toast message={toastMsg} onDone={() => setToastMsg('')} />}
       <nav className="nav-bar">
-        {NAV_ITEMS.map(n => <button key={n.id} className={`nav-item ${tab === n.id ? 'active' : ''}`} onClick={() => setTab(n.id)}>{n.icon}<span>{n.label}</span></button>)}
+        {NAV_ITEMS.map(n => <button key={n.id} className={`nav-item ${tab === n.id ? 'active' : ''}`} onClick={() => { setEditingId(null); setTab(n.id); }}>{n.icon}<span>{n.label}</span></button>)}
       </nav>
       <div className="page-content" style={{ padding: '24px 20px 100px', maxWidth: 640, margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <div>
-            <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 26 }}>{PAGE_TITLES[tab]}</h1>
-            {tab === 'recipes' && <p style={{ color: '#7A7568', fontSize: 14, marginTop: 2 }}>{recipes.length} recipe{recipes.length !== 1 ? 's' : ''}</p>}
+            <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 26 }}>{editing ? 'Edit Recipe' : PAGE_TITLES[tab]}</h1>
+            {tab === 'recipes' && !editing && <p style={{ color: '#7A7568', fontSize: 14, marginTop: 2 }}>{recipes.length} recipe{recipes.length !== 1 ? 's' : ''}</p>}
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 2 }}>
               {bgSyncing && <div className="loading-spinner" style={{ width: 11, height: 11, borderWidth: 2 }} />}
               {lastSynced && <span style={{ fontSize: 11, color: '#A39E93' }}>{bgSyncing ? 'Syncing...' : `Synced ${formatSince(lastSynced)}`}</span>}
             </div>
           </div>
-          {tab === 'recipes' && <button className="btn-secondary" style={{ padding: '8px 14px' }} onClick={handleRefresh} disabled={refreshing}>{I.refresh}</button>}
+          {tab === 'recipes' && !editing && <button className="btn-secondary" style={{ padding: '8px 14px' }} onClick={handleRefresh} disabled={refreshing}>{I.refresh}</button>}
         </div>
         {loading ? (
           <div style={{ padding: '60px 0', textAlign: 'center' }}><div className="loading-spinner" /><p style={{ color: '#7A7568', marginTop: 16, fontSize: 14 }}>Loading your meal prep data...</p></div>
+        ) : editing ? (
+          // Editing takes over the content area rather than opening another modal, because a
+          // Recipe's worth of fields does not fit in the sheet the card slides up in.
+          <EditRecipePage
+            recipe={editing}
+            onSaved={() => { setEditingId(null); loadData(true); }}
+            onCancel={() => setEditingId(null)}
+            toast={toast}
+          />
         ) : (
           <>
-            {tab === 'recipes' && <RecipesPage recipes={recipes} onToggleSelected={handleToggleSelected} />}
+            {tab === 'recipes' && <RecipesPage recipes={recipes} onToggleSelected={handleToggleSelected} onEdit={recipe => setEditingId(recipe.id)} onDelete={handleDelete} />}
             {tab === 'shopping' && <ShoppingListPage shoppingList={shoppingList} />}
             {tab === 'pantry' && (
               <PantryPage
