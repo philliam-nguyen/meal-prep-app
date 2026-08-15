@@ -11,7 +11,7 @@ import { describe, it } from 'node:test';
 import { RECIPE_ID_MAX, RECIPE_INGREDIENTS_MAX } from '@meal-prep/shared';
 import { startApp } from './helpers/app.js';
 import { connect } from './helpers/database.js';
-import { markIngredient, markRecipe } from './helpers/flags.js';
+import { markRecipe } from './helpers/flags.js';
 import { setPantry } from './helpers/pantry.js';
 import {
   createRecipe,
@@ -22,6 +22,7 @@ import {
   setSelected,
   updateRecipe,
 } from './helpers/recipes.js';
+import { setAisle, setGotIt } from './helpers/shopping.js';
 
 const soup = {
   name: 'Leek and Potato Soup',
@@ -660,10 +661,10 @@ describe('deleting a Recipe to make room for another', () => {
 describe('an Ingredient outliving the Recipe Ingredient that named it', () => {
   it('keeps its Aisle and Got It mark across a removal and a re-add', async (t) => {
     const app = await startApp(t);
-    const client = await connect(t);
     const created = await createRecipe(app, soup);
     const potato = created.ingredients.find(({ name }) => name === 'Potato');
-    await markIngredient(client, potato.ingredientId, { gotIt: true, aisle: 'Produce' });
+    await setGotIt(app, potato.ingredientId, true);
+    await setAisle(app, potato.ingredientId, 'Produce');
 
     await updateRecipe(app, created.id, {
       ...soup,
