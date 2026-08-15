@@ -14,7 +14,7 @@
 //
 // Every statement is parameterized. Nothing on this path builds SQL from a string.
 
-import { RECIPE_ID_MAX, createRecipeBody } from '@meal-prep/shared';
+import { RECIPE_ID_MAX, RECIPE_INGREDIENTS_MAX, createRecipeBody } from '@meal-prep/shared';
 import { readRecipe, recipeSchema } from './state.js';
 
 const INSERT_RECIPE = `
@@ -80,18 +80,20 @@ const SET_SELECTED = `
   update recipes set selected = $2 where id = $1
 `;
 
-// The absolute ceiling on total Recipes (ADR-0001). Counting and then inserting is only an
-// approximate cap: two creates arriving together both read a count below the ceiling and both
-// insert. Taking a lock first is what makes it exact. The lock is released when the transaction
-// ends, and it is advisory rather than a lock on the table, so it serializes creating a Recipe
-// without standing in the way of any other write to one. Creating a Recipe is a rare, human-paced
-// write, so serializing it costs nothing worth measuring.
+// The absolute ceilings on rows (ADR-0001). Counting and then inserting is only an approximate cap:
+// two writes arriving together both read a count below the ceiling and both insert. Taking a lock
+// first is what makes it exact. The lock is released when the transaction ends, and it is advisory
+// rather than a lock on a table, so it serializes the writes that mint rows without standing in the
+// way of any other write. Those writes are rare and human-paced, so serializing them costs nothing
+// worth measuring.
 //
-// The key is arbitrary. All that matters is that every session contending for the ceiling names the
-// same number, and this is the only advisory lock the application takes.
-const RECIPE_CAP_LOCK_KEY = 831_071;
-const LOCK_RECIPE_CAP = 'select pg_advisory_xact_lock($1)';
+// The key is arbitrary. All that matters is that every session contending for a ceiling names the
+// same number, and this is the only advisory lock the application takes. Creating and editing share
+// it because they contend for the same Ingredient ceiling.
+const ROW_CAP_LOCK_KEY = 831_071;
+const LOCK_ROW_CAPS = 'select pg_advisory_xact_lock($1)';
 const COUNT_RECIPES = 'select count(*)::int as total from recipes';
+const COUNT_INGREDIENTS = 'select count(*)::int as total from ingredients';
 
 const UNIQUE_VIOLATION = '23505';
 
@@ -141,14 +143,45 @@ function findRepeatedIngredient(ingredients) {
 }
 
 /**
- * Whether this instance is already holding every Recipe it is configured for. Call inside the
- * transaction that inserts: the lock it takes is what makes the answer still true a moment later.
+ * Serializes the writes that mint rows against each other, so a count taken after it is still true
+ * when the transaction commits. Call first, inside the transaction.
  */
+async function lockRowCaps(client) {
+  await client.query(LOCK_ROW_CAPS, [ROW_CAP_LOCK_KEY]);
+}
+
+/** Whether this instance is already holding every Recipe it is configured for. */
 async function atRecipeCap(client, recipesMax) {
-  await client.query(LOCK_RECIPE_CAP, [RECIPE_CAP_LOCK_KEY]);
   const { rows } = await client.query(COUNT_RECIPES);
   return rows[0].total >= recipesMax;
 }
+
+// The ceiling on Ingredient rows, derived rather than configured because it is the bound that was
+// already true. Before a Recipe could be edited or deleted, the only way to mint an Ingredient was
+// creating a Recipe, and a Recipe was capped at RECIPE_INGREDIENTS_MAX of them and could never be
+// freed, so the table could never hold more than every Recipe's worth. Editing broke that on its
+// own: a Recipe rewritten with a hundred new foods leaves the old hundred behind and can be
+// rewritten again, forever. This restores the old bound rather than choosing a new one, so it needs
+// no setting of its own and no wrapper has to learn about it.
+const ingredientCeiling = (recipesMax) => recipesMax * RECIPE_INGREDIENTS_MAX;
+
+/**
+ * Whether the rows this transaction has just written put the instance past that ceiling. Asked
+ * after the write rather than before, because how many Ingredients a request creates depends on how
+ * many of the foods it names are already here, and the upserts are what answer that. The
+ * transaction rolls back, so a request that oversteps leaves nothing behind.
+ */
+async function overIngredientCeiling(client, recipesMax) {
+  const { rows } = await client.query(COUNT_INGREDIENTS);
+  return rows[0].total > ingredientCeiling(recipesMax);
+}
+
+// No advice to give: nothing in the app deletes an Ingredient, so telling a cook to free one would
+// be telling them to do something they cannot. Deleting a Recipe frees a Recipe slot and no
+// Ingredient, which is why this refusal does not borrow the other one's wording.
+const ingredientCeilingRefusal = (recipesMax) => ({
+  message: `This instance has room for ${ingredientCeiling(recipesMax)} Ingredients and is holding all of them.`,
+});
 
 /**
  * Attaches each Recipe Ingredient to the Ingredient it names, creating that Ingredient only if no
@@ -236,6 +269,7 @@ export function registerRecipeRoutes(app) {
         // One transaction, so a Recipe refused partway through leaves neither a half-written Recipe
         // nor an Ingredient nothing references.
         await client.query('begin');
+        await lockRowCaps(client);
 
         if (await atRecipeCap(client, recipesMax)) {
           await client.query('rollback');
@@ -245,6 +279,15 @@ export function registerRecipeRoutes(app) {
         }
 
         recipeId = await insertRecipe(client, recipe);
+
+        // A create cannot pass the Ingredient ceiling on its own, since the ceiling is every
+        // Recipe's worth and a Recipe is capped at one Recipe's worth. It can once an edit has left
+        // orphans behind, which is why this is asked here and not only on the edit.
+        if (await overIngredientCeiling(client, recipesMax)) {
+          await client.query('rollback');
+          return reply.code(409).send(ingredientCeilingRefusal(recipesMax));
+        }
+
         await client.query('commit');
       } catch (cause) {
         await client.query('rollback');
@@ -295,6 +338,7 @@ export function registerRecipeRoutes(app) {
         // One transaction, so an edit refused partway through leaves the Recipe as it was rather
         // than holding its old name beside its new Recipe Ingredients.
         await client.query('begin');
+        await lockRowCaps(client);
 
         const { rowCount } = await client.query(UPDATE_RECIPE, [
           id,
@@ -311,6 +355,16 @@ export function registerRecipeRoutes(app) {
 
         await client.query(DELETE_RECIPE_INGREDIENTS, [id]);
         await insertRecipeIngredients(client, id, recipe.ingredients);
+
+        // The write an edit makes that a create cannot: the foods it stops naming leave their
+        // Ingredients behind, so rewriting one Recipe with fresh names over and over grows the
+        // table without bound. Asked after the upserts, because only they know how many of these
+        // foods were already here.
+        if (await overIngredientCeiling(client, app.guardrails.recipesMax)) {
+          await client.query('rollback');
+          return reply.code(409).send(ingredientCeilingRefusal(app.guardrails.recipesMax));
+        }
+
         await client.query('commit');
       } catch (cause) {
         await client.query('rollback');

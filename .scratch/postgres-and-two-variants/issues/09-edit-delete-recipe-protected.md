@@ -74,6 +74,23 @@ the delete endpoint, so it belongs to whoever builds the version endpoint — it
 a record of deletions alongside the maximum. Flagged here because this ticket is what makes deletion
 reachable.
 
+**Editing removed a row cap nobody had written down, so it was restored.** Before this ticket the
+only way to mint an Ingredient was creating a Recipe, and a Recipe was capped at
+`RECIPE_INGREDIENTS_MAX` of them and could never be deleted, so the table could never hold more than
+every Recipe's worth. Editing breaks that on its own — a Recipe rewritten with a hundred new foods
+leaves the old hundred behind and can be rewritten again — and deleting hands Recipe slots back on
+top. The ceiling is now `RECIPES_MAX * RECIPE_INGREDIENTS_MAX`, checked under the advisory lock the
+Recipe cap already takes and after the upserts, since only they know how many of the named foods
+were already there. Derived rather than configured, because it is the bound that already existed
+rather than a new policy: no wrapper has to learn a setting. Found in code review against ADR-0001.
+
+**The ceiling is fifty times past the point the schema breaks, which is ticket 19.** `lpad` truncates
+rather than only padding, so `ingredients.id` and `recipes.id` collide on every value past 999. The
+default ceiling is 50000. The cap is correct and does its job once ticket 19 lands; until then an
+instance stops being able to mint Ingredients at a thousand, with a refusal that blames a repeated
+Ingredient. This ticket's ceiling tests use `recipesMax: 1` for exactly that reason, and the comment
+saying so should go when 19 is done.
+
 **Known sharp edge, not fixed.** A client sending `Content-Type: application/json` with no body on
 `DELETE /api/recipes/:id` gets Fastify's `FST_ERR_CTP_EMPTY_JSON_BODY` 400 rather than the delete.
 The app's own client sends no content-type and is unaffected. Fixing it means replacing the JSON

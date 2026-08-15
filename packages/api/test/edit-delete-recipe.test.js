@@ -503,6 +503,110 @@ describe('deleting a Recipe', () => {
   });
 });
 
+// Before this ticket the Ingredients table was bounded without anything saying so: the only way to
+// mint an Ingredient was creating a Recipe, and Recipes could never be freed, so the table could
+// never hold more than every Recipe's worth of them. Editing breaks that on its own — a Recipe
+// rewritten with a hundred new foods leaves the old hundred behind and can be rewritten again —
+// and deleting hands back Recipe slots on top. The ceiling is the one that was already true
+// (ADR-0001).
+describe('bounding the Ingredients an instance can hold', () => {
+  // One Recipe's worth, so the ceiling is a hundred and one Recipe at the per-Recipe cap fills it.
+  // Deliberately small: `recipes.id` and `ingredients.id` collide past 999 (see the note on this
+  // ticket), so a suite that minted a thousand rows would be testing that bug instead of this cap.
+  const oneRecipesWorth = { guardrails: { recipesMax: 1 } };
+  const twoRecipesWorth = { guardrails: { recipesMax: 2 } };
+
+  const foods = (prefix, count = RECIPE_INGREDIENTS_MAX) =>
+    Array.from({ length: count }, (_, index) => ({ name: `${prefix}${index}` }));
+
+  /** A Recipe holding a full hundred foods, which is the whole ceiling when recipesMax is 1. */
+  const recipeAtTheCeiling = async (app) =>
+    createRecipe(app, { name: 'Everything', type: 'Dinner', ingredients: foods('first-') });
+
+  it('refuses an edit that would push it past the ceiling', async (t) => {
+    const app = await startApp(t, oneRecipesWorth);
+    const created = await recipeAtTheCeiling(app);
+
+    const refusal = await refuseEdit(
+      app,
+      created.id,
+      { name: 'Everything', type: 'Dinner', ingredients: foods('second-') },
+      409,
+    );
+
+    assert.match(refusal.message, /100 Ingredients/);
+  });
+
+  it('leaves the Recipe as it was when it refuses', async (t) => {
+    const app = await startApp(t, oneRecipesWorth);
+    const created = await recipeAtTheCeiling(app);
+
+    await refuseEdit(
+      app,
+      created.id,
+      { name: 'Renamed', type: 'Soup', ingredients: foods('second-') },
+      409,
+    );
+
+    const [recipe] = await readRecipes(app);
+    assert.equal(recipe.name, 'Everything');
+    assert.equal(recipe.type, 'Dinner');
+    assert.equal(recipe.ingredients.length, RECIPE_INGREDIENTS_MAX);
+    assert.ok(recipe.ingredients.every(({ name }) => name.startsWith('first-')));
+  });
+
+  // The cap bounds what an instance holds, not what a cook may do. An edit naming foods already
+  // there creates no row, so a full instance is still correctable.
+  it('allows an edit that names Ingredients already there', async (t) => {
+    const app = await startApp(t, oneRecipesWorth);
+    const created = await recipeAtTheCeiling(app);
+
+    const edited = await updateRecipe(app, created.id, {
+      name: 'Everything Renamed',
+      type: 'Soup',
+      ingredients: foods('first-', 40),
+    });
+
+    assert.equal(edited.name, 'Everything Renamed');
+    assert.equal(edited.ingredients.length, 40);
+  });
+
+  // Creating cannot pass the ceiling on its own, because a Recipe is capped at a hundred Recipe
+  // Ingredients and the ceiling is every Recipe's worth of them. It can once an edit has left a
+  // hundred orphans behind.
+  it('refuses a create once an edit has filled the table', async (t) => {
+    const app = await startApp(t, twoRecipesWorth);
+    const created = await recipeAtTheCeiling(app);
+    await updateRecipe(app, created.id, {
+      name: 'Everything',
+      type: 'Dinner',
+      ingredients: foods('second-'),
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/recipes',
+      payload: { name: 'One More', type: 'Soup', ingredients: foods('third-') },
+    });
+
+    assert.equal(response.statusCode, 409, response.body);
+    assert.match(response.json().message, /200 Ingredients/);
+    assert.equal((await readRecipes(app)).length, 1);
+  });
+
+  it('leaves an ordinary instance alone', async (t) => {
+    const app = await startApp(t);
+
+    const created = await createRecipe(app, soup);
+    const edited = await updateRecipe(app, created.id, {
+      ...soup,
+      ingredients: [...soup.ingredients, { name: 'Cream', quantity: 100, unit: 'ml' }],
+    });
+
+    assert.equal(edited.ingredients.length, 3);
+  });
+});
+
 // The refusal a full instance gives says "Delete one to add another". Nothing made that true until
 // this ticket, and nothing proved it.
 describe('deleting a Recipe to make room for another', () => {
