@@ -11,7 +11,6 @@ import { describe, it } from 'node:test';
 import { RECIPE_ID_MAX, RECIPE_INGREDIENTS_MAX } from '@meal-prep/shared';
 import { startApp } from './helpers/app.js';
 import { connect } from './helpers/database.js';
-import { markRecipe } from './helpers/flags.js';
 import { setPantry } from './helpers/pantry.js';
 import {
   createRecipe,
@@ -715,75 +714,6 @@ describe('refusing an id no Recipe could carry', () => {
   });
 });
 
-// Only ever set in the Demo Variant. The Homelab Variant leaves it false, so every assertion here
-// describes behaviour the homelab never reaches (ADR-0002).
-describe('a Protected Recipe', () => {
-  const protectedSoup = async (t) => {
-    const app = await startApp(t);
-    const created = await createRecipe(app, soup);
-    await markRecipe(await connect(t), created.id, { isProtected: true });
-    return { app, created };
-  };
-
-  it('refuses an edit', async (t) => {
-    const { app, created } = await protectedSoup(t);
-
-    const refusal = await refuseEdit(app, created.id, { ...soup, name: 'Anything' }, 403);
-
-    assert.match(refusal.message, /Leek and Potato Soup/);
-  });
-
-  it('is unchanged after a refused edit', async (t) => {
-    const { app, created } = await protectedSoup(t);
-
-    await refuseEdit(app, created.id, { ...soup, name: 'Anything', ingredients: [] }, 403);
-
-    const [recipe] = await readRecipes(app);
-    assert.equal(recipe.name, 'Leek and Potato Soup');
-    assert.equal(recipe.ingredients.length, 2);
-    assert.equal(created.id, recipe.id);
-  });
-
-  it('refuses a delete', async (t) => {
-    const { app, created } = await protectedSoup(t);
-
-    const refusal = await refuseDelete(app, created.id, 403);
-
-    assert.match(refusal.message, /Leek and Potato Soup/);
-  });
-
-  it('is still there after a refused delete', async (t) => {
-    const { app, created } = await protectedSoup(t);
-
-    await refuseDelete(app, created.id, 403);
-
-    assert.equal((await readRecipes(app)).length, 1);
-    assert.equal((await readRecipes(app))[0].id, created.id);
-  });
-
-  // Putting a Recipe on the Shopping List is not editing it. A Demo Visitor has to be able to shop
-  // for a seeded Recipe, or the demo is a read-only tour of the one thing the app is for. This one
-  // passes the moment it is written: it is here to keep the Protected check off the Selected Recipe
-  // route, not to drive it onto the two routes below.
-  it('is still a Recipe a cook can shop for', async (t) => {
-    const { app, created } = await protectedSoup(t);
-
-    await setSelected(app, created.id, true);
-
-    assert.equal((await readShoppingList(app)).length, 2);
-  });
-
-  it('accepts an edit and a delete once it is not Protected', async (t) => {
-    const app = await startApp(t);
-    const created = await createRecipe(app, soup);
-    const client = await connect(t);
-    await markRecipe(client, created.id, { isProtected: true });
-
-    await markRecipe(client, created.id, { isProtected: false });
-
-    const edited = await updateRecipe(app, created.id, { ...soup, name: 'Leek and Potato' });
-    assert.equal(edited.name, 'Leek and Potato');
-    await deleteRecipe(app, created.id);
-    assert.deepEqual(await readRecipes(app), []);
-  });
-});
+// Protected is the one refusal on these two routes that is not about the request. It moved to
+// test/seed.test.js when ticket 12 landed, because the Seed is the only thing that sets the flag and
+// a test that set it by hand was arranging a row the application could not produce (ADR-0005).

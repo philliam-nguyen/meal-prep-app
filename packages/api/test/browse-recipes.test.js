@@ -4,14 +4,12 @@
 // whole collection arrives in this one response and the client narrows it, which is what makes a
 // keystroke in the search box cost nothing.
 //
-// State is arranged through the API. Only the Protected flag is still set directly, because nothing
-// owns it until the Seed lands in ticket 12.
+// Every piece of state here is arranged through the API, so no test sets up a Recipe the
+// application itself could not produce.
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { startApp } from './helpers/app.js';
-import { connect } from './helpers/database.js';
-import { markRecipe } from './helpers/flags.js';
 import { createRecipe, readRecipes, setSelected } from './helpers/recipes.js';
 
 describe('browsing Recipes', () => {
@@ -114,15 +112,15 @@ describe('browsing Recipes', () => {
     assert.deepEqual(recipe.ingredients, []);
   });
 
-  it('reports whether a Recipe is Protected', async (t) => {
+  // The flag as a cook meets it: unset, because nothing they can do sets it. The other side of it,
+  // a seeded Recipe reporting itself Protected, belongs to the Seed and lives in seed.test.js.
+  it('reports a Recipe a cook added as not Protected', async (t) => {
     const app = await startApp(t);
-    const client = await connect(t);
-    const seeded = await createRecipe(app, { name: 'Seeded', type: 'Dinner' });
-    await markRecipe(client, seeded.id, { isProtected: true });
+    await createRecipe(app, { name: 'Mine', type: 'Dinner' });
 
     const [recipe] = await readRecipes(app);
 
-    assert.equal(recipe.protected, true);
+    assert.equal(recipe.protected, false);
   });
 
   it('orders Recipes by name so a browse list reads alphabetically', async (t) => {

@@ -3,7 +3,7 @@ id: 0001
 title: Postgres migration and two deployment Variants
 status: accepted
 date: 2026-08-03
-adrs: [0001, 0002, 0003, 0005]
+adrs: [0001, 0002, 0003, 0005, 0007]
 ---
 
 # Postgres migration and two deployment Variants
