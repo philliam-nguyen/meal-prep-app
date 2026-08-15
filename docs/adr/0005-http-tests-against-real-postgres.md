@@ -80,11 +80,33 @@ Protected flag are columns on a Recipe the browse payload reports and no endpoin
 on ticket 06 for the toggle and ticket 12 for the Seed. The helper updates those two columns on a
 Recipe the API created rather than inserting anything, and it goes when those tickets land.
 
+A second exception, added by ticket 10 and different in kind: `test/version.test.js` wraps the pool's
+`query` method for the life of a test. The version endpoint promises to answer from one cheap query
+to a client that asks for it every few seconds, and promises to read that version before the payload
+it travels with. Neither promise is visible in a response body, and both are the kind that a later
+change breaks silently. One test counts the statements a request runs; one lands a write between two
+of them, through the API. The database stays real and the assertions still read HTTP responses. That
+file also holds the last raw statement in the suite, a `delete from recipes`, because ticket 09 has
+not shipped a delete endpoint to send instead; it goes when 09 lands.
+
 Every test reaches Postgres as the restricted role, so a missing grant surfaces on the first run
 that needs it instead of at deployment.
 
 The frontend keeps having no tests. Once the Shopping List and Best Match derivations move into SQL
 it is presentational, and nothing here changes that.
+
+Ticket 10 qualified that, and the line it drew is behaviour against presentation.
+`packages/web/src/freshness.js` decides when to ask the API for a version, when to stay quiet, and
+what counts as a change. It holds no JSX, renders nothing and imports no framework, and three of that
+ticket's acceptance criteria live in it and are invisible from the API. So `packages/web` runs
+`node --test` now, the same way `packages/shared` already does, with no renderer, no DOM and no new
+dependency. Components still have no tests and are still not meant to.
+
+Those tests supply the module a clock, a document visibility flag and a version reader, which is the
+first place in this repository where a test hands code a collaborator. What is supplied is the
+browser and the network, not the module under test: the poll's own rules run unmodified, and the
+alternative was waiting four real seconds per assertion. Anything reachable through HTTP against the
+real database still goes through the seam above, and nothing about that changes.
 
 Test duration now depends on Docker image pull and container start. Expect the first run on a clean
 machine to be slow and later runs to be quick, and revisit this if the suite grows enough that one

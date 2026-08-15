@@ -10,6 +10,16 @@ export async function fetchState() {
 }
 
 /**
+ * The freshness signal, and the only request this app makes on a timer. A few dozen bytes, so the
+ * poll that finds nothing new costs almost nothing.
+ */
+export async function fetchVersion() {
+  const response = await fetch('/api/version');
+  if (!response.ok) throw new Error(`GET /api/version returned ${response.status}`);
+  return (await response.json()).version;
+}
+
+/**
  * Creates a Recipe. The form has already validated against the same schema the API enforces, so a
  * refusal here is either a rule only the server can check or a bug in the pair; both are worth
  * showing the cook verbatim rather than flattening into "could not save".

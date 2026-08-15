@@ -8,6 +8,7 @@ import { registerGuardrails } from './guardrails.js';
 import { registerIngredientRoutes } from './ingredients.js';
 import { registerRecipeRoutes } from './recipes.js';
 import { readState, stateResponse } from './state.js';
+import { registerVersionRoute } from './version.js';
 
 // The frontend is served from the API's own origin in both Variants, which is what lets it call
 // relative paths and carry no per-Variant configuration (ADR-0002). API routes sit under /api so
@@ -65,6 +66,19 @@ export async function buildApp({ pool, staticRoot = defaultWebDist, logger = tru
   // Before every route below, so a route added later is covered without opting in.
   await registerGuardrails(app, guardrails);
 
+  // No read from this API may be served from a cache. The version endpoint exists to change, and the
+  // state payload is what a changed version sends the client back for, so either one held by a
+  // browser's own heuristics or by the Demo Variant's CDN default breaks freshness silently: the
+  // poll keeps running and keeps concluding that nothing has moved. Nothing else here sets a cache
+  // header, and a response with none is exactly the one an intermediary is free to guess about.
+  //
+  // Scoped to /api so the built frontend keeps whatever caching its hashed filenames earn.
+  app.addHook('onSend', async (request, reply) => {
+    if (request.method === 'GET' && request.url.startsWith('/api/')) {
+      reply.header('cache-control', 'no-store');
+    }
+  });
+
   app.get(
     '/api/health',
     { schema: { response: { 200: healthResponse, 503: healthResponse } } },
@@ -87,6 +101,7 @@ export async function buildApp({ pool, staticRoot = defaultWebDist, logger = tru
 
   registerRecipeRoutes(app);
   registerIngredientRoutes(app);
+  registerVersionRoute(app);
 
   if (bundleExists(staticRoot)) {
     app.register(fastifyStatic, { root: staticRoot });

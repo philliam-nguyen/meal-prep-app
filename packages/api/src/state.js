@@ -19,6 +19,7 @@ import {
   readStaples,
   stapleSchema,
 } from './ingredients.js';
+import { readVersion } from './version.js';
 
 const recipesQuery = (where = '') => `
   select
@@ -170,9 +171,14 @@ const shoppingListEntry = {
 /** Fastify serializes the response through this, so a column added later stays off the wire. */
 export const stateResponse = {
   type: 'object',
-  required: ['recipes', 'shoppingList', 'pantryChecklist', 'staples', 'bestMatches'],
+  required: ['version', 'recipes', 'shoppingList', 'pantryChecklist', 'staples', 'bestMatches'],
   additionalProperties: false,
   properties: {
+    // What the freshness poll compares against. Here rather than left to the client's first poll,
+    // because a client that starts by asking the version endpoint has a gap between the two requests
+    // where a write can land and be adopted as the baseline, and a change adopted as the baseline is
+    // a change that never arrives.
+    version: { type: 'string' },
     recipes: { type: 'array', items: recipeSchema },
     shoppingList: { type: 'array', items: shoppingListEntry },
     // Two lists rather than one collection with a flag, so that Staples being absent from the
@@ -192,8 +198,15 @@ export const stateResponse = {
  * could hand a client a Recipe from before it alongside a Shopping List from after. That is a stale
  * read rather than a conflict, it corrects itself on the next read, and last-write-wins is the model
  * this app is built on.
+ *
+ * The version is read first and alone, which is the one piece of ordering here that matters. It is
+ * the mark the client's poll compares against, so it has to describe a moment no later than the
+ * payload around it. Read after these queries, or in parallel with them, it could describe a write
+ * the payload missed, and the client would compare against a version it never actually received and
+ * sit on stale data until something else changed.
  */
 export async function readState(db) {
+  const version = await readVersion(db);
   const [recipes, shoppingList, pantryChecklist, staples, bestMatches] = await Promise.all([
     db.query(RECIPES_QUERY),
     db.query(SHOPPING_LIST_QUERY),
@@ -202,6 +215,7 @@ export async function readState(db) {
     readBestMatches(db),
   ]);
   return {
+    version,
     recipes: recipes.rows,
     shoppingList: shoppingList.rows,
     pantryChecklist,

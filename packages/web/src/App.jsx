@@ -1,14 +1,17 @@
-import { useCallback, useEffect, useState } from 'react';
-import { deleteRecipe,
-  clearGotItMarks,
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { 
   fetchState,
+  fetchVersion,
+  deleteRecipe,
+  clearGotItMarks,
   setIngredientAisle,
-  setIngredientGotIt,
-  setIngredientPantry,
-  setIngredientStaple,
-  setRecipeSelected,
+  setIngredientGotIt, 
+  setIngredientPantry, 
+  setIngredientStaple, 
+  setRecipeSelected 
 } from './api.js';
 import { loadCache, saveCache } from './cache.js';
+import { startFreshnessPoll } from './freshness.js';
 import { formatSince } from './format.js';
 import { I } from './icons.jsx';
 import { Toast } from './components/Toast.jsx';
@@ -56,13 +59,26 @@ export function MealPrepApp() {
   const [bgSyncing, setBgSyncing] = useState(false);
   const [lastSynced, setLastSynced] = useState(null);
   const [toastMsg, setToastMsg] = useState('');
+  // Refs, not state: neither is rendered, and neither changing should cost a paint.
+  const version = useRef(null);
+  const latestLoad = useRef(0);
 
   const toast = useCallback(msg => { setToastMsg(''); setTimeout(() => setToastMsg(msg), 10); }, []);
 
+  // Reloads overlap: every toggle asks for one, so does the poll, so does the Refresh button. They
+  // are not guaranteed to come back in the order they went out, and an older reply landing last used
+  // to repaint the screen with data the newer one had already replaced. Worse now that a version
+  // travels with the payload, because the same reply would rewind the freshness mark to a version
+  // the screen has moved past, and the poll would then refetch what it already had. Only the newest
+  // request in flight is allowed to land.
   const loadData = useCallback(async (silent = false) => {
+    const load = (latestLoad.current += 1);
+    const stale = () => load !== latestLoad.current;
+
     if (silent) setBgSyncing(true); else setLoading(true);
     try {
       const state = await fetchState();
+      if (stale()) return;
       setRecipes(state.recipes);
       setShoppingList(state.shoppingList);
       setPantryChecklist(state.pantryChecklist);
@@ -70,10 +86,17 @@ export function MealPrepApp() {
       setBestMatches(state.bestMatches);
       setLastSynced(Date.now());
       saveCache(state);
+      // The version this data arrived with, which is what the next poll is compared against. The
+      // payload carries it rather than the poll fetching its own, so there is no window between the
+      // two where a change can land and be mistaken for the version already on screen.
+      version.current = state.version;
     } catch {
-      if (!silent) toast('Could not load your recipes. Check your connection.');
+      if (!silent && !stale()) toast('Could not load your recipes. Check your connection.');
+    } finally {
+      // Cleared by whichever call set it, overtaken or not. Letting an overtaken load leave it on
+      // would trade a moment of missing spinner for a first paint that never stops loading.
+      if (silent) setBgSyncing(false); else setLoading(false);
     }
-    if (silent) setBgSyncing(false); else setLoading(false);
   }, [toast]);
 
   useEffect(() => {
@@ -87,11 +110,27 @@ export function MealPrepApp() {
       if (cache.staples) setStaples(cache.staples);
       if (cache.bestMatches) setBestMatches(cache.bestMatches);
       setLastSynced(cache.savedAt);
+      // What the cached payload was current at, so a poll has something to compare against even if
+      // the reload below never lands.
+      version.current = cache.version ?? null;
       loadData(true);
     } else {
       loadData();
     }
   }, [loadData]);
+
+  // Restarted per view, because staleness does not matter on all of them. Which ones is the poll's
+  // own decision, so this hands it the view rather than asking first.
+  useEffect(() => {
+    const watching = startFreshnessPoll({
+      view: tab,
+      versionOnScreen: () => version.current,
+      readVersion: fetchVersion,
+      onStale: () => loadData(true),
+    });
+
+    return () => watching.stop();
+  }, [tab, loadData]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
