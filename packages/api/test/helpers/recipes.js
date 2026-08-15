@@ -10,6 +10,23 @@ export async function createRecipe(app, body) {
   return response.json();
 }
 
+/** Rewrites a Recipe and returns it, failing the test if the API refused the edit. */
+export async function updateRecipe(app, recipeId, body) {
+  const response = await app.inject({
+    method: 'PUT',
+    url: `/api/recipes/${recipeId}`,
+    payload: body,
+  });
+  assert.equal(response.statusCode, 200, response.body);
+  return response.json();
+}
+
+/** Deletes a Recipe, failing the test if the API refused. */
+export async function deleteRecipe(app, recipeId) {
+  const response = await app.inject({ method: 'DELETE', url: `/api/recipes/${recipeId}` });
+  assert.equal(response.statusCode, 204, response.body);
+}
+
 /** Marks a Recipe as a Selected Recipe, or unmarks it. */
 export async function setSelected(app, recipeId, selected) {
   const response = await app.inject({
@@ -30,7 +47,8 @@ export async function readShoppingList(app) {
   return (await readState(app)).shoppingList;
 }
 
-async function readState(app) {
+/** The whole first-paint payload, for assertions that span more than one of its lists. */
+export async function readState(app) {
   const response = await app.inject({ method: 'GET', url: '/api/state' });
   assert.equal(response.statusCode, 200);
   return response.json();

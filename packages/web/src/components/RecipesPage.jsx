@@ -17,7 +17,7 @@ function typesPresent(recipes) {
   return [ALL, ...known, ...unknown];
 }
 
-export function RecipesPage({ recipes, onToggleSelected }) {
+export function RecipesPage({ recipes, onToggleSelected, onEdit, onDelete }) {
   const [filter, setFilter] = useState(ALL);
   const [searchTerm, setSearchTerm] = useState('');
   // The id of the open card rather than the Recipe itself, so what the card shows is looked up on
@@ -66,12 +66,15 @@ export function RecipesPage({ recipes, onToggleSelected }) {
           ))}
         </div>
       )}
-      {/* Closing on the toggle is what the pre-migration app did. */}
+      {/* Closing on the toggle is what the pre-migration app did. Editing and deleting close it for
+          the same reason: the card is describing a Recipe that is about to be something else. */}
       {open && (
         <RecipeDetail
           recipe={open}
           onClose={() => setOpenId(null)}
           onToggleSelected={recipe => { onToggleSelected(recipe); setOpenId(null); }}
+          onEdit={recipe => { onEdit(recipe); setOpenId(null); }}
+          onDelete={recipe => { onDelete(recipe); setOpenId(null); }}
         />
       )}
     </div>

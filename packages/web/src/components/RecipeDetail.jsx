@@ -1,9 +1,29 @@
+import { useState } from 'react';
 import { formatAmount } from '../format.js';
 import { getTypeBadge } from '../typeBadge.js';
 import { I } from '../icons.jsx';
 
-export function RecipeDetail({ recipe, onClose, onToggleSelected }) {
+// Editing and deleting are offered here rather than from the browse list, because this is the only
+// place the cook can see what they are about to change.
+//
+// A Protected Recipe offers neither. The server refuses both whatever this shows, so hiding them is
+// what keeps a visitor from meeting a refusal rather than what enforces it. The Homelab Variant
+// never sets the flag, so nothing here is hidden there (ADR-0002).
+
+const dangerButtonStyle = {
+  flex: 1,
+  justifyContent: 'center',
+  background: '#F7E9E6',
+  color: '#C26A5A',
+  border: 'none',
+};
+
+export function RecipeDetail({ recipe, onClose, onToggleSelected, onEdit, onDelete }) {
   const { ingredients } = recipe;
+  // Deleting is the one thing here nothing undoes, so it asks. In place rather than through the
+  // browser's confirm dialog, which a phone renders as a modal on top of a modal.
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content slide-up" onClick={e => e.stopPropagation()}>
@@ -35,6 +55,33 @@ export function RecipeDetail({ recipe, onClose, onToggleSelected }) {
         <button className="btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => onToggleSelected(recipe)}>
           {I.cart} <span>{recipe.selected ? 'Remove from Shopping List' : 'Add to Shopping List'}</span>
         </button>
+
+        {!recipe.protected && (
+          confirmingDelete ? (
+            <div style={{ marginTop: 12 }}>
+              <p style={{ fontSize: 14, color: '#7A7568', marginBottom: 10, textAlign: 'center' }}>
+                Delete {recipe.name}? This cannot be undone.
+              </p>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setConfirmingDelete(false)}>
+                  Keep It
+                </button>
+                <button className="btn-secondary" style={dangerButtonStyle} onClick={() => onDelete(recipe)}>
+                  {I.trash} <span>Delete</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+              <button className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => onEdit(recipe)}>
+                {I.edit} <span>Edit</span>
+              </button>
+              <button className="btn-secondary" style={dangerButtonStyle} onClick={() => setConfirmingDelete(true)}>
+                {I.trash} <span>Delete</span>
+              </button>
+            </div>
+          )
+        )}
       </div>
     </div>
   );

@@ -28,6 +28,42 @@ export async function createRecipe(recipe) {
 }
 
 /**
+ * Rewrites a Recipe. Sends the whole Recipe rather than the fields that changed, because the form
+ * has all of it on screen and a whole-Recipe write lands the same way however many times it
+ * arrives.
+ *
+ * A refusal is shown verbatim for the reason a refused create is: the server knows two things the
+ * form cannot check, that a Recipe may not name one food twice and that a Protected Recipe refuses
+ * the write at all.
+ */
+export async function updateRecipe(recipeId, recipe) {
+  const response = await fetch(`/api/recipes/${encodeURIComponent(recipeId)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(recipe),
+  });
+
+  if (response.ok) return response.json();
+
+  const refusal = await response.json().catch(() => null);
+  throw new Error(refusal?.message ?? `PUT /api/recipes/${recipeId} returned ${response.status}`);
+}
+
+/** Deletes a Recipe. Nothing comes back; the Shopping List it was on is derived on the server. */
+export async function deleteRecipe(recipeId) {
+  const response = await fetch(`/api/recipes/${encodeURIComponent(recipeId)}`, {
+    method: 'DELETE',
+  });
+
+  if (response.ok) return;
+
+  const refusal = await response.json().catch(() => null);
+  throw new Error(
+    refusal?.message ?? `DELETE /api/recipes/${recipeId} returned ${response.status}`,
+  );
+}
+
+/**
  * Marks a Recipe as a Selected Recipe, or unmarks it. Sends the value it wants rather than asking
  * for a flip, so a retry after a dropped response cannot undo the write it is retrying.
  *
