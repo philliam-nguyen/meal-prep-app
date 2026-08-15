@@ -84,9 +84,14 @@ and none of them can be seen from the API. `packages/web/src/freshness.js` holds
 nothing: it is the polling rules with the browser injected, so the tests need no DOM, no renderer and
 no new dependency, and `packages/web` now runs `node --test` like `packages/shared` already does.
 That is still a contradiction of a recorded decision rather than a reading of it, and
-`docs/agents/domain.md` says to surface those rather than override them quietly. **ADR-0005 wants
-amending, or a new ADR wants writing.** Left for the operator, since amending an ADR is not a
-ticket's call to make.
+`docs/agents/domain.md` says to surface those rather than override them quietly.
+
+This was first left for the operator on the grounds that amending an ADR is not a ticket's call. Both
+reviewers disagreed, and they were right: ADR-0005's Consequences already carry two amendments made
+exactly this way, appended by the ticket that caused them, when `test/helpers/rows.js` was added and
+again when `POST /api/recipes` closed most of it. Deferring here would have left the ADR asserting
+something no longer true. It is amended, in that established form, with the line drawn at behaviour
+against presentation, and the injected clock owned rather than glossed.
 
 **Two tests in `version.test.js` reach past the HTTP seam, both on purpose, both recorded in the
 file's header.** `recordQueries` wraps `pool.query` to count statements, because "one cheap query" is
@@ -101,10 +106,20 @@ reviews.
 **A real bug the spec review found.** The in-flight guard covered the version poll but not the
 refetch it triggers, so a `/api/state` reload slower than the four-second interval had a second one
 started on top of it, then a third, stacking requests on exactly the connection least able to carry
-them. One flag now covers both, and `onStale` is awaited. The test written for it passed against the
-broken code on the first attempt, because the second interval was arriving while the first poll was
-still parked on its own request; it needed a settle step to reach the case at all. Verified red, then
-green.
+them. One flag inside the poll covers both now, and `onStale` is awaited. The test written for it
+passed against the broken code on the first attempt, because the second interval was arriving while
+the first poll was still parked on its own request; it needed a settle step to reach the case at all.
+Verified red, then green.
+
+The second review pass then showed that flag was narrower than the claim made for it. It is local to
+one `startFreshnessPoll` call, so it does nothing about the reloads `loadData` starts everywhere
+else: every toggle, the Refresh button, and adding a Recipe. Those overlap, they are not guaranteed
+to return in order, and an older reply landing last repainted the screen with data a newer one had
+already replaced. Carrying a version made that worse rather than better, because the same reply also
+rewound the freshness mark to a version the screen had moved past, and the next poll then refetched
+what it already had. `loadData` now numbers its requests and lets only the newest land. That is a
+change to a function tickets 04 and 06 own rather than to anything this ticket introduced, taken
+because the version rewind is this ticket's doing and the fix has one sensible home.
 
 **Vocabulary.** `CONTEXT.md` lists "version" under the words to avoid, though it lists it as a
 synonym for **Variant** rather than as a banned word, and the spec calls this the "version endpoint"
@@ -113,9 +128,45 @@ which is the real gap: worth a `Freshness` or `Version` entry so that "version" 
 `version.js` and another in `compose.yaml` on purpose rather than by accident. Noted for
 `/domain-modeling` rather than edited here.
 
+Both reviewers pressed for the entry to be written now, and unlike the ADR question this one goes the
+other way. `docs/agents/domain.md` says in terms what to do about a concept missing from the
+glossary: "note it for `/domain-modeling`". That is the documented instruction, the skill exists, and
+a glossary entry invented by the ticket that needed the word is how a glossary stops being
+authoritative. Still noted, still unwritten, and it is one command away whenever the operator wants
+it.
+
+**Nothing here may be cached, and nothing in this API said so.** No route in `packages/api/src` set a
+cache header before this ticket. A 200 carrying no `Cache-Control` is one a browser may hold under
+its own heuristics, and one the Demo Variant's CDN caches for whatever its default lifetime is:
+ticket 15 puts CloudFront in front of `/api/*` and says nothing about cache behaviour. The endpoint
+whose entire job is to change would then have been served frozen, and the failure is silent, because
+the poll keeps running and keeps concluding nothing has moved. `/api/state` needed it just as much,
+since a refetch answered from a cache is the same bug one step later. An `onSend` hook now sets
+`no-store` on every `/api` GET, scoped so the bundle keeps whatever caching its hashed filenames
+earn. Caught by the spec review, and the best find of either pass.
+
+**A third gap in the design, narrower than the other two.** `now()` in Postgres is transaction start
+time, not commit time, so two write transactions that overlap can commit in the opposite order to
+their timestamps. A poll reading between those two commits adopts the later stamp and never sees the
+earlier-stamped write. Row counts do not help, because both writes here are updates. Every write in
+this app is a single autocommit statement, so the window is the microseconds between a statement
+executing and committing, and all three events have to interleave inside it. Worth knowing rather
+than worth fixing: `clock_timestamp()` would narrow it without closing it, and only the single-row
+version table rejected above closes it properly, by making writers serialize and so making the
+version strictly commit-ordered. Found by the standards review.
+
 **Cost, measured honestly.** The endpoint is one round trip and one statement, and that statement is
 three sequential scans plus two aggregates. At a few hundred Recipes that is microseconds and the
 body is 34 bytes. It is not free, and it is what the single-row table above would have made free.
+`/api/state` also pays a serial round trip it did not before, because the version is read ahead of
+the payload's `Promise.all` rather than inside it. That ordering is the point, so the cost is the
+price of it, but the app's hottest request is a round trip slower than it was.
+
+**Ticket 09 now carries the obligation this ticket assumed of it.** `version.js` stated as settled
+fact that the edit path would write the parent Recipe row. Nothing enforced that: ticket 09's boxes
+were satisfiable without ever touching `recipes`, which would have left the gap open with a comment
+claiming it closed. Ticket 09 has the requirement and a box of its own now. Caught by the spec
+review.
 
 **One judgement call argued down.** The standards review called `VIEWS_THAT_GO_STALE` a third
 parallel list of tab ids beside `NAV_ITEMS` and `PAGE_TITLES`, and suggested a flag on `NAV_ITEMS`.

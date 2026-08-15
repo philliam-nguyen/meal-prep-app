@@ -1,16 +1,22 @@
 // The endpoint two phones ask every few seconds while they shop together. It has to move whenever
 // anything the cook can see moved, and it has to cost almost nothing when nothing has.
 //
-// Two tests here reach past the HTTP seam ADR-0005 fixes, and both are deliberate.
+// Three tests here reach past the HTTP seam ADR-0005 fixes, all three deliberately, and one of them
+// does more than watch.
 //
-// `recordQueries` counts the statements a request runs. "One cheap query" is a promise this endpoint
-// makes to a client that asks for it every four seconds, and a response body cannot show whether it
-// was answered by one query or six. The wrapper observes and passes through; nothing is stubbed, and
-// the database stays real.
+// `interposeOnQueries` records the statements a request runs. "One cheap query" is a promise this
+// endpoint makes to a client that asks for it every four seconds, and a response body cannot show
+// whether one query answered it or six. Nothing is stubbed and the database stays real.
 //
-// The delete below is the file's one raw statement. There is no delete endpoint until ticket 09, and
-// the version surviving a delete is the property that endpoint will depend on, so the alternative is
-// shipping the claim untested. It goes when ticket 09 lands and the test can send a DELETE.
+// The same helper is what `is never newer than the payload it arrives with` uses to land a write
+// inside a live request. That one interposes rather than observes, which is the strongest reach in
+// this file, and it is the only way to prove an ordering that exists precisely so that a write
+// arriving mid-request cannot be lost. The write it lands goes through the API like any other.
+//
+// `deleteRecipeDirectly` is the file's one raw statement. Ticket 09 owns the delete endpoint, so
+// until it lands there is no API to arrange this through, and the alternative is shipping untested
+// the property that endpoint will depend on. Its one call site becomes a DELETE request when 09
+// lands, and this helper goes.
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -25,25 +31,29 @@ const SOUP = {
   ingredients: [{ name: 'Onion', quantity: 2, unit: '' }],
 };
 
-async function readVersion(app) {
+async function askVersion(app) {
   const response = await app.inject({ method: 'GET', url: '/api/version' });
   assert.equal(response.statusCode, 200, response.body);
   return response.json().version;
 }
 
 /**
- * Records the SQL a request runs. Reaches past the HTTP seam on purpose: "one cheap query" is a
- * promise this endpoint makes to a client that asks every few seconds, and there is nowhere else to
- * observe it.
+ * Records every statement the pool runs for the life of one test, and runs `between` after each one.
+ * Returns the running list, which `between` is handed so it can act on a particular statement.
+ *
+ * The one place this file reaches past the HTTP seam, and both of its uses are explained in the
+ * header.
  */
-function recordQueries(t, app) {
+function interposeOnQueries(t, app, between = async () => {}) {
   const pool = app.db;
   const original = pool.query;
   const sql = [];
 
-  pool.query = function record(...args) {
+  pool.query = async function interposed(...args) {
     sql.push(args[0]);
-    return original.apply(this, args);
+    const result = await original.apply(this, args);
+    await between(sql);
+    return result;
   };
   // Removes the override rather than reassigning, so the pool goes back to its own method.
   t.after(() => delete pool.query);
@@ -51,11 +61,18 @@ function recordQueries(t, app) {
   return sql;
 }
 
+/**
+ * Deletes a Recipe as the restricted role, which is the file's one raw statement. See the header:
+ * this goes when ticket 09 ships an endpoint to send instead.
+ */
+const deleteRecipeDirectly = (db, recipeId) =>
+  db.query('delete from recipes where id = $1', [recipeId]);
+
 /** Asserts that a write is one the polling client finds out about. */
 async function assertAdvances(app, write) {
-  const before = await readVersion(app);
+  const before = await askVersion(app);
   await write();
-  assert.notEqual(await readVersion(app), before);
+  assert.notEqual(await askVersion(app), before);
 }
 
 describe('the version endpoint', () => {
@@ -63,8 +80,8 @@ describe('the version endpoint', () => {
     const app = await startApp(t);
     await createRecipe(app, SOUP);
 
-    const first = await readVersion(app);
-    const second = await readVersion(app);
+    const first = await askVersion(app);
+    const second = await askVersion(app);
 
     assert.equal(second, first);
   });
@@ -101,27 +118,37 @@ describe('the version endpoint', () => {
   // The one write shape a timestamp alone cannot see. Deleting a row that is not the most recently
   // touched one leaves the maximum where it was, so a version built only from that maximum would sit
   // still while a Recipe disappeared from under the other phone.
-  //
-  // Deleted here as the restricted role rather than through an endpoint, because the delete endpoint
-  // arrives in ticket 09 and this is the property that endpoint will rely on.
   it('advances when a Recipe is deleted, even one that is not the newest', async (t) => {
     const app = await startApp(t);
     const older = await createRecipe(app, SOUP);
     await createRecipe(app, { name: 'Focaccia', type: 'Bread' });
     const db = await connect(t);
 
-    await assertAdvances(app, () => db.query('delete from recipes where id = $1', [older.id]));
+    await assertAdvances(app, () => deleteRecipeDirectly(db, older.id));
   });
 
   it('costs one query and a body a phone can ask for all afternoon', async (t) => {
     const app = await startApp(t);
     await createRecipe(app, SOUP);
-    const sql = recordQueries(t, app);
+    const sql = interposeOnQueries(t, app);
 
     const response = await app.inject({ method: 'GET', url: '/api/version' });
 
     assert.equal(sql.length, 1);
     assert.ok(Buffer.byteLength(response.body) < 100, `${response.body} is not a small body`);
+  });
+
+  // Freshness is the one thing a cache cannot be allowed to help with. A poll answered from a
+  // browser's heuristic cache or from the Demo Variant's CDN reports "nothing has changed" for as
+  // long as that copy lives, and it reports it silently.
+  it('refuses a cache, and so does the payload a moved version sends the client back for', async (t) => {
+    const app = await startApp(t);
+
+    const version = await app.inject({ method: 'GET', url: '/api/version' });
+    const state = await app.inject({ method: 'GET', url: '/api/state' });
+
+    assert.equal(version.headers['cache-control'], 'no-store');
+    assert.equal(state.headers['cache-control'], 'no-store');
   });
 });
 
@@ -132,7 +159,7 @@ describe('the version the first paint arrives with', () => {
 
     const response = await app.inject({ method: 'GET', url: '/api/state' });
 
-    assert.equal(response.json().version, await readVersion(app));
+    assert.equal(response.json().version, await askVersion(app));
   });
 
   // The version is read before the payload's own queries, never alongside them. A write landing in
@@ -141,21 +168,13 @@ describe('the version the first paint arrives with', () => {
   // whole endpoint exists to prevent.
   it('is never newer than the payload it arrives with', async (t) => {
     const app = await startApp(t);
-    const sql = recordQueries(t, app);
-    // Lands between the version read and the payload's queries, in the window the ordering exists
-    // to make safe. Sent through the API like any other write, and the guard is what keeps its own
-    // queries from arriving here and starting a second one.
-    const writeAfterTheVersionIsRead = async () => {
+    // Lands after the version read and before the payload's queries, which is the window the
+    // ordering exists to make safe. It goes through the API like any other write, and the guard is
+    // what stops its own statements arriving back here and starting a second one.
+    interposeOnQueries(t, app, async (sql) => {
       if (sql.length !== 1) return;
       await createRecipe(app, { name: 'Focaccia', type: 'Bread' });
-    };
-    const pool = app.db;
-    const record = pool.query;
-    pool.query = async function interleave(...args) {
-      const result = await record.apply(this, args);
-      await writeAfterTheVersionIsRead();
-      return result;
-    };
+    });
 
     const response = await app.inject({ method: 'GET', url: '/api/state' });
 
@@ -165,6 +184,6 @@ describe('the version the first paint arrives with', () => {
       ['Focaccia'],
       'the payload should have been read after the write',
     );
-    assert.notEqual(state.version, await readVersion(app));
+    assert.notEqual(state.version, await askVersion(app));
   });
 });
