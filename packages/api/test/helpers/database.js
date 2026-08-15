@@ -24,6 +24,18 @@ export async function connect(t) {
   return client;
 }
 
+/**
+ * A client connected as the owner role, closed when the test ends. Only for the things the app role
+ * is deliberately not allowed to do: it holds `usage, select` on the sequences, which mints ids but
+ * cannot move one. The operator's extract moves them, which is the case these tests set up.
+ */
+export async function connectAsOwner(t) {
+  const client = new pg.Client({ connectionString: ownerDatabaseUrl() });
+  await client.connect();
+  t.after(() => client.end());
+  return client;
+}
+
 /** Empties every domain table, leaving migration bookkeeping alone. Runs as the owner. */
 export async function truncateAllTables() {
   const client = new pg.Client({ connectionString: ownerDatabaseUrl() });

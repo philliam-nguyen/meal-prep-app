@@ -511,8 +511,8 @@ describe('deleting a Recipe', () => {
 // (ADR-0001).
 describe('bounding the Ingredients an instance can hold', () => {
   // One Recipe's worth, so the ceiling is a hundred and one Recipe at the per-Recipe cap fills it.
-  // Deliberately small: `recipes.id` and `ingredients.id` collide past 999 (see the note on this
-  // ticket), so a suite that minted a thousand rows would be testing that bug instead of this cap.
+  // Small so the suite stays quick: what is under test is the ceiling, and a ceiling of a hundred
+  // exercises it exactly as a ceiling of fifty thousand would.
   const oneRecipesWorth = { guardrails: { recipesMax: 1 } };
   const twoRecipesWorth = { guardrails: { recipesMax: 2 } };
 
@@ -604,6 +604,32 @@ describe('bounding the Ingredients an instance can hold', () => {
     });
 
     assert.equal(edited.ingredients.length, 3);
+  });
+
+  // The slow one, and the only test here that fills a table rather than a corner of it. It crosses
+  // the thousandth Ingredient, which is where the id generator used to cut ids back to three
+  // characters and refuse the write for a reason that had nothing to do with a ceiling
+  // (0003_readable_ids_past_999.sql). The ceiling has to be the thing that stops this, not that.
+  it('holds past the thousandth Ingredient', async (t) => {
+    const app = await startApp(t, { guardrails: { recipesMax: 10 } });
+    const created = await recipeAtTheCeiling(app);
+
+    for (let round = 1; round < 10; round += 1) {
+      await updateRecipe(app, created.id, {
+        name: 'Everything',
+        type: 'Dinner',
+        ingredients: foods(`round${round}-`),
+      });
+    }
+
+    const refusal = await refuseEdit(
+      app,
+      created.id,
+      { name: 'Everything', type: 'Dinner', ingredients: foods('overflow-') },
+      409,
+    );
+
+    assert.match(refusal.message, /1000 Ingredients/);
   });
 });
 

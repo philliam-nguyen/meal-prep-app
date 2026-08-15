@@ -84,12 +84,12 @@ Recipe cap already takes and after the upserts, since only they know how many of
 were already there. Derived rather than configured, because it is the bound that already existed
 rather than a new policy: no wrapper has to learn a setting. Found in code review against ADR-0001.
 
-**The ceiling is fifty times past the point the schema breaks, which is ticket 19.** `lpad` truncates
-rather than only padding, so `ingredients.id` and `recipes.id` collide on every value past 999. The
-default ceiling is 50000. The cap is correct and does its job once ticket 19 lands; until then an
-instance stops being able to mint Ingredients at a thousand, with a refusal that blames a repeated
-Ingredient. This ticket's ceiling tests use `recipesMax: 1` for exactly that reason, and the comment
-saying so should go when 19 is done.
+**The ceiling was fifty times past the point the schema broke, which was ticket 19, now fixed.**
+`lpad` truncates rather than only padding, so `ingredients.id` and `recipes.id` collided on every
+value past 999 while the default ceiling was 50000. The cap would have been dead weight. Ticket 19
+landed `0003_readable_ids_past_999.sql` in the same branch, and this ticket's ceiling suite now
+carries a test that fills past the thousandth Ingredient to prove the ceiling is what stops the
+write.
 
 **Known sharp edge, not fixed.** A client sending `Content-Type: application/json` with no body on
 `DELETE /api/recipes/:id` gets Fastify's `FST_ERR_CTP_EMPTY_JSON_BODY` 400 rather than the delete.

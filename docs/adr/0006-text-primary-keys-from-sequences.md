@@ -57,3 +57,12 @@ wrote. The sequences carry no ownership over rows that already exist.
 Ids are capped in length but their format is not constrained, so the extract can carry whatever
 column A of the Recipes tab actually holds rather than failing on rows that never matched `R###`.
 Nothing reads meaning out of the digits.
+
+The three digits are a minimum width and never a maximum. `R001` is what the hundredth row and
+everything below it looks like; the thousandth is `R1000` and the scheme carries on from there.
+This is worth stating because the first implementation read it the other way: it padded with
+`lpad(nextval(...)::text, 3, '0')`, and `lpad` cuts a string that is already longer than the width
+it is given. The thousandth row asked for `1000`, received `100`, and collided with the hundredth.
+`0003_readable_ids_past_999.sql` replaced that with a `readable_id()` function whose padding only
+ever adds characters. Anything that mints one of these ids has to keep that property, including the
+extract at cutover.

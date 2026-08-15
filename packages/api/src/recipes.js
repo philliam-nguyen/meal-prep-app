@@ -95,7 +95,20 @@ const LOCK_ROW_CAPS = 'select pg_advisory_xact_lock($1)';
 const COUNT_RECIPES = 'select count(*)::int as total from recipes';
 const COUNT_INGREDIENTS = 'select count(*)::int as total from ingredients';
 
+// One uniqueness rule, not every uniqueness rule. Two spellings that JavaScript reads as different
+// foods and Postgres folds into one resolve to a single Ingredient, and the second Recipe
+// Ingredient row then lands on a (recipe_id, ingredient_id) pair the first one already took. That
+// is the only 23505 on this path that means "this Recipe names one food twice".
+//
+// Matching the code alone said it about all of them. When the id generator was cutting ids back to
+// three characters, the thousandth Ingredient collided on the primary key and a cook was told to
+// look for a repeated Ingredient that was not there. Migration 0003 fixed the generator; this stops
+// the handler putting its own words in Postgres's mouth if anything else ever raises a 23505.
 const UNIQUE_VIOLATION = '23505';
+const REPEATED_RECIPE_INGREDIENT = 'recipe_ingredients_pkey';
+
+const namesOneFoodTwice = (cause) =>
+  cause.code === UNIQUE_VIOLATION && cause.constraint === REPEATED_RECIPE_INGREDIENT;
 
 // Setting the flag rather than flipping it. Both phones on one instance can send a toggle, and a
 // flip would land in whatever order they arrived; a set is idempotent, so last-write-wins is
@@ -293,7 +306,7 @@ export function registerRecipeRoutes(app) {
         await client.query('rollback');
         // Two spellings JavaScript reads as different Ingredients and Postgres folds into one. The
         // check above catches the ordinary case; this catches whatever case folding disagrees on.
-        if (cause.code === UNIQUE_VIOLATION) {
+        if (namesOneFoodTwice(cause)) {
           return reply
             .code(400)
             .send({ message: 'This Recipe lists one Ingredient twice.' });
@@ -370,7 +383,7 @@ export function registerRecipeRoutes(app) {
         await client.query('rollback');
         // The same folding disagreement the create guards against: two spellings JavaScript reads
         // as different Ingredients and Postgres resolves to one row.
-        if (cause.code === UNIQUE_VIOLATION) {
+        if (namesOneFoodTwice(cause)) {
           return reply.code(400).send({ message: 'This Recipe lists one Ingredient twice.' });
         }
         throw cause;
