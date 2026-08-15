@@ -23,7 +23,7 @@ exist from ticket 05, so this could be pulled earlier at the cost of having noth
 for.
 
 - [x] The version endpoint advances after a write and holds steady otherwise, proven by a test
-- [ ] A change made in one browser appears in a second within a few seconds with no navigation
+- [x] A change made in one browser appears in a second within a few seconds with no navigation
 - [x] Polling stops while the document is hidden and resumes when it becomes visible
 - [x] An unchanged version triggers no data refetch
 - [x] The endpoint costs one cheap query and returns a small body
@@ -31,12 +31,17 @@ for.
 
 ## Comments
 
-**The one unticked box.** Nobody has watched a Got It mark cross between two browsers, because no
-browser driver is installed here and the Compose stack still wants the image build that ticket 13
-unblocks. Everything under that box is proven a layer down: the endpoint moves on every write shape
+**The box no test could tick, ticked by hand.** The operator confirmed on 2026-08-15 that a change
+made in one browser reaches a second one without anybody navigating. No browser driver is installed
+here and no test in this repository can make that claim, so it was checked against a running stack:
+Postgres in a throwaway container, the API on the host serving the built bundle from its own origin,
+and two browser windows on `http://localhost:8080`. The Got It mark was not what crossed, because
+ticket 07 has not built its toggle yet; Selected Recipe and Pantry membership are the writes two
+phones can race on today, and the poll does not know the difference.
+
+Everything under that box is also proven a layer down. The endpoint moves on every write shape
 through Fastify's `inject` against real Postgres, and the poll's rules are proven against an injected
-clock. What is unproven is React calling them, which is a five-minute check for whoever has the stack
-up.
+clock. What the manual check adds is React calling them.
 
 **The version is a timestamp and three row counts, not a timestamp.** `max(updated_at)` across
 Recipes and Ingredients cannot see a delete: removing a row that is not the most recently touched one
