@@ -78,6 +78,29 @@ Two of them will bite you if you get them wrong:
   when something you control terminates in front of the API. Off behind a CDN buckets every visitor
   together; on when nothing sets the header lets a caller claim any address.
 
+## Seed and restore
+
+The Demo Variant is populated from a hand-written fixture in `packages/api/src/seedFixture.js`, and
+restored to it on a schedule so that whatever a visitor leaves behind clears itself. The restore is
+this project's own image with a different command, the way the migration step is:
+
+```
+node packages/api/src/seed.js
+```
+
+It reads one variable, `SEED_DATABASE_URL`, and it must be the owner role: the restore empties every
+table but the migration record before it loads, and the role the API connects as cannot truncate.
+Everything else it needs has a default.
+
+**This command deletes every Recipe, Ingredient and mark in the database it is pointed at.** It
+belongs to the Demo Variant. `compose.yaml` has no service for it, so nothing in the local or
+homelab stack can run it by accident.
+
+Recipes go in as HTTP requests against the API rather than as inserts, so the fixture is held to the
+same rules a visitor's own Recipe is held to and a fixture the API would refuse fails the restore.
+`docs/adr/0007-seed-loads-through-the-api.md` covers why and what it costs. Seeded Recipes are
+marked Protected, which is what makes the demo survive the next visitor.
+
 ## Tests
 
 ```

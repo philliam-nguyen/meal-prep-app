@@ -85,12 +85,38 @@ export function readServerConfig(env = process.env) {
   };
 }
 
-/** For the migration command, the only thing that connects as the owner role. */
+/** For the migration command, which connects as the owner role. */
 export function readMigrateConfig(env = process.env) {
   return {
     databaseUrl: required(env, 'MIGRATION_DATABASE_URL'),
     appRole: env.APP_DB_ROLE ?? 'meal_prep_app',
     appPassword: required(env, 'APP_DB_PASSWORD'),
     migrationsDir,
+  };
+}
+
+// The restore binds no socket and answers no browser, so the one guardrail with no default is given
+// a value here rather than asked of whoever schedules the task. Its requests are injected and carry
+// no Origin, which is the header both the origin hook and the CORS plugin decide on.
+const SEED_ORIGIN = 'seed://restore';
+
+// The one limit the restore is not held to. Rate limiting bounds how fast one address may write,
+// which says nothing about whether the Seed is legitimate data, and a fixture holding more Recipes
+// than a visitor may write in a window would otherwise refuse its own restore. Every limit that does
+// describe the data - the Recipe cap, the Ingredient ceiling, the body limit, every field rule - is
+// read from the environment below, so a Seed the deployment would not accept fails the restore.
+const SEED_WRITE_RATE_LIMIT = Number.MAX_SAFE_INTEGER;
+
+/**
+ * For the Seed restore, which connects as the owner role because it empties the database before it
+ * loads, and the API's role deliberately cannot.
+ */
+export function readSeedConfig(env = process.env) {
+  return {
+    databaseUrl: required(env, 'SEED_DATABASE_URL'),
+    guardrails: {
+      ...guardrails({ ...env, CORS_ORIGIN: SEED_ORIGIN }),
+      writeRateLimit: SEED_WRITE_RATE_LIMIT,
+    },
   };
 }

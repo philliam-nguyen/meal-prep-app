@@ -3,6 +3,7 @@
 // role deliberately has no TRUNCATE privilege.
 
 import pg from 'pg';
+import { emptyDatabase } from '../../src/seeding.js';
 
 function requireUrl(name) {
   const url = process.env[name];
@@ -36,19 +37,18 @@ export async function connectAsOwner(t) {
   return client;
 }
 
-/** Empties every domain table, leaving migration bookkeeping alone. Runs as the owner. */
+/**
+ * Empties every domain table, leaving migration bookkeeping alone. Runs as the owner.
+ *
+ * Through the restore's own function rather than a statement of its own, so the database a test
+ * starts from is the database a restore leaves behind, by construction rather than by two
+ * definitions of "domain table" that happen to agree today.
+ */
 export async function truncateAllTables() {
   const client = new pg.Client({ connectionString: ownerDatabaseUrl() });
   await client.connect();
   try {
-    const { rows } = await client.query(`
-      select quote_ident(tablename) as ident
-      from pg_tables
-      where schemaname = 'public' and tablename <> 'schema_migrations'
-    `);
-    if (rows.length === 0) return;
-    const tables = rows.map((row) => row.ident).join(', ');
-    await client.query(`truncate table ${tables} restart identity cascade`);
+    await emptyDatabase(client);
   } finally {
     await client.end();
   }

@@ -75,10 +75,22 @@ the helper is deleted rather than kept for convenience.
 
 `POST /api/recipes` closed most of it. `test/helpers/rows.js` is gone, and Recipes are arranged by
 creating them through the API, so no test can now set up a Recipe the application would have
-refused. What survives is narrower and is `test/helpers/flags.js`: the Selected Recipe flag and the
-Protected flag are columns on a Recipe the browse payload reports and no endpoint yet sets, waiting
-on ticket 06 for the toggle and ticket 12 for the Seed. The helper updates those two columns on a
-Recipe the API created rather than inserting anything, and it goes when those tickets land.
+refused. What survived was narrower and was `test/helpers/flags.js`: the Selected Recipe flag and
+the Protected flag were columns on a Recipe the browse payload reported and no endpoint set, waiting
+on ticket 06 for the toggle and ticket 12 for the Seed.
+
+Ticket 12 closed it. `test/helpers/flags.js` is gone, and the tests that used to set Protected by
+hand load the Seed instead, which is the only thing that sets the flag in a deployment
+([0007](./0007-seed-loads-through-the-api.md)). Those assertions moved with it, out of
+`test/edit-delete-recipe.test.js` and into `test/seed.test.js`, because a Protected Recipe is
+something the Seed produces rather than something an edit test can arrange. What is left in the edit
+tests is the other half of the same rule: a Recipe a cook added takes an edit and a delete.
+
+That ticket also brought the loader itself under this seam. `restoreSeed` is driven from
+`test/seed.test.js` the way the scheduled task drives it, once as a function and once as
+`node packages/api/src/seed.js` in a child process, and everything asserted about what it wrote is
+read back through `/api/state`. It needs the owner connection string, which the fixture already
+hands out for truncation, and nothing else.
 
 A second exception, added by ticket 10 and different in kind: `test/version.test.js` wraps the pool's
 `query` method for the life of a test. The version endpoint promises to answer from one cheap query
