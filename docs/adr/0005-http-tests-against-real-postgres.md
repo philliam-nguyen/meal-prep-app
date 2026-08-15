@@ -108,6 +108,17 @@ browser and the network, not the module under test: the poll's own rules run unm
 alternative was waiting four real seconds per assertion. Anything reachable through HTTP against the
 real database still goes through the seam above, and nothing about that changes.
 
+A third exception, added by the Homelab Variant's Compose file and further from the seam than either
+of the others: `test/compose.test.js` sends no request and touches no database. It has
+`docker compose config` resolve the deployment file and asserts on what comes back. What it guards
+is the pair of properties that make that Variant private rather than merely undocumented, which is
+that the API is published only to the loopback address `tailscale serve` proxies from, and that no
+service depends on a path existing on one host. Neither is reachable over HTTP, both break in
+silence, and an app that works normally is what a breach of either looks like. This suite lives at
+the repository root because the file it asserts on does, and `npm test` runs it after the
+workspaces. It resolves that file against `.env.example` rather than a developer's `.env`, so the
+assertions hold on any machine and the example file has to stay a working configuration.
+
 Test duration now depends on Docker image pull and container start. Expect the first run on a clean
 machine to be slow and later runs to be quick, and revisit this if the suite grows enough that one
 container per run becomes the bottleneck.

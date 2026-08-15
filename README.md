@@ -42,12 +42,18 @@ calls relative paths and needs no configuration of its own.
 
 ```
 cp .env.example .env   # fill in the two passwords and check CORS_ORIGIN
-docker compose up --build
+docker compose -f compose.yaml -f compose.build.yaml up --build
 ```
 
 That brings up three services: Postgres, a migration step that runs to completion, and the API on
 `http://localhost:8080`. Health is at `/api/health`. `.env` holds the only passwords and connection
 strings in the project and is gitignored.
+
+`compose.yaml` on its own builds nothing: it runs the image `MEAL_PREP_IMAGE` names, because both
+Variants run one published image (`docs/adr/0002-variant-seam-in-infrastructure.md`). The build
+override adds the build for a machine that has the source, and tags it with that same name, so
+building and pulling produce one artifact rather than two. The API is published to `127.0.0.1`
+only, whatever `API_PORT` says.
 
 Migrations run as an owner role. The API connects as a restricted role with no ownership and no DDL
 rights, created by the migration step, so a permission problem surfaces locally rather than at
@@ -78,17 +84,19 @@ Two of them will bite you if you get them wrong:
 npm test
 ```
 
-Every test is an HTTP request against the API backed by a real Postgres — one throwaway container
-per run, provisioned and torn down by the suite, no mocks. See
-`docs/adr/0005-http-tests-against-real-postgres.md`. The suite needs a running Docker daemon and
-fails rather than degrades without one.
+The API's tests are HTTP requests against it backed by a real Postgres, one throwaway container per
+run, provisioned and torn down by the suite, no mocks. That seam and everything standing outside it
+are in `docs/adr/0005-http-tests-against-real-postgres.md`: unit suites in `packages/shared` and
+`packages/web`, and the assertions on `compose.yaml` at the repository root. The suite needs a
+running Docker daemon and fails rather than degrades without one.
 
 ## Access
 
 There is no setup screen, no API key to paste and nothing to share by link. The frontend calls the
 API on its own origin, and reaching the homelab instance means being on the Tailscale network:
 network membership is the whole authorization model, which is what
-`docs/adr/0003-no-application-auth.md` decided and why.
+`docs/adr/0003-no-application-auth.md` decided and why. `docs/runbooks/homelab.md` covers deploying
+that instance, including the checks that prove it answers on the tailnet and nowhere else.
 
 Anyone who can reach an instance can change what is in it. That is the intended model for a
 household of two on a private network, and the reason the public Demo Variant is populated only

@@ -1,6 +1,6 @@
 # 13 - Homelab Variant: one Compose command and Tailscale
 
-Status: ready-for-agent
+Status: ready-for-human
 
 **What to build:** The Operator brings up the whole Homelab Variant with one Compose command, so
 rebuilding after a host change is uneventful. API and Postgres, a named volume, and no host path
@@ -20,10 +20,60 @@ image wiring and the runbook.
 **Blocked by:** 09 (feature parity with what the spreadsheet did), 11 (guardrails, which the Homelab
 Variant inherits unconditionally).
 
-- [ ] One Compose command brings up API and Postgres from the published image
-- [ ] Data survives recreating the containers
-- [ ] No bind mount to a host path appears in the Compose file
+- [x] One Compose command brings up API and Postgres from the published image
+- [x] Data survives recreating the containers
+- [x] No bind mount to a host path appears in the Compose file
 - [ ] The app answers on the tailnet name with a valid certificate, and both phones reach it
 - [ ] The app does not answer from outside the tailnet
-- [ ] Migrations apply on start or through a documented one-line command
-- [ ] A runbook covers bring-up, migration, and where the connection string lives, which is never the repository
+- [x] Migrations apply on start or through a documented one-line command
+- [x] A runbook covers bring-up, migration, and where the connection string lives, which is never the repository
+
+## Comments
+
+**The Compose file stopped being able to build, which is the whole of the image wiring.** Both
+services now run `${MEAL_PREP_IMAGE:?...}` and `compose.yaml` has no `build:` at all. Leaving the
+build in would have meant that a homelab missing the published tag builds from whatever source is
+checked out beside the file and runs it under a name claiming otherwise, which is precisely the
+drift ADR-0002 exists to stop. The build moved to `compose.build.yaml`, tagging what it produces
+with the same `MEAL_PREP_IMAGE`, so building and pulling are one artifact under one name rather
+than two. There is no `:-` fallback either: the example file is the only place a default lives, and
+running an unintended image is not a thing to do quietly. Unset, Compose refuses with `required
+variable MEAL_PREP_IMAGE is missing a value: set MEAL_PREP_IMAGE in .env to the image tag you mean
+to run`.
+
+**The port was open to the whole local network and nothing said so.** `'${API_PORT:-8080}:8080'`
+publishes on every address the host has, so an app with no login (ADR-0003) was answering any
+device on the LAN. It publishes to `127.0.0.1` now, which is where `tailscale serve` proxies from,
+and is what makes "reachable only over Tailscale" a property of the deployment rather than a
+sentence in a document.
+
+**`TRUST_PROXY` should be `true` on this Variant, which is a reversal of what `.env.example` said.**
+`tailscale serve` sets `X-Forwarded-For` to the calling tailnet address, verified in
+`addProxyForwardedHeaders` in Tailscale's `ipn/ipnlocal/serve.go` rather than taken from the docs,
+which return 403 to a fetcher. It uses `Header.Set`, so a caller's own header is replaced rather
+than appended to, and the leftmost value Fastify reads is the one Tailscale wrote. Left `false`,
+both phones share a single rate-limit bucket keyed on `127.0.0.1`.
+
+**The migration gate is narrower than the runbook first claimed, and the spec review caught it.**
+The first draft said every `docker compose up -d` applies migrations before the API starts.
+Reproduced with a throwaway stack of the same shape: on a re-up where nothing changed, Compose
+reruns the migration step and leaves the running API alone, so a failing migration exits 1 with the
+API still serving. When the API container is replaced, which is what an image change does, the gate
+holds and the container sits in `created` with a zero `StartedAt`. The runbook says both, because
+the difference is what an Operator hits at the stove.
+
+**Verified by running.** 269 tests green: 229 API against real Postgres, 23 shared, 10 web, 7 new
+against `docker compose config`. Data survives recreation for real, not by inspection: a row
+written, `docker compose down`, `up` again, row read back. `docker compose run --rm migrate` starts
+Postgres, waits for it to be healthy and runs the container's command. The three tests asserting
+invariants that already held were watched failing against a deliberately broken file first.
+
+**Not verified here, and it needs the Operator.** The image does not build on this machine, because
+the network inspects TLS and `npm ci` inside the container fails on it, so nothing ran the API
+container end to end. Boxes four and five are on the host: the certificate on the `ts.net` name,
+both phones, and the two negative checks. The runbook lists them as four numbered checks and this
+ticket stays `ready-for-human` until they are run.
+
+**ADR-0005 amended.** A suite that sends no HTTP request and touches no database is a third
+departure from that seam, further out than either existing exception, so it is recorded there the
+way ticket 10 recorded `packages/web`.

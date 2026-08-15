@@ -1,0 +1,13 @@
+# Builds the image compose.yaml runs, on a machine that has the source: the local stack, or the
+# homelab before a pipeline publishes one.
+#
+#   docker compose -f compose.yaml -f compose.build.yaml up --build
+#
+# All it adds is the build. The tag it produces is MEAL_PREP_IMAGE, the same name compose.yaml
+# would have pulled, so a build here substitutes for a pull rather than introducing a second name.
+# Compose builds before it creates any container, so the migrate service finds the image even
+# though it starts first.
+
+services:
+  api:
+    build: .

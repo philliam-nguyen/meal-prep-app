@@ -1,6 +1,10 @@
-# The local stack: Postgres, the migration step, and the API serving the frontend from its own
-# origin. The Homelab Variant is this file plus Tailscale and a backup job; no host paths are
-# assumed, so it lifts into a virtual machine unchanged.
+# Postgres, the migration step, and the API serving the frontend from its own origin. The Homelab
+# Variant is this file plus Tailscale and a backup job; no host paths are assumed, so it lifts into
+# a virtual machine unchanged.
+#
+# Nothing here builds. Both Variants run the one published image (ADR-0002), and a file that could
+# build would quietly do so on the homelab whenever the tag was missing, running local source under
+# a name that says otherwise. Building it is compose.build.yaml's job.
 #
 # Every value comes from .env. Nothing here carries a default password, and no connection string is
 # written down anywhere but here, assembled from parts.
@@ -24,11 +28,10 @@ services:
     restart: unless-stopped
 
   # Runs to completion as the owner role, then the API starts. The only container that holds owner
-  # credentials or has any DDL rights. Runs the api service's image with a different command, so the
-  # image is built once and there is no second artifact to keep in step.
+  # credentials or has any DDL rights. The api service's image with a different command, so a
+  # deployment is one image and there is no second artifact to keep in step.
   migrate:
-    image: meal-prep-app:local
-    pull_policy: never
+    image: ${MEAL_PREP_IMAGE:?set MEAL_PREP_IMAGE in .env to the image tag you mean to run}
     command: ['node', 'packages/api/src/migrate.js']
     environment:
       MIGRATION_DATABASE_URL: postgres://${POSTGRES_OWNER_ROLE:-meal_prep_owner}:${POSTGRES_OWNER_PASSWORD}@db:5432/${POSTGRES_DB:-meal_prep}
@@ -39,11 +42,8 @@ services:
         condition: service_healthy
     restart: 'no'
 
-  # The only service that builds. Compose builds before it creates any container, so the migrate
-  # service finds this image even though it starts first.
   api:
-    build: .
-    image: meal-prep-app:local
+    image: ${MEAL_PREP_IMAGE:?set MEAL_PREP_IMAGE in .env to the image tag you mean to run}
     environment:
       DATABASE_URL: postgres://${APP_DB_ROLE:-meal_prep_app}:${APP_DB_PASSWORD}@db:5432/${POSTGRES_DB:-meal_prep}
       PORT: 8080
@@ -57,8 +57,11 @@ services:
       WRITE_RATE_WINDOW_MS: ${WRITE_RATE_WINDOW_MS}
       RECIPES_MAX: ${RECIPES_MAX}
       TRUST_PROXY: ${TRUST_PROXY}
+    # Loopback, never the host's other addresses. On the homelab `tailscale serve` is what reaches
+    # this port, and it runs on the host; publishing any wider would put an app with no login of its
+    # own (ADR-0003) in front of the whole local network, where nothing about the deployment says so.
     ports:
-      - '${API_PORT:-8080}:8080'
+      - '127.0.0.1:${API_PORT:-8080}:8080'
     depends_on:
       db:
         condition: service_healthy
