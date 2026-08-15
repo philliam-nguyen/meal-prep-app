@@ -151,17 +151,20 @@ export function MealPrepApp() {
     loadData(true);
   }, [loadData, toast]);
 
-  // The Aisle is the Ingredient's rather than this list's, so the reload is what carries a
+  // Sends what the cook typed, untouched. Trimming here and emptying to null would be the server's
+  // rule written a second time in the browser, which is the drift ADR-0005 keeps out; the box shows
+  // what was typed until the reload replaces it with what the server actually stored.
+  //
+  // The Aisle is the Ingredient's rather than this list's, so that reload is also what carries a
   // correction to wherever else that Ingredient shows up.
   const handleSetAisle = useCallback(async (entry, aisle) => {
     const previous = entry.aisle;
-    const next = aisle.trim() ? aisle.trim() : null;
-    if (next === previous) return;
+    if (aisle === (previous ?? '')) return;
     const show = value => setShoppingList(prev => prev.map(e => (e.ingredientId === entry.ingredientId ? { ...e, aisle: value } : e)));
 
-    show(next);
+    show(aisle);
     try {
-      await setIngredientAisle(entry.ingredientId, next);
+      await setIngredientAisle(entry.ingredientId, aisle);
     } catch {
       show(previous);
       toast(`Could not set the aisle for ${entry.name}. Nothing was saved.`);
@@ -173,13 +176,17 @@ export function MealPrepApp() {
   // Deliberate, and the only thing that clears a mark. Nothing else does: adding a forgotten Recipe
   // mid-trip has to leave the ticks already earned in the store.
   const handleClearGotIt = useCallback(async () => {
-    const previous = shoppingList;
+    // The marks alone, not the list they sit on. Putting a whole captured list back would throw away
+    // a background reload that landed while the write was in flight, which is the stale snapshot
+    // ticket 06's review caught in RecipesPage. An entry that arrived since keeps what it arrived
+    // with.
+    const marks = new Map(shoppingList.map(entry => [entry.ingredientId, entry.gotIt]));
 
     setShoppingList(prev => prev.map(entry => ({ ...entry, gotIt: false })));
     try {
       await clearGotItMarks();
     } catch {
-      setShoppingList(previous);
+      setShoppingList(prev => prev.map(entry => ({ ...entry, gotIt: marks.get(entry.ingredientId) ?? entry.gotIt })));
       toast('Could not clear your marks. Nothing was saved.');
       return;
     }

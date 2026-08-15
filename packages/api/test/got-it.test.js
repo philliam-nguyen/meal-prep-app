@@ -176,6 +176,46 @@ describe('what leaves a Got It mark alone', () => {
     assert.equal((await entryFor(app, 'Onion')).gotIt, true);
   });
 
+  // Creating a Recipe that names a food an existing Recipe already uses attaches to the Ingredient
+  // that is already there, through the `on conflict do update` in the create path. That is the one
+  // route by which a write meant for a Recipe reaches a ticked Ingredient's row, so it is worth an
+  // assertion rather than an inspection.
+  it('adding a Recipe that names an Ingredient already ticked', async (t) => {
+    const app = await startApp(t);
+    await selectRecipe(app, {
+      name: 'Minestrone',
+      type: 'Soup',
+      ingredients: [{ name: 'Onion', quantity: 2, unit: '' }],
+    });
+    const { ingredientId } = await entryFor(app, 'Onion');
+    await setGotIt(app, ingredientId, true);
+
+    await selectRecipe(app, {
+      name: 'Ragu',
+      type: 'Dinner',
+      ingredients: [{ name: 'onion ', quantity: 1, unit: '' }],
+    });
+
+    const entry = await entryFor(app, 'Onion');
+    assert.equal(entry.ingredientId, ingredientId);
+    assert.equal(entry.gotIt, true);
+  });
+
+  it('marking the same Ingredient a Staple', async (t) => {
+    const app = await startApp(t);
+    await selectRecipe(app, {
+      name: 'Minestrone',
+      type: 'Soup',
+      ingredients: [{ name: 'Olive oil', quantity: 30, unit: 'ml' }],
+    });
+    const { ingredientId } = await entryFor(app, 'Olive oil');
+    await setGotIt(app, ingredientId, true);
+
+    await setStaple(app, ingredientId, true);
+
+    assert.equal((await entryFor(app, 'Olive oil')).gotIt, true);
+  });
+
   it('ticking the same Ingredient into the Pantry', async (t) => {
     const app = await startApp(t);
     await selectRecipe(app, {

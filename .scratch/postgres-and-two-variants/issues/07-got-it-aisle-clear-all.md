@@ -105,3 +105,35 @@ excludes the frontend from testing, and no browser driver is installed here.
 **Built in a worktree off `postgres-migration`,** not off `main`, because ticket 06 has not merged
 and this depends on it. Tickets 07 and 10 were built in parallel worktrees and both touch `app.js`,
 `api.js` and `App.jsx`, so whoever lands the second one resolves the overlap.
+
+**From code review.** Two axes ran against `postgres-migration`. Three findings taken, the rest left
+open on the operator's call.
+
+Taken, and the review was right to call it the same defect twice: `handleClearGotIt` captured the
+whole Shopping List and put all of it back when the write failed, so a background reload landing
+between the click and the refusal was thrown away. Ticket 06's review caught this shape in
+`RecipesPage`, where a captured Recipe made the button send the opposite of what the cook saw. It
+now captures the marks alone, in a Map keyed by Ingredient, and reverts those. An entry that arrived
+since keeps what it arrived with.
+
+Taken: the client normalized an Aisle before sending it, trimming and emptying to null exactly as
+`normalizeAisle` does on the server. ADR-0005 puts that rule in the API once and nowhere else, and
+`AISLE_MAX` being shared made the duplicate easy to miss. The browser now sends what the cook typed
+and shows what the cook typed, and the reload replaces it with whatever the server stored.
+
+Taken: two tests. Creating a Recipe that names an already-ticked Ingredient goes through the
+`on conflict do update` branch of the create path, which is the one route by which a write meant for
+a Recipe reaches a ticked Ingredient's row; nothing asserted on it, and the existing "mid-trip" test
+used a fresh Ingredient, so the guarantee held by inspection rather than by test. Marking that
+Ingredient a Staple was missing from the same set. Both pass, which is the point: they close a
+coverage gap rather than fix a bug.
+
+Left open, and worth someone's time later: `selectRecipe` and `entryFor` are copied across three
+test files while `test/helpers/recipes.js` already owns that job; `App.jsx` now holds four copies of
+the optimistic-then-revert block, which at four is an argument for extracting it rather than for
+another comment saying "same shape as"; `setIngredientField` takes `[id, value]` as a tuple only to
+destructure it back apart; and `aisle.test.js` has a test named for a column constraint that does
+not exist, since `aisle` is bare `text` and the cap is the route's.
+
+Not a finding: the review flagged the inline confirm on clear all as scope creep against story 13's
+"in one action". The operator chose it when asked, over putting the button on the Settings page.
