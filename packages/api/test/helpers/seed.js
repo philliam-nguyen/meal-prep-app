@@ -11,7 +11,7 @@ import { ownerDatabaseUrl } from './database.js';
 
 /** Loads the Seed into the fixture's database, and reports what it wrote. */
 export async function loadSeed(t, { guardrails, fixture } = {}) {
-  const pool = createPool(ownerDatabaseUrl());
+  const pool = createPool(ownerDatabaseUrl(), 'meal-prep-seed');
   t.after(() => pool.end());
 
   return restoreSeed({ pool, fixture, guardrails: { ...TEST_GUARDRAILS, ...guardrails } });

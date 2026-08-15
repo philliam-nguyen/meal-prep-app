@@ -74,8 +74,12 @@ the owner role because the restore truncates and the API's role deliberately can
 is untouched on purpose: a `seed` service behind a profile would put a command that empties the real
 collection into the Homelab Variant's own file, with the profile as the only thing between it and a
 typo. Ticket 15 schedules the task. A test runs the command as a child process from the repository
-root, which is what the image's WORKDIR holds, and another asserts the runtime stage copies the
-directory the command names.
+root, which is what the image's WORKDIR holds.
+
+Nothing here runs the command inside a built image, so checklist item 6 is verified by proxy: image
+builds wait on ticket 13. What the suite can catch is the way the command stops being in the image at
+all, so one test holds the entrypoint inside the directory the runtime stage copies and checks
+`.dockerignore` does not drop it on the way in. Running it for real belongs to 13.
 
 **ADR-0005's bounded exception is closed.** `test/helpers/flags.js` is gone. The Protected
 assertions left `edit-delete-recipe.test.js` and now live in `seed.test.js` against seeded Recipes,
@@ -96,3 +100,13 @@ to send instead; it goes when 09 lands". Ticket 09 has landed and the statement 
 
 **No frontend work.** `RecipeDetail.jsx` already hides the edit and delete controls for a Protected
 Recipe, which ticket 09 built. Nothing else in the frontend needs to know the Seed exists.
+
+**What the review changed.** The fixture's header comment claimed overlap counts that were wrong
+(onion in seven Recipes, double cream in five; both are six), written from the design sketch and
+never checked against the fixture that got built. `createPool` took the API's `application_name` as a
+constant, so the restore's owner-role connections were showing up in `pg_stat_activity` as
+`meal-prep-api`; it takes a name now and the restore calls itself `meal-prep-seed`, the way
+`migrate.js` already named itself. `emptyDatabase` was a verbatim copy of the test fixture's
+`truncateAllTables`, which is two definitions of "domain table" that agree until they do not, so the
+production function is exported and the fixture calls it. The rest was naming and repetition in the
+new tests.

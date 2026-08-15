@@ -291,9 +291,9 @@ describe('the restore', () => {
 // No second artifact and no separate database client: the scheduled task is the API's own image
 // with this in place of the server command, the way the migration step already is.
 describe('the restore command', () => {
-  // The image's WORKDIR is /app and the repository root is what lands there, so this is the command
-  // verbatim. The test runs it against the fixture's database from the same relative path.
-  const COMMAND = ['node', 'packages/api/src/seed.js'];
+  // The container runs `node packages/api/src/seed.js` from a WORKDIR holding the repository root,
+  // so running this path from the repository root is that command less the container.
+  const ENTRYPOINT = 'packages/api/src/seed.js';
   const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
   /** Only what a container has, so a variable the command needs and nobody sets fails here. */
@@ -306,13 +306,16 @@ describe('the restore command', () => {
       }).filter(([, value]) => value !== undefined),
     );
 
-  it('restores a database with one variable set and nothing else', async (t) => {
-    const app = await startApp(t);
-
-    const { stdout } = await promisify(execFile)(process.execPath, COMMAND.slice(1), {
+  const runRestore = () =>
+    promisify(execFile)(process.execPath, [ENTRYPOINT], {
       cwd: repositoryRoot,
       env: containerEnvironment({ SEED_DATABASE_URL: ownerDatabaseUrl() }),
     });
+
+  it('restores a database with one variable set and nothing else', async (t) => {
+    const app = await startApp(t);
+
+    const { stdout } = await runRestore();
 
     const recipes = await readRecipes(app);
     assert.ok(recipes.length > 0, `the command wrote no Recipes. It said: ${stdout}`);
@@ -325,22 +328,26 @@ describe('the restore command', () => {
   it('says what it did, because nobody is watching when it runs', async (t) => {
     const app = await startApp(t);
 
-    const { stdout } = await promisify(execFile)(process.execPath, COMMAND.slice(1), {
-      cwd: repositoryRoot,
-      env: containerEnvironment({ SEED_DATABASE_URL: ownerDatabaseUrl() }),
-    });
+    const { stdout } = await runRestore();
 
     const recipes = await readRecipes(app);
     assert.match(stdout, new RegExp(`${recipes.length} Recipes`));
   });
 
-  // The file the command names has to be inside what the runtime stage copies, or the image ships
-  // without it and only the scheduled task finds out.
-  it('names a file the runtime image already carries', async () => {
+  // Nothing here runs the built image: that waits on ticket 13. What this can catch is the way the
+  // command stops being in the image at all, which is somebody moving the entrypoint out of the
+  // directory the runtime stage copies, or adding a .dockerignore line that drops it on the way in.
+  // Both ship an image whose scheduled task fails, and neither shows up anywhere else in the suite.
+  it('names a file the runtime stage copies and nothing excludes', async () => {
     const dockerfile = await readFile(new URL('../../../Dockerfile', import.meta.url), 'utf8');
+    const dockerignore = await readFile(new URL('../../../.dockerignore', import.meta.url), 'utf8');
     const runtimeStage = dockerfile.slice(dockerfile.lastIndexOf('FROM '));
 
-    assert.match(runtimeStage, /^COPY packages\/api packages\/api$/m);
-    assert.ok(COMMAND[1].startsWith('packages/api/'));
+    assert.ok(ENTRYPOINT.startsWith('packages/api/'), `${ENTRYPOINT} is outside packages/api`);
+    assert.match(runtimeStage, /^COPY packages\/api packages\/api\b/m);
+    assert.deepEqual(
+      dockerignore.split('\n').filter((line) => line.trim().startsWith('packages')),
+      [],
+    );
   });
 });

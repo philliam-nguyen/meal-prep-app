@@ -7,8 +7,9 @@
 //
 // Two properties are deliberate rather than incidental, and both serve the visitor's first gesture.
 // Every Recipe Type is represented, so the browse list has range. And the same foods recur across
-// Recipes - onion in seven of them, double cream in five, chicken stock in three - so that ticking a
-// handful of Pantry Ingredients ranks most of the collection instead of matching one Recipe.
+// Recipes - butter in eight of them, onion, double cream, plain flour and olive oil in six each - so
+// that ticking a handful of Pantry Ingredients ranks nine of the nineteen at three different depths
+// of Missing, instead of matching one Recipe and calling that a demonstration.
 //
 // Recipe Card URLs point at example.com, which is reserved for exactly this. A plausible-looking URL
 // to a site that has never held these Recipes would be a broken link in a demo.

@@ -15,7 +15,7 @@ import { restoreSeed } from './seeding.js';
 const log = (message) => console.log(`seed: ${message}`);
 
 const config = readSeedConfig();
-const pool = createPool(config.databaseUrl);
+const pool = createPool(config.databaseUrl, 'meal-prep-seed');
 
 try {
   const { recipes, ingredients, staples } = await restoreSeed({

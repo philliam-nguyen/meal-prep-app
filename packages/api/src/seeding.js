@@ -28,12 +28,19 @@ const DOMAIN_TABLES = `
 // on the rows it has just created.
 const PROTECT_SEEDED_RECIPES = 'update recipes set protected = true';
 
-async function emptyDatabase(pool) {
-  const { rows } = await pool.query(DOMAIN_TABLES);
+/**
+ * Empties every domain table, leaving the migration record alone. Exported because the test fixture
+ * clears the database between tests and there is one right answer to "what counts as a domain
+ * table": a second copy would let the suite and the restore disagree about what a clean database is.
+ *
+ * Takes a pool or a client, and must be connected as the owner role.
+ */
+export async function emptyDatabase(db) {
+  const { rows } = await db.query(DOMAIN_TABLES);
   if (rows.length === 0) return;
 
   const tables = rows.map((row) => row.ident).join(', ');
-  await pool.query(`truncate table ${tables} restart identity cascade`);
+  await db.query(`truncate table ${tables} restart identity cascade`);
 }
 
 /**
@@ -41,10 +48,10 @@ async function emptyDatabase(pool) {
  * app is demonstrated with, so a fixture the API argues with is a bug in the fixture and the restore
  * has to stop and say which entry caused it.
  */
-async function send(app, { method, url, payload, expected, what }) {
+async function send(app, { method, url, payload, expected, entry }) {
   const response = await app.inject({ method, url, payload });
   if (response.statusCode !== expected) {
-    throw new Error(`the Seed's ${what} was refused with ${response.statusCode}: ${response.body}`);
+    throw new Error(`the Seed's ${entry} was refused with ${response.statusCode}: ${response.body}`);
   }
   return response;
 }
@@ -58,16 +65,16 @@ async function ingredientIds(app) {
     method: 'GET',
     url: '/api/state',
     expected: 200,
-    what: 'Ingredients',
+    entry: 'Ingredients',
   })).json();
 
   return new Map(pantryChecklist.map((ingredient) => [ingredient.name, ingredient.id]));
 }
 
 /** The id a fixture entry names, or a refusal saying which entry names a food no Recipe uses. */
-function idFor(ids, name, what) {
+function idFor(ids, name, role) {
   const id = ids.get(name);
-  if (!id) throw new Error(`the Seed gives ${name} ${what}, but no seeded Recipe calls for it`);
+  if (!id) throw new Error(`the Seed gives ${name} ${role}, but no seeded Recipe calls for it`);
   return id;
 }
 
@@ -91,7 +98,7 @@ export async function restoreSeed({ pool, guardrails, fixture = SEED, log = () =
         url: '/api/recipes',
         payload: recipe,
         expected: 201,
-        what: recipe.name,
+        entry: recipe.name,
       });
       recipeIds.set(recipe.name, created.json().id);
     }
@@ -114,7 +121,7 @@ export async function restoreSeed({ pool, guardrails, fixture = SEED, log = () =
         url: `/api/ingredients/${idFor(ids, name, 'as a Staple')}/staple`,
         payload: { staple: true },
         expected: 204,
-        what: `Staple ${name}`,
+        entry: `Staple ${name}`,
       });
     }
     log(`marked ${fixture.staples.length} Staples`);
@@ -125,7 +132,7 @@ export async function restoreSeed({ pool, guardrails, fixture = SEED, log = () =
         url: `/api/ingredients/${idFor(ids, name, 'an Aisle')}/aisle`,
         payload: { aisle },
         expected: 204,
-        what: `Aisle for ${name}`,
+        entry: `Aisle for ${name}`,
       });
     }
 
@@ -137,7 +144,7 @@ export async function restoreSeed({ pool, guardrails, fixture = SEED, log = () =
         url: `/api/recipes/${id}/selected`,
         payload: { selected: true },
         expected: 204,
-        what: `Selected Recipe ${name}`,
+        entry: `Selected Recipe ${name}`,
       });
     }
     log(`put ${fixture.selected.length} Recipes on the Shopping List`);
