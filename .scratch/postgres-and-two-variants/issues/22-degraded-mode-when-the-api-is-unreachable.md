@@ -1,6 +1,6 @@
 # 22 - Degraded mode when the API is unreachable
 
-Status: ready-for-agent
+Status: done
 
 **What to build:** When `GET /api/state` fails, the app renders from the recorded Seed that ticket 21
 puts in the bundle, disables every control that writes, and shows a banner saying the backend is
