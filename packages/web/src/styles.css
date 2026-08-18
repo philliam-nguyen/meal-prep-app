@@ -85,6 +85,10 @@ input:focus, textarea:focus, select:focus { outline: 2px solid #5B7C5A; outline-
 .checkbox-btn { width: 26px; height: 26px; border-radius: 8px; border: 2px solid #E5DED3; background: white; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; }
 .checkbox-btn.checked { background: #5B7C5A; border-color: #5B7C5A; color: white; }
 .checkbox-btn:hover { border-color: #5B7C5A; }
+/* Degraded mode greys out every control that writes rather than letting a write evaporate, so a
+   disabled control has to look disabled and stop inviting the tap. */
+.checkbox-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.checkbox-btn:disabled:hover { border-color: #E5DED3; }
 
 .recipe-card { background: white; border-radius: 16px; padding: 18px 20px; border: 1px solid #F0EBE3; cursor: pointer; transition: all 0.2s; }
 .recipe-card:hover { border-color: #5B7C5A; box-shadow: 0 4px 20px rgba(91,124,90,0.08); transform: translateY(-1px); }
@@ -96,6 +100,8 @@ input:focus, textarea:focus, select:focus { outline: 2px solid #5B7C5A; outline-
 
 .btn-secondary { background: #F5EDE3; color: #2C2C2C; border: 1px solid #E5DED3; border-radius: 12px; padding: 10px 20px; font-family: 'Nunito', sans-serif; font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 8px; }
 .btn-secondary:hover { background: #EDE5D8; }
+.btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-secondary:disabled:hover { background: #F5EDE3; }
 
 .input-field { width: 100%; padding: 12px 16px; border: 1.5px solid #E5DED3; border-radius: 12px; font-family: 'Nunito', sans-serif; font-size: 15px; background: white; color: #2C2C2C; transition: border-color 0.2s; }
 .input-field::placeholder { color: #A39E93; }

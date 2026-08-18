@@ -16,6 +16,7 @@ export function PantryPage({
   staples,
   bestMatches,
   syncing,
+  readOnly,
   onTogglePantry,
   onSetStaple,
 }) {
@@ -38,13 +39,13 @@ export function PantryPage({
         )}
         {pantryChecklist.map((item, i) => (
           <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: i < pantryChecklist.length - 1 ? '1px solid #F0EBE3' : 'none' }}>
-            <button className={`checkbox-btn ${item.inPantry ? 'checked' : ''}`} onClick={() => onTogglePantry(item)} aria-label={`I have ${item.name}`} aria-pressed={item.inPantry}>
+            <button className={`checkbox-btn ${item.inPantry ? 'checked' : ''}`} disabled={readOnly} onClick={() => onTogglePantry(item)} aria-label={`I have ${item.name}`} aria-pressed={item.inPantry}>
               {item.inPantry && I.check}
             </button>
             <span style={{ fontSize: 15, fontWeight: 500, textTransform: 'capitalize', flex: 1 }}>{item.name}</span>
             {/* Curating the list as things get noticed, which is the only way a staple ever gets
                 marked. Nothing else in the app sets one. */}
-            <button className="btn-secondary" style={{ padding: '6px 10px', color: '#7A7568' }} onClick={() => onSetStaple(item, true)} title={`Always have ${item.name}`}>
+            <button className="btn-secondary" style={{ padding: '6px 10px', color: '#7A7568' }} disabled={readOnly} onClick={() => onSetStaple(item, true)} title={`Always have ${item.name}`}>
               {I.leaf}
             </button>
           </div>
@@ -90,7 +91,7 @@ export function PantryPage({
               {staples.map((staple, i) => (
                 <div key={staple.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: i < staples.length - 1 ? '1px solid #E5DED3' : 'none' }}>
                   <span style={{ fontSize: 14, fontWeight: 500, textTransform: 'capitalize', flex: 1 }}>{staple.name}</span>
-                  <button className="btn-secondary" style={{ padding: '4px 12px', fontSize: 13 }} onClick={() => onSetStaple(staple, false)}>
+                  <button className="btn-secondary" style={{ padding: '4px 12px', fontSize: 13 }} disabled={readOnly} onClick={() => onSetStaple(staple, false)}>
                     Put back
                   </button>
                 </div>

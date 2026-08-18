@@ -36,10 +36,54 @@ building this, because testing it locally will feel instant and testing it for r
 
 **Blocked by:** 21 (the recorded state file).
 
-- [ ] A failed `GET /api/state` renders the app from the recorded Seed rather than an error page
-- [ ] Every control that writes is visibly disabled, and none accept input that would be discarded
-- [ ] A banner names the state: backend offline, data is a fixed sample
-- [ ] Degraded mode never becomes the freshness poll's baseline, and recovery forces one refetch,
+- [x] A failed `GET /api/state` renders the app from the recorded Seed rather than an error page
+- [x] Every control that writes is visibly disabled, and none accept input that would be discarded
+- [x] A banner names the state: backend offline, data is a fixed sample
+- [x] Degraded mode never becomes the freshness poll's baseline, and recovery forces one refetch,
       proven by a test
-- [ ] Recovery from degraded mode back to live needs no page reload
-- [ ] The Homelab Variant is unaffected, and no code branches on which Variant it is
+- [x] Recovery from degraded mode back to live needs no page reload
+- [x] The Homelab Variant is unaffected, and no code branches on which Variant it is
+
+## Comments
+
+**Where the behaviour lives.** `packages/web/src/degraded.js` owns the choice of what one load puts on
+screen: `readRenderableState` returns the live answer whenever the API gives one, and the recording
+otherwise. `packages/web/test/degraded.test.js` drives it with both readers injected, the way
+freshness.js takes a browser, so the four cases run without a network or a document.
+
+**The freshness baseline is a symbol.** `NO_BASELINE` is what `versionOnScreen` returns while the
+recording is on screen, and being a symbol it is equal to no version any API can answer with, which is
+what makes the refetch out of degraded mode unconditional rather than a comparison that happens to
+hold. The recorded `version` is never assigned to the ref at all. Two tests sit beside "compares
+against what the last refetch arrived with": one drives the collision ticket 21's sentinel now makes
+impossible (the API answers `recorded`, and recovery still happens, exactly once), and one holds the
+poll open across a whole outage so recovery cannot end up needing a reload.
+
+**The way back does not depend on which view is open.** Review caught this: the poll watches only the
+views where two phones can disagree, and the Add form is not one of them, so a visitor who wandered
+there during an outage would have sat in front of it after the backend came back. The recording on
+screen is now a second reason for the poll to watch, alongside a view that goes stale, and a poll
+watching only for that stops once the refetch lands, which keeps the Add form the thing nobody polls
+for. A third test covers it, with the Add view.
+
+**Degraded mode is only ever entered by the first paint.** A load with a screenful behind it fails the
+way it always did, because replacing a cook's own Recipes with a fixed sample of somebody else's is
+not an improvement, and because one failed background poll would otherwise grey out an app whose
+backend was down for four seconds. The consequence worth naming: a returning visitor whose browser
+holds a cache renders that cache rather than the recording, so they get the pre-existing behaviour for
+a failed write (optimistic change, rolled back, toast) rather than a disabled control. ADR-0009
+already treats the visitor who has been before as not the visitor this exists for, when it rejects a
+service worker for the same reason.
+
+**Not proven by an automated test:** that the disabled attributes reach the screen. The web package
+runs plain `node --test`, which cannot import JSX, and this repo has no DOM test runner; adding one is
+a bigger decision than this ticket. The wiring was checked by hand instead: only `AddRecipePage` and
+`EditRecipePage` import a writing call from `api.js` directly, and every other write is an App handler
+passed to a control that now carries `disabled={readOnly}`. The Add form is replaced by a line of text
+rather than disabled, because a form that takes twenty fields and then cannot save is the evaporating
+write with more typing in it. Edit is unreachable while degraded, its only entrance being a disabled
+button on a page that cannot be reached while a form is open.
+
+**The two reads stay live.** Refresh, on the header and in Settings, is not a control that writes, and
+it is the way back to live for a visitor who does not want to wait out a poll. It now says "Still
+offline" rather than "Data refreshed!" when the backend is still down.

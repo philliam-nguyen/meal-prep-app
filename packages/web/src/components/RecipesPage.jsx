@@ -17,7 +17,7 @@ function typesPresent(recipes) {
   return [ALL, ...known, ...unknown];
 }
 
-export function RecipesPage({ recipes, onToggleSelected, onEdit, onDelete }) {
+export function RecipesPage({ recipes, readOnly, onToggleSelected, onEdit, onDelete }) {
   const [filter, setFilter] = useState(ALL);
   const [searchTerm, setSearchTerm] = useState('');
   // The id of the open card rather than the Recipe itself, so what the card shows is looked up on
@@ -71,6 +71,7 @@ export function RecipesPage({ recipes, onToggleSelected, onEdit, onDelete }) {
       {open && (
         <RecipeDetail
           recipe={open}
+          readOnly={readOnly}
           onClose={() => setOpenId(null)}
           onToggleSelected={recipe => { onToggleSelected(recipe); setOpenId(null); }}
           onEdit={recipe => { onEdit(recipe); setOpenId(null); }}

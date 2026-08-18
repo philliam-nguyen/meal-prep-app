@@ -7,7 +7,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { startFreshnessPoll } from '../src/freshness.js';
+import { NO_BASELINE, startFreshnessPoll } from '../src/freshness.js';
 
 /** A document and a clock the test drives, standing in for the browser's. */
 function testBrowser({ hidden = false } = {}) {
@@ -135,6 +135,80 @@ describe('the freshness poll', () => {
     await browser.elapse();
 
     assert.equal(refetches, 1);
+  });
+
+  // Degraded mode is the case where there is nothing on screen worth comparing against: the app is
+  // rendering the recording the bundle ships, which carries a version of its own. Adopting that
+  // version would make recovery depend on it differing from the live one, so the app hands over
+  // NO_BASELINE instead and the first version the API manages to answer with forces a refetch,
+  // whatever it says (ADR-0009). The version below is the one the recording actually carries.
+  it('refetches once out of degraded mode, whatever version the API comes back with', async () => {
+    const browser = testBrowser();
+    const server = testServer('recorded');
+    let onScreen = NO_BASELINE;
+    let refetches = 0;
+    startFreshnessPoll({
+      view: 'shopping',
+      versionOnScreen: () => onScreen,
+      readVersion: server.readVersion,
+      onStale: () => {
+        refetches += 1;
+        onScreen = server.version;
+      },
+      environment: browser,
+    });
+
+    await browser.elapse();
+    await browser.elapse();
+
+    assert.equal(refetches, 1, 'the recorded version became the baseline it is compared against');
+  });
+
+  // What the poll does for the whole of an outage. It cannot tell a recovered API from an unchanged
+  // one until one of them answers, so it keeps asking and the recording stays on screen until one
+  // does.
+  it('holds degraded mode while the API is still unreachable', async () => {
+    const browser = testBrowser();
+    let refetches = 0;
+    startFreshnessPoll({
+      view: 'shopping',
+      versionOnScreen: () => NO_BASELINE,
+      readVersion: () => Promise.reject(new Error('GET /api/version returned 502')),
+      onStale: () => (refetches += 1),
+      environment: browser,
+    });
+
+    await browser.elapse();
+    await browser.elapse();
+
+    assert.equal(refetches, 0);
+    assert.equal(browser.polling, true, 'the poll gave up, so recovery would need a page reload');
+  });
+
+  // The way back cannot depend on which view happens to be open. Nothing on the Add form goes stale,
+  // so nothing polls there normally, and a visitor reading the line degraded mode puts in place of
+  // the form would otherwise sit in front of it long after the backend came back.
+  it('watches a view that cannot go stale while the recording is on screen', async () => {
+    const browser = testBrowser();
+    const server = testServer('recorded');
+    let onScreen = NO_BASELINE;
+    let refetches = 0;
+    startFreshnessPoll({
+      view: 'add',
+      versionOnScreen: () => onScreen,
+      readVersion: server.readVersion,
+      onStale: () => {
+        refetches += 1;
+        onScreen = server.version;
+      },
+      environment: browser,
+    });
+
+    await browser.elapse();
+    await browser.elapse();
+
+    assert.equal(refetches, 1);
+    assert.equal(browser.polling, false, 'it kept polling a view with nothing left to watch for');
   });
 
   it('does not pile a second refetch on top of a slow one', async () => {

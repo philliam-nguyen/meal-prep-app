@@ -9,6 +9,10 @@ import { I } from '../icons.jsx';
 // A Protected Recipe offers neither. The server refuses both whatever this shows, so hiding them is
 // what keeps a visitor from meeting a refusal rather than what enforces it. The Homelab Variant
 // never sets the flag, so nothing here is hidden there (ADR-0002).
+//
+// Read-only is the other reason a button here does nothing, and it greys out rather than hides: the
+// backend is offline, the Recipe Card link still works, and a visitor who came to see what the app
+// does should still see what it offers (ADR-0009).
 
 const dangerButtonStyle = {
   flex: 1,
@@ -18,7 +22,7 @@ const dangerButtonStyle = {
   border: 'none',
 };
 
-export function RecipeDetail({ recipe, onClose, onToggleSelected, onEdit, onDelete }) {
+export function RecipeDetail({ recipe, readOnly, onClose, onToggleSelected, onEdit, onDelete }) {
   const { ingredients } = recipe;
   // Deleting is the one thing here nothing undoes, so it asks. In place rather than through the
   // browser's confirm dialog, which a phone renders as a modal on top of a modal.
@@ -52,7 +56,7 @@ export function RecipeDetail({ recipe, onClose, onToggleSelected, onEdit, onDele
             ))}
           </div>
         )}
-        <button className="btn-primary" style={{ width: '100%', justifyContent: 'center' }} onClick={() => onToggleSelected(recipe)}>
+        <button className="btn-primary" style={{ width: '100%', justifyContent: 'center' }} disabled={readOnly} onClick={() => onToggleSelected(recipe)}>
           {I.cart} <span>{recipe.selected ? 'Remove from Shopping List' : 'Add to Shopping List'}</span>
         </button>
 
@@ -66,17 +70,19 @@ export function RecipeDetail({ recipe, onClose, onToggleSelected, onEdit, onDele
                 <button className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setConfirmingDelete(false)}>
                   Keep It
                 </button>
-                <button className="btn-secondary" style={dangerButtonStyle} onClick={() => onDelete(recipe)}>
+                {/* Disabled with the button that opens it, so read-only is a property of the whole
+                    flow rather than of whichever button a reader happens to reach first. */}
+                <button className="btn-secondary" style={dangerButtonStyle} disabled={readOnly} onClick={() => onDelete(recipe)}>
                   {I.trash} <span>Delete</span>
                 </button>
               </div>
             </div>
           ) : (
             <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
-              <button className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => onEdit(recipe)}>
+              <button className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }} disabled={readOnly} onClick={() => onEdit(recipe)}>
                 {I.edit} <span>Edit</span>
               </button>
-              <button className="btn-secondary" style={dangerButtonStyle} onClick={() => setConfirmingDelete(true)}>
+              <button className="btn-secondary" style={dangerButtonStyle} disabled={readOnly} onClick={() => setConfirmingDelete(true)}>
                 {I.trash} <span>Delete</span>
               </button>
             </div>

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { 
-  fetchState,
+import {
   fetchVersion,
   deleteRecipe,
   clearGotItMarks,
@@ -11,7 +10,8 @@ import {
   setRecipeSelected 
 } from './api.js';
 import { loadCache, saveCache } from './cache.js';
-import { startFreshnessPoll } from './freshness.js';
+import { OFFLINE_NOTICE, readRenderableState } from './degraded.js';
+import { NO_BASELINE, startFreshnessPoll } from './freshness.js';
 import { formatSince } from './format.js';
 import { I } from './icons.jsx';
 import { Toast } from './components/Toast.jsx';
@@ -54,6 +54,10 @@ export function MealPrepApp() {
   const [pantryChecklist, setPantryChecklist] = useState([]);
   const [staples, setStaples] = useState([]);
   const [bestMatches, setBestMatches] = useState([]);
+  // Whether what is on screen is the recording rather than anything the API said. Every control that
+  // writes reads it, because a write against a backend that cannot answer is a write that evaporates
+  // (ADR-0009).
+  const [degraded, setDegraded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [bgSyncing, setBgSyncing] = useState(false);
@@ -77,13 +81,26 @@ export function MealPrepApp() {
 
     if (silent) setBgSyncing(true); else setLoading(true);
     try {
-      const state = await fetchState();
+      // Only a load with nothing behind it may fall back to the recording, and that is the first
+      // paint. Every other load has a screenful already, and a fixed sample is not an improvement
+      // on it.
+      const { state, degraded: fromRecording } = await readRenderableState({
+        nothingOnScreen: !silent,
+      });
       if (stale()) return;
       setRecipes(state.recipes);
       setShoppingList(state.shoppingList);
       setPantryChecklist(state.pantryChecklist);
       setStaples(state.staples);
       setBestMatches(state.bestMatches);
+      setDegraded(fromRecording);
+      if (fromRecording) {
+        // None of the three things a live payload leaves behind. The recording is nobody's data to
+        // cache, nothing about it was synced, and the version it carries must not become what the
+        // poll compares against: NO_BASELINE is what makes the way back one unconditional refetch.
+        version.current = NO_BASELINE;
+        return;
+      }
       setLastSynced(Date.now());
       saveCache(state);
       // The version this data arrived with, which is what the next poll is compared against. The
@@ -132,11 +149,16 @@ export function MealPrepApp() {
     return () => watching.stop();
   }, [tab, loadData]);
 
+  // A read, so it stays offered while the backend is offline: it is the way back to live for a
+  // visitor who does not want to wait out a poll.
   const handleRefresh = async () => {
     setRefreshing(true);
     await loadData(true);
     setRefreshing(false);
-    toast('Data refreshed!');
+    // The ref rather than the flag beside it, which the load above has only just asked React to
+    // change. Saying the data refreshed while the banner says the backend is offline is exactly the
+    // contradiction degraded mode exists to avoid.
+    toast(version.current === NO_BASELINE ? 'Still offline. Showing the fixed sample.' : 'Data refreshed!');
   };
 
   // The toggle lands on screen before the write does, because a cook changing their mind about four
@@ -278,6 +300,13 @@ export function MealPrepApp() {
         {NAV_ITEMS.map(n => <button key={n.id} className={`nav-item ${tab === n.id ? 'active' : ''}`} onClick={() => { setEditingId(null); setTab(n.id); }}>{n.icon}<span>{n.label}</span></button>)}
       </nav>
       <div className="page-content" style={{ padding: '24px 20px 100px', maxWidth: 640, margin: '0 auto' }}>
+        {/* Named rather than hinted at. A visitor who is told only that something is wrong reaches
+            for the refresh button, and the greyed-out controls below make no sense without it. */}
+        {degraded && (
+          <div role="status" style={{ background: '#F7E9E6', border: '1px solid #EBD5CF', borderRadius: 14, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#8A5245', lineHeight: 1.5 }}>
+            {OFFLINE_NOTICE}
+          </div>
+        )}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <div>
             <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 26 }}>{editing ? 'Edit Recipe' : PAGE_TITLES[tab]}</h1>
@@ -302,10 +331,11 @@ export function MealPrepApp() {
           />
         ) : (
           <>
-            {tab === 'recipes' && <RecipesPage recipes={recipes} onToggleSelected={handleToggleSelected} onEdit={recipe => setEditingId(recipe.id)} onDelete={handleDelete} />}
+            {tab === 'recipes' && <RecipesPage recipes={recipes} readOnly={degraded} onToggleSelected={handleToggleSelected} onEdit={recipe => setEditingId(recipe.id)} onDelete={handleDelete} />}
             {tab === 'shopping' && (
               <ShoppingListPage
                 shoppingList={shoppingList}
+                readOnly={degraded}
                 onToggleGotIt={handleToggleGotIt}
                 onSetAisle={handleSetAisle}
                 onClearGotIt={handleClearGotIt}
@@ -318,12 +348,13 @@ export function MealPrepApp() {
                 staples={staples}
                 bestMatches={bestMatches}
                 syncing={bgSyncing}
+                readOnly={degraded}
                 onTogglePantry={handleTogglePantry}
                 onSetStaple={handleSetStaple}
               />
             )}
             {tab === 'add' && (
-              <AddRecipePage onRecipeAdded={() => loadData(true)} toast={toast} />
+              <AddRecipePage readOnly={degraded} onRecipeAdded={() => loadData(true)} toast={toast} />
             )}
             {tab === 'settings' && <SettingsPage onRefresh={handleRefresh} refreshing={refreshing} />}
           </>
