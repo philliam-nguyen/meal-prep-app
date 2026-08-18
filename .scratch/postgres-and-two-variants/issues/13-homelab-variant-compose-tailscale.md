@@ -1,6 +1,6 @@
 # 13 - Homelab Variant: one Compose command and Tailscale
 
-Status: ready-for-human
+Status: done
 
 **What to build:** The Operator brings up the whole Homelab Variant with one Compose command, so
 rebuilding after a host change is uneventful. API and Postgres, a named volume, and no host path
@@ -23,8 +23,8 @@ Variant inherits unconditionally).
 - [x] One Compose command brings up API and Postgres from the published image
 - [x] Data survives recreating the containers
 - [x] No bind mount to a host path appears in the Compose file
-- [ ] The app answers on the tailnet name with a valid certificate, and both phones reach it
-- [ ] The app does not answer from outside the tailnet
+- [x] The app answers on the tailnet name with a valid certificate, and both phones reach it
+- [x] The app does not answer from outside the tailnet
 - [x] Migrations apply on start or through a documented one-line command
 - [x] A runbook covers bring-up, migration, and where the connection string lives, which is never the repository
 
@@ -103,3 +103,67 @@ The isolation this achieves is real and it is not structural: both stacks share 
 daemon, a filesystem and a root user.
 [ADR-0010](../../../docs/adr/0010-demo-guardrails-on-shared-hardware.md) states what is being
 accepted and on what grounds. The runbook should point at it rather than restate it.
+
+**The two-stack runbook section splits out to ticket 25.** The requirement above stands and it is
+not this ticket's to deliver. Four of its five bullets describe the Demo Variant's stack, its egress
+rules and its restore timer, none of which are on the host until ticket 15 runs, and a runbook
+section describing containers an Operator cannot see at the prompt is the drift the comments above
+exist to stop. Ticket 25 carries those four, blocked by 15. The fifth, which container ticket 14's
+backup dumps, stays with ticket 14, which already holds a box for documenting itself in this
+runbook; two tickets writing one paragraph is two paragraphs that eventually disagree.
+
+What is left here is what was always the Operator's: the certificate on the `ts.net` name with both
+phones, and the two negative checks, which the runbook lists as four numbered checks under "Check
+the boundary". The image has to be built on the host first, per "Before you start", until
+ticket 16 publishes one. This ticket stays `ready-for-human` until those four checks are run.
+
+**2026-08-17: the image builds and the stack runs, on a second development machine.**
+`docker compose -f compose.yaml -f compose.build.yaml up --build -d` built `meal-prep-app:local` in
+26 seconds. The database reported healthy, the migration container exited, and the API started.
+`/api/health` answers `{"status":"ok","database":"up"}`; `/api/state` and the frontend answer 200.
+
+The TLS interception recorded above is a property of that network rather than of the Dockerfile, so
+the caveat narrows rather than disappears: `npm ci` still fails where it failed, and the image is
+not the reason. What this removes is the "nothing ran the API container end to end" caveat, which
+had stood since the ticket landed.
+
+It ticks no boxes. Four and five are about the `ts.net` name, its certificate, both phones and the
+two negative checks, and none of those exist on a loopback address.
+
+**2026-08-17: the boundary checks ran, and the Homelab Variant is up.** The Operator stood the stack
+up on the Ubuntu host, `tailscale serve` terminates TLS on the `ts.net` name, and both remaining
+boxes are ticked. The tailnet name is written here as `<host>.<tailnet>.ts.net` on purpose: this
+repository is public, and an internal hostname is not something to publish for the sake of a
+transcript.
+
+Verified from a second tailnet machine rather than only from the phone:
+
+- `https://<host>.<tailnet>.ts.net/api/health` answers `{"status":"ok","database":"up"}` with 200,
+  and curl reports `ssl_verify_result=0`. The certificate validates against the system trust store
+  rather than merely existing.
+- The frontend answers 200 on the same name.
+- `http://<tailnet-address>:8080/api/health` fails to connect, and so does the same request to the
+  host's LAN address. That is the loopback binding holding.
+
+The negative checks are only worth something because the positive one was true at the same moment.
+A refused connection on 8080 proves nothing about the binding if the stack happens to be down, and
+these ran in the same minute as the 200 above. Ticket 12's habit, applied to a deployment.
+
+**Box four is ticked on the Operator's judgement, not on a check.** One phone reached the app over
+Tailscale and the Recipe list rendered. The second phone is not in the tailnet and the Operator
+waived it. Worth recording rather than leaving implied: the reason the box names two is that
+`TRUST_PROXY` is `true` here so that two devices get separate rate-limit buckets, and one device
+cannot demonstrate a separation. That property is untested. If the limiter ever behaves as though
+everyone shares a bucket, this is the check that was skipped.
+
+**Check four ran differently from how the runbook words it.** The runbook says mobile data with
+Tailscale off. The Operator switched the phone to a work VPN, which disconnects Tailscale on iOS,
+and the name did not answer. That is the outcome the mechanism predicts: the `ts.net` name resolves
+into CGNAT space and nothing routes it off the tailnet. It is weaker only in that a corporate
+network's own filtering cannot be ruled out as a second cause.
+
+**Still on `meal-prep-app:local`, built on the host.** Ticket 16 has published nothing yet, so
+`MEAL_PREP_IMAGE` names a locally built tag rather than a pinned registry reference. The runbook
+already says this is the arrangement until a pipeline exists.
+
+This unblocks 14, and 14 unblocks 17.
