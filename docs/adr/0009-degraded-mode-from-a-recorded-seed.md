@@ -12,9 +12,10 @@ saying the backend is offline and the data is a fixed sample.
 This exists because [0008](./0008-demo-backend-on-the-homelab.md) puts the backend on a home server,
 which will be unreachable sometimes. A Reviewer clicking the link during an outage is the case that
 matters: a dead link reads worse than no link, and it is the only impression that visitor will form.
-A degraded app shows the Recipes, the Pantry checklist, the Staples and the Shopping List, which is
-most of what there is to see. It shows Best Matches empty, for the reason the consequences below
-record.
+A degraded app shows the Recipes, the Pantry checklist, the Staples, the Shopping List and Best
+Matches, which is everything there is to see: the Seed ticks a handful of its own Pantry Ingredients
+as part of the restore (ticket 26), so the ranking the recording carries is the same populated one a
+freshly restored, healthy API answers with.
 
 Controls are visibly disabled rather than accepting input and discarding it. A write that silently
 evaporates is worse than a greyed-out button, because the first thing a technical visitor does after
@@ -89,20 +90,22 @@ made now produces, so a Seed edited without a regeneration is a red test rather 
 fallback. A hand-edited recording fails the same way, which is the point of comparing the bytes
 rather than the parsed object.
 
-The recorded Best Matches is empty, which the introduction above originally failed to say. Not
-because the ranking is unreachable without a Pantry tick: `bestMatches.js` admits a Recipe on either
-of two grounds, Pantry overlap or nothing Missing, and the second exists for the Recipe whose
-Ingredients are all Staples. It is empty because the Seed happens to satisfy neither. No Seed Recipe
-is built from Staples alone, and a restored database has no Pantry ticks, so nothing qualifies.
+The recorded Best Matches is populated. `bestMatches.js` admits a Recipe on either of two grounds,
+Pantry overlap or nothing Missing, and the second exists for the Recipe whose Ingredients are all
+Staples; the Seed satisfies neither of those on its own. What closes the gap is ticket 26: the fixture
+now names a handful of
+Pantry Ingredients, and `restoreSeed` ticks them through the same Pantry route a visitor's own tick
+would use, after the Staples loop so a tick against a Staple meets the route's refusal rather than
+being silently swallowed. A restored database therefore has ticks the moment the restore finishes,
+live or recorded.
 
-That is the same empty list a Reviewer meets on a healthy API before their first tick, and the tick
-is a write degraded mode disables. It is recorded that way deliberately, and the cost is named rather
-than hidden: the Seed was built so that ticking a handful of Pantry Ingredients ranks nine of its
-nineteen Recipes at three depths of Missing, and a Reviewer who arrives during an outage sees none of
-that. The recorder is not the place to fix it. Ticking through the API before the capture would make
-the recording a staged scenario rather than the state a restore produces, and it is that equivalence
-which lets the suite check the committed file at all. Ticket 26 proposes the fix that works in both
-modes, by putting the ticks in the Seed itself.
+That fix works in both modes because it changes what a restore produces rather than what the
+recorder does with it. The Seed was built so that ticking a handful of Pantry Ingredients ranks nine
+of its nineteen Recipes at three depths of Missing, and a Reviewer who arrives during an outage now
+sees that ranking rather than the empty one a first restore used to leave. The recorder itself is
+untouched: it still just calls `restoreSeed` and reads `GET /api/state` back, and the recording is
+still exactly the state a restore produces rather than a scenario staged for the capture, which is
+the equivalence that lets the suite check the committed file at all.
 
 The behaviour is unconditional, so the Homelab Variant carries the recorded file too and never uses
 it: there, the API serves the bundle, so an API that cannot answer cannot serve the page that would

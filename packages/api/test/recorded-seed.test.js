@@ -13,6 +13,7 @@ import { relative, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import { recordedSeedFile } from '../src/config.js';
 import { RECORDED_VERSION, assertRecorded, serializeRecording } from '../src/recording.js';
+import { SEED } from '../src/seedFixture.js';
 import { startApp } from './helpers/app.js';
 import { readState } from './helpers/recipes.js';
 import { recordTheSeed } from './helpers/seed.js';
@@ -39,22 +40,26 @@ describe('recording the Seed', () => {
     assert.ok(recorded.staples.length > 0, 'the recording holds no Staples');
   });
 
-  // Empty because the Seed satisfies neither way into the ranking, not because a recording cannot
-  // hold one. bestMatches.js admits a Recipe on Pantry overlap or on nothing Missing, and the second
-  // exists for the Recipe built from Staples alone; the Seed has no such Recipe, and a restored
-  // database has no Pantry ticks. A Reviewer arriving during an outage therefore sees the same empty
-  // ranking a Reviewer arriving to a healthy API sees before their first tick, and the tick itself is
-  // a write degraded mode has disabled. Ticking here would record a state no restore produces, which
-  // would cost the equivalence the two tests below rest on. Ticket 26 carries the fix.
-  it('carries an empty ranking, because the Seed satisfies neither way into it', async (t) => {
+  // Populated, because the Seed now ticks its own Pantry Ingredients as part of the restore
+  // (ticket 26). bestMatches.js admits a Recipe on Pantry overlap or on nothing Missing, and it is
+  // the first ground the fixture's ticks satisfy. Recording is still just reading `GET /api/state`
+  // after a restore, so a Reviewer arriving during an outage now sees the same populated ranking a
+  // Reviewer arriving to a healthy, freshly restored API sees before touching anything themselves.
+  // The ticked names come off the checklist's `inPantry` flags rather than a literal, so this test
+  // follows the fixture instead of racing it.
+  it('carries the ranking its own Pantry ticks produce', async (t) => {
     await startApp(t);
 
     const recorded = await recordTheSeed(t);
 
-    assert.deepEqual(recorded.bestMatches, []);
+    assert.ok(recorded.bestMatches.length > 0, 'the recording holds no Best Matches');
+    const depths = new Set(recorded.bestMatches.map((match) => match.missing.length));
+    assert.ok(depths.size >= 3, `the recording ranks only ${depths.size} depths of Missing`);
+
+    const ticked = recorded.pantryChecklist.filter((ingredient) => ingredient.inPantry);
     assert.deepEqual(
-      recorded.pantryChecklist.filter((ingredient) => ingredient.inPantry),
-      [],
+      ticked.map((ingredient) => ingredient.name).sort(),
+      [...SEED.pantry].sort(),
     );
   });
 

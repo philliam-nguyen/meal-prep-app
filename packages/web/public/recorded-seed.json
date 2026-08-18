@@ -1004,7 +1004,7 @@
     {
       "id": "I017",
       "name": "Carrot",
-      "inPantry": false
+      "inPantry": true
     },
     {
       "id": "I068",
@@ -1019,7 +1019,7 @@
     {
       "id": "I002",
       "name": "Chicken stock",
-      "inPantry": false
+      "inPantry": true
     },
     {
       "id": "I003",
@@ -1049,7 +1049,7 @@
     {
       "id": "I011",
       "name": "Garlic",
-      "inPantry": false
+      "inPantry": true
     },
     {
       "id": "I062",
@@ -1089,7 +1089,7 @@
     {
       "id": "I013",
       "name": "Onion",
-      "inPantry": false
+      "inPantry": true
     },
     {
       "id": "I014",
@@ -1109,7 +1109,7 @@
     {
       "id": "I021",
       "name": "Potato",
-      "inPantry": false
+      "inPantry": true
     },
     {
       "id": "I064",
@@ -1182,5 +1182,80 @@
       "name": "Water"
     }
   ],
-  "bestMatches": []
+  "bestMatches": [
+    {
+      "recipeId": "R009",
+      "missing": [
+        "Double cream",
+        "Leek"
+      ]
+    },
+    {
+      "recipeId": "R010",
+      "missing": [
+        "Ground cumin",
+        "Red lentils"
+      ]
+    },
+    {
+      "recipeId": "R007",
+      "missing": [
+        "Bacon",
+        "Mushrooms",
+        "Parsley"
+      ]
+    },
+    {
+      "recipeId": "R003",
+      "missing": [
+        "Chicken thighs",
+        "Lemon",
+        "Thyme"
+      ]
+    },
+    {
+      "recipeId": "R004",
+      "missing": [
+        "Basil",
+        "Pasta",
+        "Tinned tomatoes"
+      ]
+    },
+    {
+      "recipeId": "R011",
+      "missing": [
+        "Ale",
+        "Beef shin",
+        "Celery",
+        "Thyme"
+      ]
+    },
+    {
+      "recipeId": "R001",
+      "missing": [
+        "Chicken thighs",
+        "Double cream",
+        "Leek",
+        "Thyme"
+      ]
+    },
+    {
+      "recipeId": "R012",
+      "missing": [
+        "Chickpeas",
+        "Ground cumin",
+        "Spinach",
+        "Tinned tomatoes"
+      ]
+    },
+    {
+      "recipeId": "R002",
+      "missing": [
+        "Double cream",
+        "Mushrooms",
+        "Paprika",
+        "Rice"
+      ]
+    }
+  ]
 }

@@ -126,6 +126,22 @@ export async function restoreSeed({ pool, guardrails, fixture = SEED, log = () =
     }
     log(`marked ${fixture.staples.length} Staples`);
 
+    // After the Staples loop, never before it. Marking a Staple silently clears its Pantry membership
+    // (`SET_STAPLE` in ingredients.js), so a tick loaded first would vanish the moment its Ingredient
+    // became a Staple rather than naming the fixture entry that conflicts. Loaded here, a tick against
+    // a Staple instead meets the Pantry route's own refusal and dies loudly, which is the loader's
+    // established failure pattern.
+    for (const name of fixture.pantry) {
+      await send(app, {
+        method: 'PUT',
+        url: `/api/ingredients/${idFor(ids, name, 'a Pantry tick')}/pantry`,
+        payload: { inPantry: true },
+        expected: 204,
+        entry: `Pantry tick ${name}`,
+      });
+    }
+    log(`ticked ${fixture.pantry.length} Pantry Ingredients`);
+
     for (const [name, aisle] of Object.entries(fixture.aisles)) {
       await send(app, {
         method: 'PUT',

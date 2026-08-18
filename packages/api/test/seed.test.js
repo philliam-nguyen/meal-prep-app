@@ -81,14 +81,19 @@ describe('the Seed', () => {
   });
 
   // The visitor's first gesture, and the whole reason the fixture is written by hand: five ticks
-  // have to rank a good part of the collection, or Best Matches demonstrates nothing.
+  // have to rank a good part of the collection, or Best Matches demonstrates nothing. The restore
+  // is what ticks them now, so this reads the ticked names back off the checklist rather than
+  // asserting against the literal the fixture happens to use today.
   it('ranks a good part of the collection off a handful of Pantry ticks', async (t) => {
     const app = await startApp(t);
-    await loadSeed(t);
-    const ticked = ['Onion', 'Garlic', 'Carrot', 'Potato', 'Chicken stock'];
-    await tickPantry(app, ticked);
 
-    const { bestMatches, staples } = await readState(app);
+    await loadSeed(t);
+
+    const { bestMatches, staples, pantryChecklist, shoppingList } = await readState(app);
+    const tickedNames = pantryChecklist
+      .filter((ingredient) => ingredient.inPantry)
+      .map((ingredient) => ingredient.name);
+    assert.ok(tickedNames.length > 0, 'the restore ticked nothing');
 
     assert.ok(bestMatches.length >= 8, `a handful of ticks ranked only ${bestMatches.length}`);
     const missingCounts = bestMatches.map((match) => match.missing.length);
@@ -99,9 +104,12 @@ describe('the Seed', () => {
     // Staple. The Staple half is why the fixture names any, so an empty list would pass vacuously.
     const missing = new Set(bestMatches.flatMap((match) => match.missing));
     assert.ok(staples.length > 0, 'the Seed marked no Staples');
-    for (const name of [...ticked, ...staples.map((staple) => staple.name)]) {
+    for (const name of [...tickedNames, ...staples.map((staple) => staple.name)]) {
       assert.ok(!missing.has(name), `${name} is counted Missing`);
     }
+
+    // The ticks rank Recipes without emptying the list a visitor shops from.
+    assert.ok(shoppingList.length > 0, 'the ticks left the Shopping List empty');
   });
 
   // A visitor should not have to select a Recipe before the Shopping List has anything to show. The
@@ -139,6 +147,7 @@ describe('the Seed', () => {
       staples: [],
       aisles: {},
       selected: [],
+      pantry: [],
     };
 
     await assert.rejects(() => loadSeed(t, { fixture: refused }), /Insecure Card/);
@@ -163,9 +172,55 @@ describe('the Seed', () => {
       staples: [],
       aisles: {},
       selected: [],
+      pantry: [],
     };
 
     await assert.rejects(() => loadSeed(t, { fixture: refused }), /Apple/);
+  });
+
+  // Ticks load after Staples are marked, so a fixture that ticks a Staple meets the Pantry route's
+  // own refusal rather than a guard this loader would otherwise need to write. This is verification
+  // of behaviour the route already gives for free, not a case the loader added code to handle.
+  it('refuses a fixture that ticks a Staple', async (t) => {
+    await startApp(t);
+    const refused = {
+      recipes: [
+        {
+          name: 'Salted Snack',
+          type: 'Snack',
+          cardUrl: null,
+          ingredients: [{ name: 'Salt', quantity: 1, unit: 'pinch' }],
+        },
+      ],
+      staples: ['Salt'],
+      aisles: { Salt: 'Herbs & spices' },
+      selected: [],
+      pantry: ['Salt'],
+    };
+
+    await assert.rejects(() => loadSeed(t, { fixture: refused }), /Salt/);
+  });
+
+  // A tick naming a food no seeded Recipe calls for fails the same way an unshelved Ingredient does:
+  // loudly, and naming the entry, rather than silently ticking nothing.
+  it('refuses a fixture that ticks an unknown Ingredient', async (t) => {
+    await startApp(t);
+    const refused = {
+      recipes: [
+        {
+          name: 'Plain Snack',
+          type: 'Snack',
+          cardUrl: null,
+          ingredients: [{ name: 'Apple', quantity: 1, unit: '' }],
+        },
+      ],
+      staples: [],
+      aisles: { Apple: 'Produce' },
+      selected: [],
+      pantry: ['Banana'],
+    };
+
+    await assert.rejects(() => loadSeed(t, { fixture: refused }), /Banana/);
   });
 });
 

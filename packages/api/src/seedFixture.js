@@ -9,7 +9,10 @@
 // Every Recipe Type is represented, so the browse list has range. And the same foods recur across
 // Recipes - butter in eight of them, onion, double cream, plain flour and olive oil in six each - so
 // that ticking a handful of Pantry Ingredients ranks nine of the nineteen at three different depths
-// of Missing, instead of matching one Recipe and calling that a demonstration.
+// of Missing, instead of matching one Recipe and calling that a demonstration. That ticking is no
+// longer something a visitor has to discover for themselves: the fixture below names the handful, and
+// the restore ticks them through the Pantry route itself, so the ranking is populated the moment a
+// restore finishes rather than after the first gesture made against it.
 //
 // Recipe Card URLs point at example.com, which is reserved for exactly this. A plausible-looking URL
 // to a site that has never held these Recipes would be a broken link in a demo.
@@ -80,6 +83,11 @@ const AISLES = {
 // rather than at an empty page that needs explaining. These two share leek, double cream, butter and
 // chicken stock, which is what makes the list show consolidation rather than a flat concatenation.
 const SELECTED = ['Chicken and Leek Pie', 'Leek and Potato Soup'];
+
+// The handful of Pantry Ingredients the header above describes ticked. None is a Staple - the Pantry
+// route refuses those - and none is Leek, the one food both Selected Recipes share, so the Shopping
+// List a visitor lands on still has something in it after the restore ticks these.
+const PANTRY = ['Onion', 'Garlic', 'Carrot', 'Potato', 'Chicken stock'];
 
 const RECIPES = [
   {
@@ -331,4 +339,5 @@ export const SEED = {
   staples: STAPLES,
   aisles: AISLES,
   selected: SELECTED,
+  pantry: PANTRY,
 };
