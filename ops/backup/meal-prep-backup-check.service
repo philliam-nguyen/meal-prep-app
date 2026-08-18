@@ -6,4 +6,4 @@ After=network-online.target
 [Service]
 Type=oneshot
 WorkingDirectory=/opt/meal-prep-app
-ExecStart=/opt/meal-prep-app/ops/backup/check-backup.sh
+ExecStart=/bin/bash /opt/meal-prep-app/ops/backup/check-backup.sh

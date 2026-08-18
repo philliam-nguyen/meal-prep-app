@@ -8,4 +8,7 @@ Type=oneshot
 # Adjust to wherever the checkout actually lives on the host - the runbook's example uses
 # /opt/meal-prep-app.
 WorkingDirectory=/opt/meal-prep-app
-ExecStart=/opt/meal-prep-app/ops/backup/dump.sh
+# Invoked through bash explicitly rather than relying on the checkout carrying the executable bit -
+# a plain `git clone` does, but a zip download or a filesystem that does not track it would
+# otherwise turn "the timer is installed" into a silent no-op.
+ExecStart=/bin/bash /opt/meal-prep-app/ops/backup/dump.sh
