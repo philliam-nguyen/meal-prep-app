@@ -106,3 +106,10 @@ _Avoid_: sample data, test data, dummy data, fake data
 A mark on a seeded row meaning it cannot be edited or deleted. Only ever set in the Demo
 Variant; the Homelab Variant leaves it unset so it has no effect there.
 _Avoid_: locked, readonly, system row
+
+**Site Notice**:
+A line of configured text every visitor to an instance is shown, or nothing where none was
+configured. The Demo Variant sets it to say the data is a Seed; the Homelab Variant sets
+nothing, which is an unset value rather than a branch. Distinct from the offline notice
+degraded mode shows, which is fixed text about the backend rather than configuration.
+_Avoid_: demo banner, mode flag, announcement

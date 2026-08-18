@@ -74,11 +74,12 @@ export async function recordSeed({ pool, guardrails }) {
   // bundle and fail that comparison everywhere else.
   //
   // It also settles which banners a visitor can meet at once. The frontend's notice follows the
-  // payload on screen, so degraded mode renders this null and the configured notice is absent for
-  // exactly as long as the backend is unreachable. The offline banner stands alone there, and it
-  // already says the data is a fixed sample of the demo data, which is what the other one would
-  // have been there to say. The two cannot stack by construction rather than by anyone styling
-  // around it.
+  // payload on screen, so degraded mode renders this null and the offline banner stands alone,
+  // already saying the data is a fixed sample of the demo data, which is what the other one would
+  // have been there to say. A visitor restored from cache during an outage sees the opposite pair:
+  // their cached notice and no offline banner, because a load with a screenful behind it never
+  // falls back to the recording. Either way the two cannot stack, by construction rather than by
+  // anyone styling around it.
   const app = await buildApp({ pool, logger: false, guardrails });
   try {
     const response = await app.inject({ method: 'GET', url: '/api/state' });
