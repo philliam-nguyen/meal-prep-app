@@ -1,0 +1,1186 @@
+{
+  "version": "recorded",
+  "recipes": [
+    {
+      "id": "R014",
+      "name": "Apple and Walnut Crumble",
+      "type": "Dessert",
+      "cardUrl": "https://recipes.example.com/apple-and-walnut-crumble",
+      "selected": false,
+      "protected": true,
+      "ingredients": [
+        {
+          "ingredientId": "I083",
+          "name": "Apple",
+          "quantity": 6,
+          "unit": ""
+        },
+        {
+          "ingredientId": "I001",
+          "name": "Butter",
+          "quantity": 100,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I079",
+          "name": "Caster sugar",
+          "quantity": 100,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I050",
+          "name": "Oats",
+          "quantity": 100,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I006",
+          "name": "Plain flour",
+          "quantity": 150,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I088",
+          "name": "Walnuts",
+          "quantity": 75,
+          "unit": "g"
+        }
+      ]
+    },
+    {
+      "id": "R008",
+      "name": "Banana Oat Pancakes",
+      "type": "Breakfast",
+      "cardUrl": "https://recipes.example.com/banana-oat-pancakes",
+      "selected": false,
+      "protected": true,
+      "ingredients": [
+        {
+          "ingredientId": "I046",
+          "name": "Banana",
+          "quantity": 2,
+          "unit": ""
+        },
+        {
+          "ingredientId": "I001",
+          "name": "Butter",
+          "quantity": 20,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I032",
+          "name": "Eggs",
+          "quantity": 2,
+          "unit": ""
+        },
+        {
+          "ingredientId": "I049",
+          "name": "Milk",
+          "quantity": 200,
+          "unit": "ml"
+        },
+        {
+          "ingredientId": "I050",
+          "name": "Oats",
+          "quantity": 100,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I006",
+          "name": "Plain flour",
+          "quantity": 100,
+          "unit": "g"
+        }
+      ]
+    },
+    {
+      "id": "R011",
+      "name": "Beef and Ale Stew",
+      "type": "Stew",
+      "cardUrl": "https://recipes.example.com/beef-and-ale-stew",
+      "selected": false,
+      "protected": true,
+      "ingredients": [
+        {
+          "ingredientId": "I065",
+          "name": "Ale",
+          "quantity": 500,
+          "unit": "ml"
+        },
+        {
+          "ingredientId": "I066",
+          "name": "Beef shin",
+          "quantity": 900,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I017",
+          "name": "Carrot",
+          "quantity": 3,
+          "unit": ""
+        },
+        {
+          "ingredientId": "I068",
+          "name": "Celery",
+          "quantity": 2,
+          "unit": "sticks"
+        },
+        {
+          "ingredientId": "I013",
+          "name": "Onion",
+          "quantity": 2,
+          "unit": ""
+        },
+        {
+          "ingredientId": "I006",
+          "name": "Plain flour",
+          "quantity": 2,
+          "unit": "tbsp"
+        },
+        {
+          "ingredientId": "I008",
+          "name": "Thyme",
+          "quantity": 4,
+          "unit": "sprigs"
+        }
+      ]
+    },
+    {
+      "id": "R017",
+      "name": "Cheddar and Thyme Soda Bread",
+      "type": "Bread",
+      "cardUrl": "https://recipes.example.com/cheddar-and-thyme-soda-bread",
+      "selected": false,
+      "protected": true,
+      "ingredients": [
+        {
+          "ingredientId": "I001",
+          "name": "Butter",
+          "quantity": 25,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I030",
+          "name": "Cheddar",
+          "quantity": 100,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I049",
+          "name": "Milk",
+          "quantity": 300,
+          "unit": "ml"
+        },
+        {
+          "ingredientId": "I006",
+          "name": "Plain flour",
+          "quantity": 400,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I008",
+          "name": "Thyme",
+          "quantity": 2,
+          "unit": "sprigs"
+        }
+      ]
+    },
+    {
+      "id": "R001",
+      "name": "Chicken and Leek Pie",
+      "type": "Dinner",
+      "cardUrl": "https://recipes.example.com/chicken-and-leek-pie",
+      "selected": true,
+      "protected": true,
+      "ingredients": [
+        {
+          "ingredientId": "I001",
+          "name": "Butter",
+          "quantity": 125,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I002",
+          "name": "Chicken stock",
+          "quantity": 300,
+          "unit": "ml"
+        },
+        {
+          "ingredientId": "I003",
+          "name": "Chicken thighs",
+          "quantity": 600,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I004",
+          "name": "Double cream",
+          "quantity": 150,
+          "unit": "ml"
+        },
+        {
+          "ingredientId": "I005",
+          "name": "Leek",
+          "quantity": 300,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I006",
+          "name": "Plain flour",
+          "quantity": 250,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I007",
+          "name": "Salt",
+          "quantity": null,
+          "unit": ""
+        },
+        {
+          "ingredientId": "I008",
+          "name": "Thyme",
+          "quantity": 3,
+          "unit": "sprigs"
+        }
+      ]
+    },
+    {
+      "id": "R006",
+      "name": "Chickpea and Spinach Salad",
+      "type": "Lunch",
+      "cardUrl": null,
+      "selected": false,
+      "protected": true,
+      "ingredients": [
+        {
+          "ingredientId": "I035",
+          "name": "Chickpeas",
+          "quantity": 400,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I019",
+          "name": "Lemon",
+          "quantity": 1,
+          "unit": ""
+        },
+        {
+          "ingredientId": "I020",
+          "name": "Olive oil",
+          "quantity": 3,
+          "unit": "tbsp"
+        },
+        {
+          "ingredientId": "I038",
+          "name": "Parsley",
+          "quantity": 1,
+          "unit": "bunch"
+        },
+        {
+          "ingredientId": "I039",
+          "name": "Spinach",
+          "quantity": 200,
+          "unit": "g"
+        }
+      ]
+    },
+    {
+      "id": "R012",
+      "name": "Chickpea and Tomato Stew",
+      "type": "Stew",
+      "cardUrl": "https://recipes.example.com/chickpea-and-tomato-stew",
+      "selected": false,
+      "protected": true,
+      "ingredients": [
+        {
+          "ingredientId": "I035",
+          "name": "Chickpeas",
+          "quantity": 800,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I011",
+          "name": "Garlic",
+          "quantity": 3,
+          "unit": "cloves"
+        },
+        {
+          "ingredientId": "I062",
+          "name": "Ground cumin",
+          "quantity": 2,
+          "unit": "tsp"
+        },
+        {
+          "ingredientId": "I020",
+          "name": "Olive oil",
+          "quantity": 2,
+          "unit": "tbsp"
+        },
+        {
+          "ingredientId": "I013",
+          "name": "Onion",
+          "quantity": 1,
+          "unit": ""
+        },
+        {
+          "ingredientId": "I039",
+          "name": "Spinach",
+          "quantity": 200,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I028",
+          "name": "Tinned tomatoes",
+          "quantity": 400,
+          "unit": "g"
+        }
+      ]
+    },
+    {
+      "id": "R013",
+      "name": "Dark Chocolate Mousse",
+      "type": "Dessert",
+      "cardUrl": "https://recipes.example.com/dark-chocolate-mousse",
+      "selected": false,
+      "protected": true,
+      "ingredients": [
+        {
+          "ingredientId": "I079",
+          "name": "Caster sugar",
+          "quantity": 50,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I080",
+          "name": "Dark chocolate",
+          "quantity": 200,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I004",
+          "name": "Double cream",
+          "quantity": 300,
+          "unit": "ml"
+        },
+        {
+          "ingredientId": "I032",
+          "name": "Eggs",
+          "quantity": 4,
+          "unit": ""
+        }
+      ]
+    },
+    {
+      "id": "R018",
+      "name": "Honey and Oat Flapjacks",
+      "type": "Snack",
+      "cardUrl": "https://recipes.example.com/honey-and-oat-flapjacks",
+      "selected": false,
+      "protected": true,
+      "ingredients": [
+        {
+          "ingredientId": "I001",
+          "name": "Butter",
+          "quantity": 150,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I079",
+          "name": "Caster sugar",
+          "quantity": 75,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I103",
+          "name": "Honey",
+          "quantity": 100,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I050",
+          "name": "Oats",
+          "quantity": 300,
+          "unit": "g"
+        }
+      ]
+    },
+    {
+      "id": "R005",
+      "name": "Leek and Cheddar Tart",
+      "type": "Lunch",
+      "cardUrl": "https://recipes.example.com/leek-and-cheddar-tart",
+      "selected": false,
+      "protected": true,
+      "ingredients": [
+        {
+          "ingredientId": "I001",
+          "name": "Butter",
+          "quantity": 100,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I030",
+          "name": "Cheddar",
+          "quantity": 150,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I004",
+          "name": "Double cream",
+          "quantity": 200,
+          "unit": "ml"
+        },
+        {
+          "ingredientId": "I032",
+          "name": "Eggs",
+          "quantity": 3,
+          "unit": ""
+        },
+        {
+          "ingredientId": "I005",
+          "name": "Leek",
+          "quantity": 400,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I006",
+          "name": "Plain flour",
+          "quantity": 200,
+          "unit": "g"
+        }
+      ]
+    },
+    {
+      "id": "R009",
+      "name": "Leek and Potato Soup",
+      "type": "Soup",
+      "cardUrl": "https://recipes.example.com/leek-and-potato-soup",
+      "selected": true,
+      "protected": true,
+      "ingredients": [
+        {
+          "ingredientId": "I016",
+          "name": "Black pepper",
+          "quantity": null,
+          "unit": ""
+        },
+        {
+          "ingredientId": "I001",
+          "name": "Butter",
+          "quantity": 40,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I002",
+          "name": "Chicken stock",
+          "quantity": 800,
+          "unit": "ml"
+        },
+        {
+          "ingredientId": "I004",
+          "name": "Double cream",
+          "quantity": 100,
+          "unit": "ml"
+        },
+        {
+          "ingredientId": "I005",
+          "name": "Leek",
+          "quantity": 400,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I013",
+          "name": "Onion",
+          "quantity": 1,
+          "unit": ""
+        },
+        {
+          "ingredientId": "I021",
+          "name": "Potato",
+          "quantity": 500,
+          "unit": "g"
+        }
+      ]
+    },
+    {
+      "id": "R015",
+      "name": "Lemon Posset",
+      "type": "Dessert",
+      "cardUrl": "https://recipes.example.com/lemon-posset",
+      "selected": false,
+      "protected": true,
+      "ingredients": [
+        {
+          "ingredientId": "I079",
+          "name": "Caster sugar",
+          "quantity": 150,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I004",
+          "name": "Double cream",
+          "quantity": 600,
+          "unit": "ml"
+        },
+        {
+          "ingredientId": "I019",
+          "name": "Lemon",
+          "quantity": 3,
+          "unit": ""
+        }
+      ]
+    },
+    {
+      "id": "R002",
+      "name": "Mushroom Stroganoff",
+      "type": "Dinner",
+      "cardUrl": "https://recipes.example.com/mushroom-stroganoff",
+      "selected": false,
+      "protected": true,
+      "ingredients": [
+        {
+          "ingredientId": "I001",
+          "name": "Butter",
+          "quantity": 30,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I004",
+          "name": "Double cream",
+          "quantity": 200,
+          "unit": "ml"
+        },
+        {
+          "ingredientId": "I011",
+          "name": "Garlic",
+          "quantity": 2,
+          "unit": "cloves"
+        },
+        {
+          "ingredientId": "I012",
+          "name": "Mushrooms",
+          "quantity": 500,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I013",
+          "name": "Onion",
+          "quantity": 1,
+          "unit": ""
+        },
+        {
+          "ingredientId": "I014",
+          "name": "Paprika",
+          "quantity": 2,
+          "unit": "tsp"
+        },
+        {
+          "ingredientId": "I015",
+          "name": "Rice",
+          "quantity": 300,
+          "unit": "g"
+        }
+      ]
+    },
+    {
+      "id": "R007",
+      "name": "Mushroom and Bacon Hash",
+      "type": "Breakfast",
+      "cardUrl": "https://recipes.example.com/mushroom-and-bacon-hash",
+      "selected": false,
+      "protected": true,
+      "ingredients": [
+        {
+          "ingredientId": "I040",
+          "name": "Bacon",
+          "quantity": 6,
+          "unit": "rashers"
+        },
+        {
+          "ingredientId": "I012",
+          "name": "Mushrooms",
+          "quantity": 250,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I020",
+          "name": "Olive oil",
+          "quantity": 1,
+          "unit": "tbsp"
+        },
+        {
+          "ingredientId": "I013",
+          "name": "Onion",
+          "quantity": 1,
+          "unit": ""
+        },
+        {
+          "ingredientId": "I038",
+          "name": "Parsley",
+          "quantity": 1,
+          "unit": "handful"
+        },
+        {
+          "ingredientId": "I021",
+          "name": "Potato",
+          "quantity": 600,
+          "unit": "g"
+        }
+      ]
+    },
+    {
+      "id": "R016",
+      "name": "Overnight White Loaf",
+      "type": "Bread",
+      "cardUrl": "https://recipes.example.com/overnight-white-loaf",
+      "selected": false,
+      "protected": true,
+      "ingredients": [
+        {
+          "ingredientId": "I007",
+          "name": "Salt",
+          "quantity": 10,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I093",
+          "name": "Strong white flour",
+          "quantity": 500,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I094",
+          "name": "Water",
+          "quantity": 350,
+          "unit": "ml"
+        },
+        {
+          "ingredientId": "I095",
+          "name": "Yeast",
+          "quantity": 3,
+          "unit": "g"
+        }
+      ]
+    },
+    {
+      "id": "R010",
+      "name": "Red Lentil and Carrot Soup",
+      "type": "Soup",
+      "cardUrl": "https://recipes.example.com/red-lentil-and-carrot-soup",
+      "selected": false,
+      "protected": true,
+      "ingredients": [
+        {
+          "ingredientId": "I017",
+          "name": "Carrot",
+          "quantity": 400,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I002",
+          "name": "Chicken stock",
+          "quantity": 1,
+          "unit": "l"
+        },
+        {
+          "ingredientId": "I011",
+          "name": "Garlic",
+          "quantity": 2,
+          "unit": "cloves"
+        },
+        {
+          "ingredientId": "I062",
+          "name": "Ground cumin",
+          "quantity": 1,
+          "unit": "tsp"
+        },
+        {
+          "ingredientId": "I013",
+          "name": "Onion",
+          "quantity": 1,
+          "unit": ""
+        },
+        {
+          "ingredientId": "I064",
+          "name": "Red lentils",
+          "quantity": 200,
+          "unit": "g"
+        }
+      ]
+    },
+    {
+      "id": "R003",
+      "name": "Roast Chicken Traybake",
+      "type": "Dinner",
+      "cardUrl": "https://recipes.example.com/roast-chicken-traybake",
+      "selected": false,
+      "protected": true,
+      "ingredients": [
+        {
+          "ingredientId": "I016",
+          "name": "Black pepper",
+          "quantity": null,
+          "unit": ""
+        },
+        {
+          "ingredientId": "I017",
+          "name": "Carrot",
+          "quantity": 4,
+          "unit": ""
+        },
+        {
+          "ingredientId": "I003",
+          "name": "Chicken thighs",
+          "quantity": 8,
+          "unit": ""
+        },
+        {
+          "ingredientId": "I019",
+          "name": "Lemon",
+          "quantity": 1,
+          "unit": ""
+        },
+        {
+          "ingredientId": "I020",
+          "name": "Olive oil",
+          "quantity": 3,
+          "unit": "tbsp"
+        },
+        {
+          "ingredientId": "I021",
+          "name": "Potato",
+          "quantity": 800,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I008",
+          "name": "Thyme",
+          "quantity": 4,
+          "unit": "sprigs"
+        }
+      ]
+    },
+    {
+      "id": "R004",
+      "name": "Spaghetti with Tomato and Basil",
+      "type": "Dinner",
+      "cardUrl": "https://recipes.example.com/spaghetti-tomato-basil",
+      "selected": false,
+      "protected": true,
+      "ingredients": [
+        {
+          "ingredientId": "I023",
+          "name": "Basil",
+          "quantity": 1,
+          "unit": "bunch"
+        },
+        {
+          "ingredientId": "I011",
+          "name": "Garlic",
+          "quantity": 3,
+          "unit": "cloves"
+        },
+        {
+          "ingredientId": "I020",
+          "name": "Olive oil",
+          "quantity": 2,
+          "unit": "tbsp"
+        },
+        {
+          "ingredientId": "I026",
+          "name": "Pasta",
+          "quantity": 400,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I007",
+          "name": "Salt",
+          "quantity": null,
+          "unit": ""
+        },
+        {
+          "ingredientId": "I028",
+          "name": "Tinned tomatoes",
+          "quantity": 800,
+          "unit": "g"
+        }
+      ]
+    },
+    {
+      "id": "R019",
+      "name": "Spiced Roasted Chickpeas",
+      "type": "Snack",
+      "cardUrl": null,
+      "selected": false,
+      "protected": true,
+      "ingredients": [
+        {
+          "ingredientId": "I035",
+          "name": "Chickpeas",
+          "quantity": 400,
+          "unit": "g"
+        },
+        {
+          "ingredientId": "I062",
+          "name": "Ground cumin",
+          "quantity": 1,
+          "unit": "tsp"
+        },
+        {
+          "ingredientId": "I020",
+          "name": "Olive oil",
+          "quantity": 2,
+          "unit": "tbsp"
+        },
+        {
+          "ingredientId": "I014",
+          "name": "Paprika",
+          "quantity": 1,
+          "unit": "tsp"
+        },
+        {
+          "ingredientId": "I007",
+          "name": "Salt",
+          "quantity": null,
+          "unit": ""
+        }
+      ]
+    }
+  ],
+  "shoppingList": [
+    {
+      "ingredientId": "I016",
+      "name": "Black pepper",
+      "aisle": "Herbs & spices",
+      "gotIt": false,
+      "amounts": []
+    },
+    {
+      "ingredientId": "I001",
+      "name": "Butter",
+      "aisle": "Dairy & eggs",
+      "gotIt": false,
+      "amounts": [
+        {
+          "quantity": 165,
+          "unit": "g"
+        }
+      ]
+    },
+    {
+      "ingredientId": "I002",
+      "name": "Chicken stock",
+      "aisle": "Tins & jars",
+      "gotIt": false,
+      "amounts": [
+        {
+          "quantity": 1100,
+          "unit": "ml"
+        }
+      ]
+    },
+    {
+      "ingredientId": "I003",
+      "name": "Chicken thighs",
+      "aisle": "Meat & poultry",
+      "gotIt": false,
+      "amounts": [
+        {
+          "quantity": 600,
+          "unit": "g"
+        }
+      ]
+    },
+    {
+      "ingredientId": "I004",
+      "name": "Double cream",
+      "aisle": "Dairy & eggs",
+      "gotIt": false,
+      "amounts": [
+        {
+          "quantity": 250,
+          "unit": "ml"
+        }
+      ]
+    },
+    {
+      "ingredientId": "I005",
+      "name": "Leek",
+      "aisle": "Produce",
+      "gotIt": false,
+      "amounts": [
+        {
+          "quantity": 700,
+          "unit": "g"
+        }
+      ]
+    },
+    {
+      "ingredientId": "I013",
+      "name": "Onion",
+      "aisle": "Produce",
+      "gotIt": false,
+      "amounts": [
+        {
+          "quantity": 1,
+          "unit": ""
+        }
+      ]
+    },
+    {
+      "ingredientId": "I006",
+      "name": "Plain flour",
+      "aisle": "Baking",
+      "gotIt": false,
+      "amounts": [
+        {
+          "quantity": 250,
+          "unit": "g"
+        }
+      ]
+    },
+    {
+      "ingredientId": "I021",
+      "name": "Potato",
+      "aisle": "Produce",
+      "gotIt": false,
+      "amounts": [
+        {
+          "quantity": 500,
+          "unit": "g"
+        }
+      ]
+    },
+    {
+      "ingredientId": "I007",
+      "name": "Salt",
+      "aisle": "Herbs & spices",
+      "gotIt": false,
+      "amounts": []
+    },
+    {
+      "ingredientId": "I008",
+      "name": "Thyme",
+      "aisle": "Produce",
+      "gotIt": false,
+      "amounts": [
+        {
+          "quantity": 3,
+          "unit": "sprigs"
+        }
+      ]
+    }
+  ],
+  "pantryChecklist": [
+    {
+      "id": "I065",
+      "name": "Ale",
+      "inPantry": false
+    },
+    {
+      "id": "I083",
+      "name": "Apple",
+      "inPantry": false
+    },
+    {
+      "id": "I040",
+      "name": "Bacon",
+      "inPantry": false
+    },
+    {
+      "id": "I046",
+      "name": "Banana",
+      "inPantry": false
+    },
+    {
+      "id": "I023",
+      "name": "Basil",
+      "inPantry": false
+    },
+    {
+      "id": "I066",
+      "name": "Beef shin",
+      "inPantry": false
+    },
+    {
+      "id": "I017",
+      "name": "Carrot",
+      "inPantry": false
+    },
+    {
+      "id": "I068",
+      "name": "Celery",
+      "inPantry": false
+    },
+    {
+      "id": "I030",
+      "name": "Cheddar",
+      "inPantry": false
+    },
+    {
+      "id": "I002",
+      "name": "Chicken stock",
+      "inPantry": false
+    },
+    {
+      "id": "I003",
+      "name": "Chicken thighs",
+      "inPantry": false
+    },
+    {
+      "id": "I035",
+      "name": "Chickpeas",
+      "inPantry": false
+    },
+    {
+      "id": "I080",
+      "name": "Dark chocolate",
+      "inPantry": false
+    },
+    {
+      "id": "I004",
+      "name": "Double cream",
+      "inPantry": false
+    },
+    {
+      "id": "I032",
+      "name": "Eggs",
+      "inPantry": false
+    },
+    {
+      "id": "I011",
+      "name": "Garlic",
+      "inPantry": false
+    },
+    {
+      "id": "I062",
+      "name": "Ground cumin",
+      "inPantry": false
+    },
+    {
+      "id": "I103",
+      "name": "Honey",
+      "inPantry": false
+    },
+    {
+      "id": "I005",
+      "name": "Leek",
+      "inPantry": false
+    },
+    {
+      "id": "I019",
+      "name": "Lemon",
+      "inPantry": false
+    },
+    {
+      "id": "I049",
+      "name": "Milk",
+      "inPantry": false
+    },
+    {
+      "id": "I012",
+      "name": "Mushrooms",
+      "inPantry": false
+    },
+    {
+      "id": "I050",
+      "name": "Oats",
+      "inPantry": false
+    },
+    {
+      "id": "I013",
+      "name": "Onion",
+      "inPantry": false
+    },
+    {
+      "id": "I014",
+      "name": "Paprika",
+      "inPantry": false
+    },
+    {
+      "id": "I038",
+      "name": "Parsley",
+      "inPantry": false
+    },
+    {
+      "id": "I026",
+      "name": "Pasta",
+      "inPantry": false
+    },
+    {
+      "id": "I021",
+      "name": "Potato",
+      "inPantry": false
+    },
+    {
+      "id": "I064",
+      "name": "Red lentils",
+      "inPantry": false
+    },
+    {
+      "id": "I015",
+      "name": "Rice",
+      "inPantry": false
+    },
+    {
+      "id": "I039",
+      "name": "Spinach",
+      "inPantry": false
+    },
+    {
+      "id": "I093",
+      "name": "Strong white flour",
+      "inPantry": false
+    },
+    {
+      "id": "I008",
+      "name": "Thyme",
+      "inPantry": false
+    },
+    {
+      "id": "I028",
+      "name": "Tinned tomatoes",
+      "inPantry": false
+    },
+    {
+      "id": "I088",
+      "name": "Walnuts",
+      "inPantry": false
+    },
+    {
+      "id": "I095",
+      "name": "Yeast",
+      "inPantry": false
+    }
+  ],
+  "staples": [
+    {
+      "id": "I016",
+      "name": "Black pepper"
+    },
+    {
+      "id": "I001",
+      "name": "Butter"
+    },
+    {
+      "id": "I079",
+      "name": "Caster sugar"
+    },
+    {
+      "id": "I020",
+      "name": "Olive oil"
+    },
+    {
+      "id": "I006",
+      "name": "Plain flour"
+    },
+    {
+      "id": "I007",
+      "name": "Salt"
+    },
+    {
+      "id": "I094",
+      "name": "Water"
+    }
+  ],
+  "bestMatches": []
+}

@@ -13,7 +13,10 @@ COPY packages/web/package.json packages/web/
 RUN npm ci --workspace @meal-prep/web --include-workspace-root
 COPY packages/shared packages/shared
 COPY packages/web packages/web
-RUN npm run build
+# The web build alone, not the root `build` script. That one records the Seed first, which needs a
+# Postgres and so a Docker daemon this stage does not have (ADR-0009). The recording arrives in the
+# build context already generated, and the check that it is current is a test rather than a layer.
+RUN npm run build --workspace @meal-prep/web
 
 FROM node:24-alpine AS runtime
 ENV NODE_ENV=production

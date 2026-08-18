@@ -1,6 +1,6 @@
 # 21 - Record the Seed into the bundle
 
-Status: ready-for-agent
+Status: done
 
 **What to build:** A build step that captures one real `GET /api/state` response and writes it into
 the frontend bundle, plus the check that stops it going stale. This is the data ticket 22 renders
@@ -34,10 +34,10 @@ something the build does, not something a person remembers.
 
 **Blocked by:** None. 12 supplied the fixture and the restore, both landed.
 
-- [ ] A build step produces the recorded state file from a real seeded database
-- [ ] The file is generated, never committed by hand, and regenerating it twice gives the same result
-- [ ] The file validates against `stateResponse` in CI, and a payload field added without
+- [x] A build step produces the recorded state file from a real seeded database
+- [x] The file is generated, never committed by hand, and regenerating it twice gives the same result
+- [x] The file validates against `stateResponse` in CI, and a payload field added without
       regenerating fails the build
-- [ ] The recording reuses `restoreSeed` and the testcontainers setup rather than a second path into
+- [x] The recording reuses `restoreSeed` and the testcontainers setup rather than a second path into
       the database
-- [ ] The bundle carries the file, and its size is small enough not to matter to first paint
+- [x] The bundle carries the file, and its size is small enough not to matter to first paint

@@ -13,12 +13,14 @@ A mobile-friendly web app for meal prepping, backed by Postgres behind a small A
 ## Development
 
 Requires Node 24 or newer, because the test command uses the test runner's global-setup hook.
-Running the tests also needs a Docker daemon.
+Running the tests needs a Docker daemon, and so does the build: it records the Seed against a real
+Postgres before Vite runs.
 
 ```
 npm install
 npm run dev      # dev server with hot reload
-npm run build    # static bundle into packages/web/dist
+npm run build    # record the Seed, then the static bundle into packages/web/dist
+npm run record   # the recording on its own, without Vite
 npm run preview  # serve the built bundle
 ```
 
@@ -100,6 +102,18 @@ Recipes go in as HTTP requests against the API rather than as inserts, so the fi
 same rules a visitor's own Recipe is held to and a fixture the API would refuse fails the restore.
 `docs/adr/0007-seed-loads-through-the-api.md` covers why and what it costs. Seeded Recipes are
 marked Protected, which is what makes the demo survive the next visitor.
+
+### The recorded Seed
+
+`packages/web/public/recorded-seed.json` is one real `GET /api/state` response, captured by
+`npm run record` against a throwaway Postgres it starts and throws away, and carried into the bundle
+so the app has something to render when the API cannot be reached
+(`docs/adr/0009-degraded-mode-from-a-recorded-seed.md`).
+
+It is generated, not written. The build regenerates it before Vite, the recording is deterministic,
+and the suite fails when the committed file differs from what a recording made now produces. So
+editing the Seed without rerunning the build is a red test rather than a fallback describing the
+previous fixture. Edit `seedFixture.js`, run `npm run record`, commit both.
 
 ## Tests
 

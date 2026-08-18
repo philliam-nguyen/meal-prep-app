@@ -11,10 +11,11 @@
   ],
   "scripts": {
     "dev": "npm run dev --workspace @meal-prep/web",
-    "build": "npm run build --workspace @meal-prep/web",
+    "build": "npm run record --workspace @meal-prep/api && npm run build --workspace @meal-prep/web",
     "preview": "npm run preview --workspace @meal-prep/web",
     "start": "npm start --workspace @meal-prep/api",
     "migrate": "npm run migrate --workspace @meal-prep/api",
+    "record": "npm run record --workspace @meal-prep/api",
     "test": "npm test --workspaces --if-present && node --test \"test/**/*.test.js\""
   }
 }
