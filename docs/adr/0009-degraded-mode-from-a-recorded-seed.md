@@ -63,6 +63,37 @@ Degraded mode must not write to the freshness poll's baseline. The recorded payl
 live one. Usually it would. Occasionally it would not, and the client would sit on Seed data after
 the API was healthy. Recovery forces one unconditional refetch instead.
 
+Ticket 21 found a second reason for the same field to be handled specially, and settled it by
+recording the sentinel string `recorded` in place of the live value. `readVersion` builds a version
+from `max(updated_at)`, wall-clock times written as the Seed loads, so two recordings of one fixture
+would differ in that field and in nothing else. That is the field the fallback never reads, and it
+would have made the recording undecidable: the build could not tell a Seed that had changed from a
+clock that had moved, so nothing could check the file for staleness, which is the risk this whole
+arrangement exists against. Everything else in the payload is already deterministic, because ids come
+from sequences the restore's `restart identity` puts back to one.
+
+The sentinel is also the safer value to ship, and it extends the paragraph above rather than
+replacing it. Every live version begins with a count of microseconds, so a recorded version can no
+longer coincide with one. The unconditional refetch is still the defence and is still where the
+behaviour is asserted; the sentinel makes the collision it defends against impossible rather than
+merely unlikely. Nothing reads a version for anything but equality, so shipping a value that is not a
+timestamp costs nothing.
+
+The recording is committed. The image build cannot produce it: the capture needs a Postgres and so a
+Docker daemon, and the build stage inside the image has neither, so the file has to arrive with the
+build context. Determinism is what makes that safe. `npm run build` records before it runs Vite, and
+the suite fails when the committed file differs by so much as its formatting from what a recording
+made now produces, so a Seed edited without a regeneration is a red test rather than a stale
+fallback. A hand-edited recording fails the same way, which is the point of comparing the bytes
+rather than the parsed object.
+
+One thing the recording cannot carry is a ranking. Best Matches needs a food in the Pantry, and a
+restored database has no Pantry ticks, so the recorded list is empty. That is the same empty list a
+Reviewer sees on a healthy API before their first tick, and the tick itself is a write degraded mode
+disables. Recording a payload with ticks in it would mean recording a state no restore produces, so
+the paragraph above overstates it: a degraded app shows the Recipes, the Pantry checklist, the
+Staples and the Shopping List, and shows Best Matches empty.
+
 The behaviour is unconditional, so the Homelab Variant carries the recorded file too and never uses
 it: there, the API serves the bundle, so an API that cannot answer cannot serve the page that would
 fall back. The file is inert rather than conditional, which is the same shape as the Protected column

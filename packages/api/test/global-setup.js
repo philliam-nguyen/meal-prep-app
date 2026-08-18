@@ -1,60 +1,23 @@
 // One throwaway Postgres for the whole run (ADR-0005). Migrations are applied as the owner role,
-// the restricted role the API connects as is created here, and tests are handed only the restricted
-// connection string. So the suite proves the migrations apply from empty and that the API's grants
-// are sufficient by booting at all, rather than by tests somebody remembers to write.
+// the restricted role the API connects as is created there too, and tests are handed only the
+// restricted connection string. So the suite proves the migrations apply from empty and that the
+// API's grants are sufficient by booting at all, rather than by tests somebody remembers to write.
+//
+// The boot itself moved to src/throwawayPostgres.js when the Seed recording needed the same
+// database. What is left here is the suite's half: which connection string the tests are handed.
 
-import { randomBytes } from 'node:crypto';
-import { PostgreSqlContainer } from '@testcontainers/postgresql';
-import pg from 'pg';
-import { runMigrations } from '../src/migrations.js';
-import { ensureAppRole } from '../src/roles.js';
-import { migrationsDir } from '../src/config.js';
+import { startThrowawayPostgres } from '../src/throwawayPostgres.js';
 
-// Pinned to match compose.yaml, so a green suite says something about what the stack runs.
-const POSTGRES_IMAGE = 'postgres:17-alpine';
-
-const OWNER_ROLE = 'meal_prep_owner';
-const APP_ROLE = 'meal_prep_app';
-const DATABASE = 'meal_prep';
-
-let container;
-
-function throwawayPassword() {
-  // URL-safe so it survives interpolation into a connection string unencoded.
-  return randomBytes(24).toString('hex');
-}
-
-function connectionUriAs(baseUri, role, password) {
-  const uri = new URL(baseUri);
-  uri.username = role;
-  uri.password = password;
-  return uri.toString();
-}
+let postgres;
 
 export async function globalSetup() {
-  container = await new PostgreSqlContainer(POSTGRES_IMAGE)
-    .withDatabase(DATABASE)
-    .withUsername(OWNER_ROLE)
-    .withPassword(throwawayPassword())
-    .start();
+  postgres = await startThrowawayPostgres();
 
-  const ownerUri = container.getConnectionUri();
-  const appPassword = throwawayPassword();
-
-  const client = new pg.Client({ connectionString: ownerUri });
-  await client.connect();
-  try {
-    await runMigrations({ client, dir: migrationsDir });
-    await ensureAppRole({ client, role: APP_ROLE, password: appPassword });
-  } finally {
-    await client.end();
-  }
-
-  process.env.TEST_OWNER_DATABASE_URL = ownerUri;
-  process.env.TEST_APP_DATABASE_URL = connectionUriAs(ownerUri, APP_ROLE, appPassword);
-  process.env.TEST_APP_ROLE = APP_ROLE;
+  process.env.TEST_OWNER_DATABASE_URL = postgres.ownerUrl;
+  process.env.TEST_APP_DATABASE_URL = postgres.appUrl;
+  process.env.TEST_APP_ROLE = postgres.appRole;
 }
 
 export async function globalTeardown() {
-  await container?.stop();
+  await postgres?.stop();
 }

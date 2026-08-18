@@ -10,6 +10,12 @@ const packageRoot = resolve(import.meta.dirname, '..');
 export const defaultWebDist = resolve(packageRoot, '../web/dist');
 export const migrationsDir = resolve(packageRoot, 'migrations');
 
+// Where the build step writes the recorded Seed (ADR-0009). Vite copies its public directory into
+// the bundle verbatim, so the recording lands beside index.html with no build configuration and
+// without being imported into a module: the frontend asks for it only once the live call has
+// already failed, so it costs nothing at first paint.
+export const recordedSeedFile = resolve(packageRoot, '../web/public/recorded-seed.json');
+
 function required(env, name) {
   const value = env[name];
   if (!value) throw new Error(`${name} is required`);

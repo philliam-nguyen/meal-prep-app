@@ -131,6 +131,23 @@ the repository root because the file it asserts on does, and `npm test` runs it 
 workspaces. It resolves that file against `.env.example` rather than a developer's `.env`, so the
 assertions hold on any machine and the example file has to stay a working configuration.
 
+A fourth, added by the recorded Seed and the same shape as the third: half of
+`test/recorded-seed.test.js` asserts on a file rather than on a response. What it captures is a
+response, and that half goes through the seam, comparing the recording to what `GET /api/state`
+answers with over the same database. What it then has to guard is that the file in
+`packages/web/public` is the one a recording made now produces, that it validates against
+`stateResponse` as that schema stands today, and that the root build script still regenerates it
+before Vite copies it into the bundle. None of that is reachable over HTTP, all of it breaks in
+silence, and the recording is dead code until an outage, so nothing else in the suite would ever
+notice. The same file is where the Dockerfile assertion in `test/seed.test.js` already set the
+precedent for reading a repository file from inside the API's suite.
+
+The Postgres boot itself moved out of `test/global-setup.js` and into `src/throwawayPostgres.js` at
+the same time, because the recording is a build step that needs the suite's database and a build step
+should not have to import test code to get one. The dependency direction is the one everything else
+here uses: tests import `src`, never the reverse. The cost is a `@testcontainers/postgresql` import
+sitting in `src`, which no server path reaches and the production install omits.
+
 Test duration now depends on Docker image pull and container start. Expect the first run on a clean
 machine to be slow and later runs to be quick, and revisit this if the suite grows enough that one
 container per run becomes the bottleneck.
