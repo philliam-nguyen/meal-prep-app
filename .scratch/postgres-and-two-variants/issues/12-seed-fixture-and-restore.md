@@ -101,6 +101,27 @@ to send instead; it goes when 09 lands". Ticket 09 has landed and the statement 
 **No frontend work.** `RecipeDetail.jsx` already hides the edit and delete controls for a Protected
 Recipe, which ticket 09 built. Nothing else in the frontend needs to know the Seed exists.
 
+**2026-08-17: the restore is scheduled on the homelab, not by ticket 15.** The comment above says
+"Ticket 15 schedules the task", which assumed an EventBridge rule against a Fargate task. The Demo
+Variant's backend now runs on the homelab
+([ADR-0008](../../../docs/adr/0008-demo-backend-on-the-homelab.md)), so the schedule is a systemd
+timer on that host calling `node packages/api/src/seed.js` every six hours, with
+`SEED_DATABASE_URL` pointing at the *demo* stack's Postgres and holding its owner role. The timer
+needs owner credentials, which the API container deliberately does not carry, so it runs as its own
+unit rather than inside the API service.
+
+Two things carry forward unchanged and matter more now. The restore builds the app in-process
+through `inject`, so it needs Postgres up but not an API server; a timer firing while the demo is
+otherwise unreachable still works. And the known gap above, that a refused fixture leaves a partly
+loaded database repaired by the next run, now has a six-hour repair window rather than whatever
+ticket 15 would have chosen.
+
+[ADR-0010](../../../docs/adr/0010-demo-guardrails-on-shared-hardware.md) lists this timer among
+security controls rather than housekeeping, because the truncate clears what an attacker stored as
+well as what a visitor did. Its interval is a security parameter.
+
+This ticket stays `done`. Nothing built here changed; only who schedules it.
+
 **What the review changed.** The fixture's header comment claimed overlap counts that were wrong
 (onion in seven Recipes, double cream in five; both are six), written from the design sketch and
 never checked against the fixture that got built. `createPool` took the API's `application_name` as a

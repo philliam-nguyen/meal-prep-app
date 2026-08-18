@@ -1,9 +1,16 @@
 ---
-status: accepted
+status: superseded
+superseded-by: 0010
 date: 2026-08-03
 ---
 
 # Public demo guardrails live in the application, not at the edge
+
+> **Superseded 2026-08-17 by [0010](./0010-demo-guardrails-on-shared-hardware.md).** Every guardrail
+> below is still in force. The reasoning is not: this ADR justifies them on the grounds that the
+> realistic threat is cost amplification, which was true of a Demo Variant on Fargate and RDS and is
+> false of one running on the homelab. Read 0010 for the current threat model, what replaced the AWS
+> ceilings, and what is being accepted.
 
 The demo variant exposes a writable Postgres-backed API to anonymous visitors on the public
 internet. We defend it entirely at the application layer — parameterized queries only, a

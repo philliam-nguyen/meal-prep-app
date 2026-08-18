@@ -77,3 +77,29 @@ ticket stays `ready-for-human` until they are run.
 **ADR-0005 amended.** A suite that sends no HTTP request and touches no database is a third
 departure from that seam, further out than either existing exception, so it is recorded there the
 way ticket 10 recorded `packages/web`.
+
+**2026-08-17: this host gains a second stack, and the runbook needs a section for it.** The Demo
+Variant's API and Postgres now run on the same machine, in their own Compose project
+([ADR-0008](../../../docs/adr/0008-demo-backend-on-the-homelab.md)). Nothing this ticket built
+changes: the Homelab Variant's API stays bound to `127.0.0.1`, `tailscale serve` still reaches it,
+`TRUST_PROXY` stays `true` here for the `Header.Set` reason recorded above, and the Compose file is
+untouched.
+
+What the runbook has to gain, because an Operator at the stove needs to know which stack they are
+looking at:
+
+- The two stacks are separate Compose projects with separate Postgres containers, separate volumes
+  and separate networks, and they must not share a password. Sharing one turns the separation into
+  decoration.
+- The `DOCKER-USER` egress rules that stop the demo network reaching private address ranges, other
+  than its own database. This is the control that addresses lateral movement; the rest is inbound.
+- The local model runtime on this host stays bound away from the network, recorded as a control
+  rather than left as an accident.
+- Which container ticket 14's backup dumps, and which it must not.
+- The demo's Seed restore timer, its owner credentials, and that it is a security control rather
+  than housekeeping.
+
+The isolation this achieves is real and it is not structural: both stacks share a kernel, a Docker
+daemon, a filesystem and a root user.
+[ADR-0010](../../../docs/adr/0010-demo-guardrails-on-shared-hardware.md) states what is being
+accepted and on what grounds. The runbook should point at it rather than restate it.

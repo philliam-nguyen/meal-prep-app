@@ -1,50 +1,72 @@
 # 15 - Demo Variant Terraform
 
-Status: needs-info
+Status: ready-for-human
 
-**What to build:** A Reviewer clicks the demo link at any hour and gets a working app populated with
-Seed data, plus Terraform they can read to judge the infrastructure work and not only the app. A
-visitor ticks Pantry items, adds a Recipe, deletes it again, and gets the full app rather than a
-read-only tour, while Protected seeded content stays intact for whoever arrives next.
+**What to build:** The AWS half of the Demo Variant, as Terraform a Reviewer can read to judge the
+infrastructure work and not only the app. A Reviewer clicks the link at any hour and gets the app
+populated with Seed data; a visitor ticks Pantry items, adds a Recipe and deletes it again, while
+Protected seeded content stays intact for whoever arrives next.
 
-Always-on rather than applied on demand, because a reviewer clicks the link without warning and a
-dead link reads worse than no link.
+The backend is not in AWS. [ADR-0008](../../../docs/adr/0008-demo-backend-on-the-homelab.md) puts the
+API and its Postgres on the homelab, in a Compose project of their own, reached over Tailscale. This
+ticket builds what sits in front of that.
 
-CloudFront is the single origin and routes by path: the bundle from object storage, `/api/*` to the
-API service. A small single-AZ RDS Postgres holds the data and is the entire recurring cost. A
-scheduled task restores the Seed, so accumulated visitor content clears itself. A banner tells the
-visitor they are looking at a demo with fake data, as configured text rather than a mode check
-(ADR-0002).
+**Where it lives.** `infra/stacks/recipe/` in the developer site repository, not here, per that
+repo's ADR-0003 topology. It reads `zone_id`, `domain_name`, `certificate_arn` and
+`oidc_provider_arn` from the platform stack through `terraform_remote_state` rather than declaring
+copies. The hostname is `meal-prep.phillip-nguyen.dev`.
 
-Cost controls per ADR-0001: an AWS Budgets alarm, a hard ceiling on task count, and a hard ceiling on
-database storage. Abuse is otherwise invisible until someone looks.
+**What the stack contains:**
 
-The Demo Variant must be structurally unable to reach personal data. Isolation is a property of the
-deployment, not a promise in a document.
+- An S3 bucket for the frontend bundle, with origin access control
+- A CloudFront distribution: the default behaviour serves the bundle, an `/api/*` behaviour reaches
+  the proxy instance. One origin from the browser's point of view, so the frontend keeps relative
+  paths
+- A `t4g.nano` instance in a public subnet, joined to the tailnet, reverse-proxying to the homelab
+- A security group admitting CloudFront and nothing else, with no inbound SSH; the instance is
+  managed over Tailscale SSH
+- A Route 53 record in the existing zone
+- A deploy role for the bundle, trusting the existing OIDC provider, scoped to one repository and
+  one branch
 
-**Open in this ticket:**
+**What it does not contain, and why.** No RDS and no Fargate: the backend is elsewhere. No ACM
+certificate: the platform stack already issues one covering the apex and `*.phillip-nguyen.dev`, and
+it is `ISSUED`. No Budgets alarm: `monthly-total` already exists account-wide, though its $5 limit
+wants revisiting against the new figure. No ECR: the image goes to a public GitHub Container Registry
+repository so the homelab needs no AWS credential (ticket 16). No NAT Gateway: the instance sits in a
+public subnet, because NAT would cost more than the rest of the design combined.
 
-- Whether the API runs as a container task or a serverless function. Ticket 03 assumed a long-running
-  server, which runs on a container task unchanged; a serverless function needs a handler adapter.
-  Record the decision here, and write an ADR if it constrains later work. **Held** while the Operator
-  prices both; see the comments below for the constraints that decision carries.
-- ~~The demo's domain name and DNS.~~ Settled: `phillip-nguyen.dev`, in Route 53 already.
+**Cost.** $7.36 a month, verified against the AWS Price List on 2026-08-17 and recorded in
+[research 0002](../../../docs/research/0002-cloudfront-ec2-tailscale-ingress.md). The public IPv4
+address costs more than the instance. Confirm before applying; the figure is only as current as its
+retrieval date.
 
-**Verify before applying:** every cost figure discussed during design was an estimate and none were
-checked. Confirm current pricing in the AWS pricing calculator and record what you find before
-`terraform apply`.
+**Two settings that are not optional.** CloudFront's `connection_attempts` and `connection_timeout`
+come down from their defaults, and the reverse proxy's upstream timeouts go to two or three seconds.
+At the defaults a dead origin costs a browser up to thirty seconds before a 502, which means the
+degraded mode in ticket 22 never gets seen and a Reviewer reads the demo as broken. The defaults
+actively defeat the feature.
 
-**Blocked by:** 11 (guardrails and the configured CORS origin), 12 (the Seed and its restore command).
+**Watch the availability zone.** `us-east-1` excludes `use1-az3` from VPC origins.
 
-- [ ] `terraform apply` from empty produces a reachable demo, and the Terraform reads well as a portfolio artifact
+**Human-only.** This is the infrastructure the Operator is doing this project to learn. Not to be
+dispatched to an agent, matching the developer site's curriculum.
+
+**Blocked by:** 20 (whether a VPC origin serves a public-subnet instance, which decides whether a
+certificate and an ACME client exist in this stack at all).
+
+- [ ] `terraform apply` from empty produces a reachable demo, and the Terraform reads well as a
+      portfolio artifact
 - [ ] One origin serves both the bundle and `/api/*`
-- [ ] The demo runs the same container image as the Homelab Variant
-- [ ] A scheduled task restores the Seed, and visitor content clears with no Operator involvement
-- [ ] A visitor sees a banner naming it a demo with fake data
-- [ ] A Budgets alarm reaches the Operator, and task count and database storage carry hard ceilings
+- [ ] The stack consumes platform outputs rather than declaring its own zone, certificate or OIDC
+      provider
+- [ ] The instance reaches the homelab over the tailnet, and accepts inbound from CloudFront only
+- [ ] No inbound SSH; the instance is managed over Tailscale SSH
+- [ ] CloudFront and the proxy carry the shortened timeouts, proven by timing a request with the
+      homelab stack stopped
 - [ ] Nothing in the demo's configuration can reach the homelab database
-- [ ] The container-versus-serverless decision is recorded here
 - [ ] Pricing verified in the calculator and recorded before apply
+- [ ] The $5 account budget is revisited against the real figure
 
 ## Comments
 
@@ -84,3 +106,20 @@ text. Whoever takes this ticket builds both halves, or splits the app half into 
 **Nothing was applied and no credentials were present.** `aws sts get-caller-identity` returned
 `NoCredentials` on the machine that opened this ticket. Terraform 1.15.8 and aws-cli 2.36.17 are
 installed there.
+
+**2026-08-17: the design changed and most of the above is superseded.** The container-versus-
+serverless question is void: neither runs. Research priced the cheapest AWS shape at $28.49 a month
+against a $5 account budget, and the decision was to run the backend on the homelab instead, at
+$7.36 for the AWS half. See [ADR-0008](../../../docs/adr/0008-demo-backend-on-the-homelab.md), and
+[ADR-0010](../../../docs/adr/0010-demo-guardrails-on-shared-hardware.md) for what that does to the
+threat model.
+
+Specifically superseded above: the runtime comment in full, including its ALB and VPC Link pricing
+advice; the assumption that this ticket creates a certificate, a Budgets alarm or an ECR repository,
+all of which either already exist or are no longer used; and the ticket's original claim that the
+Demo Variant would be *structurally* unable to reach personal data. That claim is withdrawn. Both
+Variants now share a kernel, a Docker daemon and a filesystem, so the honest statement is that the
+Demo Variant is unable to reach personal data as configured. ADR-0010 records the containment and
+what is being accepted.
+
+The banner comment still stands, and the app half is now ticket 24.
