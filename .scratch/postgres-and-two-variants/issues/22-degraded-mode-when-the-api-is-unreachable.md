@@ -59,6 +59,13 @@ against what the last refetch arrived with": one drives the collision ticket 21'
 impossible (the API answers `recorded`, and recovery still happens, exactly once), and one holds the
 poll open across a whole outage so recovery cannot end up needing a reload.
 
+**The way back does not depend on which view is open.** Review caught this: the poll watches only the
+views where two phones can disagree, and the Add form is not one of them, so a visitor who wandered
+there during an outage would have sat in front of it after the backend came back. The recording on
+screen is now a second reason for the poll to watch, alongside a view that goes stale, and a poll
+watching only for that stops once the refetch lands, which keeps the Add form the thing nobody polls
+for. A third test covers it, with the Add view.
+
 **Degraded mode is only ever entered by the first paint.** A load with a screenful behind it fails the
 way it always did, because replacing a cook's own Recipes with a fixed sample of somebody else's is
 not an improvement, and because one failed background poll would otherwise grey out an app whose

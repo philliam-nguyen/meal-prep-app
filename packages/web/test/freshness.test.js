@@ -185,6 +185,32 @@ describe('the freshness poll', () => {
     assert.equal(browser.polling, true, 'the poll gave up, so recovery would need a page reload');
   });
 
+  // The way back cannot depend on which view happens to be open. Nothing on the Add form goes stale,
+  // so nothing polls there normally, and a visitor reading the line degraded mode puts in place of
+  // the form would otherwise sit in front of it long after the backend came back.
+  it('watches a view that cannot go stale while the recording is on screen', async () => {
+    const browser = testBrowser();
+    const server = testServer('recorded');
+    let onScreen = NO_BASELINE;
+    let refetches = 0;
+    startFreshnessPoll({
+      view: 'add',
+      versionOnScreen: () => onScreen,
+      readVersion: server.readVersion,
+      onStale: () => {
+        refetches += 1;
+        onScreen = server.version;
+      },
+      environment: browser,
+    });
+
+    await browser.elapse();
+    await browser.elapse();
+
+    assert.equal(refetches, 1);
+    assert.equal(browser.polling, false, 'it kept polling a view with nothing left to watch for');
+  });
+
   it('does not pile a second refetch on top of a slow one', async () => {
     const browser = testBrowser();
     const server = testServer();

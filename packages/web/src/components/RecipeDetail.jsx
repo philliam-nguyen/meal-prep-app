@@ -70,8 +70,8 @@ export function RecipeDetail({ recipe, readOnly, onClose, onToggleSelected, onEd
                 <button className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setConfirmingDelete(false)}>
                   Keep It
                 </button>
-                {/* Disabled here too, because the API can go quiet between opening this and
-                    answering the question it asks. */}
+                {/* Disabled with the button that opens it, so read-only is a property of the whole
+                    flow rather than of whichever button a reader happens to reach first. */}
                 <button className="btn-secondary" style={dangerButtonStyle} disabled={readOnly} onClick={() => onDelete(recipe)}>
                   {I.trash} <span>Delete</span>
                 </button>

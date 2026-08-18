@@ -20,8 +20,9 @@ function AisleField({ entry, readOnly, onSetAisle }) {
   // rather than two, so there is no arrangement where the box is open holding nothing.
   const [draft, setDraft] = useState(null);
 
-  // Read-only closes the box rather than disabling it, which is what keeps an Aisle typed against an
-  // offline backend from being a correction the cook watched evaporate.
+  // Read-only shows the label and nothing else, so there is no box to type an Aisle into that could
+  // not be saved. It reads as a box that never opens rather than one closing under a cook: degraded
+  // mode is entered by the first paint, so nothing here is ever open when it arrives.
   if (draft === null || readOnly) {
     return (
       <button
