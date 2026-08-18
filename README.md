@@ -74,9 +74,12 @@ Two of them will bite you if you get them wrong:
 - `CORS_ORIGIN` has no default and must match how the browser reaches the app, port included.
   Browsers attach an `Origin` to same-origin writes too, so a wrong value refuses the app's own
   saves rather than only refusing other sites.
-- `TRUST_PROXY` decides whether the client address comes from `X-Forwarded-For`. Turn it on only
-  when something you control terminates in front of the API. Off behind a CDN buckets every visitor
-  together; on when nothing sets the header lets a caller claim any address.
+- `TRUST_PROXY` decides where in `X-Forwarded-For` the client address is read from, and takes
+  `false`, `true` or a count of the proxies in front of the API. `true` reads the leftmost entry and
+  is only right in front of a proxy that replaces the header; a count resolves that many hops inward
+  from the socket and is what an appending chain needs. `false` behind a proxy buckets every visitor
+  together; `true` in front of an appending one lets a caller claim any address. Neither mistake
+  announces itself, so `.env.example` sets out which Variant uses which and why.
 
 ## Seed and restore
 

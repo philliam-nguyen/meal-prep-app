@@ -89,33 +89,107 @@ describe('rate limiting writes per IP', () => {
 });
 
 describe('finding the client address behind a proxy', () => {
-  // One address reaching the process, two visitors behind it. Whether they share a rate-limit
-  // bucket is the whole of whether "per-IP" is true on the Demo Variant, where CloudFront is always
-  // the last hop.
-  const asVisitor = (app, address) =>
-    post(app, recipe(`Soup for ${address}`), {
-      remoteAddress: '10.0.0.1',
-      headers: { 'x-forwarded-for': address },
+  // One address reaching the process, many visitors behind it. Whether two of them share a
+  // rate-limit bucket is the whole of whether "per-address" is true, and the answer depends on
+  // what the proxies in front do to X-Forwarded-For rather than on anything in this codebase. So
+  // the chain is written down as that behaviour and the request is derived from it: an appending
+  // proxy adds the address it heard from, a replacing one throws the list away and writes that
+  // address alone. Change a chain below to match a deployment that started replacing and these
+  // tests go red, which is the only warning there would be. A limiter keyed on the wrong address
+  // still answers 201 and 429 exactly as though it were working (ADR-0010).
+  const throughChain = (chain, visitor, sent = []) => {
+    let forwarded = sent;
+    let caller = visitor;
+    for (const { address, forwards } of chain) {
+      forwarded = forwards === 'append' ? [...forwarded, caller] : [caller];
+      caller = address;
+    }
+    return { remoteAddress: caller, headers: { 'x-forwarded-for': forwarded.join(', ') } };
+  };
+
+  // CloudFront, then the reverse proxy on the instance (ADR-0008). Both append, which is the fact
+  // TRUST_PROXY=2 rests on, so the hop count is taken from the chain rather than written twice.
+  const DEMO_CHAIN = [
+    { address: '70.132.1.1', forwards: 'append' },
+    { address: '10.0.0.9', forwards: 'append' },
+  ];
+
+  // `tailscale serve`, on loopback, writing the header with Header.Set. Ticket 13 established that
+  // by reading addProxyForwardedHeaders in ipn/ipnlocal/serve.go rather than by reading the docs.
+  const HOMELAB_CHAIN = [{ address: '127.0.0.1', forwards: 'replace' }];
+
+  const writeThrough = (app, chain, visitor, sent) =>
+    post(app, recipe(`Soup for ${visitor}`), throughChain(chain, visitor, sent));
+
+  it('counts the Demo Variant visitor rather than the proxies in front of them', async (t) => {
+    const app = await startApp(t, {
+      guardrails: { writeRateLimit: 1, trustProxy: DEMO_CHAIN.length },
     });
 
-  it('counts the forwarded address when the deployment trusts the proxy in front of it', async (t) => {
+    await writeThrough(app, DEMO_CHAIN, '203.0.113.7');
+    const other = await writeThrough(app, DEMO_CHAIN, '203.0.113.8');
+
+    assert.equal(other.statusCode, 201);
+  });
+
+  it('leaves the Demo Variant bucket where it is however the visitor forges the list', async (t) => {
+    const app = await startApp(t, {
+      guardrails: { writeRateLimit: 1, trustProxy: DEMO_CHAIN.length },
+    });
+
+    // Both proxies append, so whatever the visitor sent survives at the left of the list. Reading
+    // the leftmost value is what would let one script claim a fresh address per request and never
+    // be limited at all. Counting hops inward from the socket is what discards it.
+    await writeThrough(app, DEMO_CHAIN, '203.0.113.7', ['1.1.1.1']);
+    const again = await writeThrough(app, DEMO_CHAIN, '203.0.113.7', ['2.2.2.2', '3.3.3.3']);
+
+    assert.equal(again.statusCode, 429);
+  });
+
+  it('counts the tailnet address the Homelab Variant proxy wrote', async (t) => {
     const app = await startApp(t, { guardrails: { writeRateLimit: 1, trustProxy: true } });
 
-    await asVisitor(app, '203.0.113.1');
-    const second = await asVisitor(app, '203.0.113.2');
+    // `true` is right here for the reason a hop count is needed there: a proxy that replaces has
+    // already discarded the forged entry, so the leftmost value is the one Tailscale wrote.
+    await writeThrough(app, HOMELAB_CHAIN, '100.64.0.1', ['1.1.1.1']);
+    const other = await writeThrough(app, HOMELAB_CHAIN, '100.64.0.2', ['1.1.1.1']);
 
-    assert.equal(second.statusCode, 201);
+    assert.equal(other.statusCode, 201);
+  });
+
+  it('finds no visitor at all if a proxy replaces the header rather than appending', async (t) => {
+    // Why the chains above record behaviour instead of the deployment's hop count being asserted
+    // on its own. A reverse proxy set to replace hands the app CloudFront's address and nothing
+    // else, so the visitor is gone before any counting starts and no value recovers them: every
+    // one below puts two visitors in one bucket. The remedy is a deployment change, not a tighter
+    // number, and the test above is what says so out loud.
+    const replacing = DEMO_CHAIN.map((proxy, hop) =>
+      hop === DEMO_CHAIN.length - 1 ? { ...proxy, forwards: 'replace' } : proxy,
+    );
+
+    for (const trustProxy of [true, 1, DEMO_CHAIN.length, DEMO_CHAIN.length + 1]) {
+      const app = await startApp(t, { guardrails: { writeRateLimit: 1, trustProxy } });
+
+      await writeThrough(app, replacing, '203.0.113.7');
+      const other = await writeThrough(app, replacing, '203.0.113.8');
+
+      assert.equal(
+        other.statusCode,
+        429,
+        `TRUST_PROXY=${trustProxy} appeared to tell two visitors apart`,
+      );
+    }
   });
 
   it('ignores the header when nothing it controls sets one', async (t) => {
     const app = await startApp(t, { guardrails: { writeRateLimit: 1, trustProxy: false } });
 
-    // A caller reaching the process directly can write this header itself, so trusting it here
-    // would let one script claim a fresh address per request and never be limited at all.
-    await asVisitor(app, '203.0.113.1');
-    const second = await asVisitor(app, '203.0.113.2');
+    // No proxy at all, so everything in the header is what the caller wrote themselves. Trusting
+    // it here would let one script claim a fresh address per request and never be limited.
+    await writeThrough(app, [], '10.0.0.1', ['203.0.113.1']);
+    const again = await writeThrough(app, [], '10.0.0.1', ['203.0.113.2']);
 
-    assert.equal(second.statusCode, 429);
+    assert.equal(again.statusCode, 429);
   });
 });
 
@@ -338,4 +412,22 @@ describe('reading every limit from configuration', () => {
   it('refuses a limit that is not a number', () => {
     assert.throws(() => readServerConfig({ ...env, RECIPES_MAX: 'lots' }), /RECIPES_MAX/);
   });
+
+  it('reads TRUST_PROXY as a hop count where the Variant sets one', () => {
+    // The Demo Variant's value. Both Variants run this build; only the .env differs (ADR-0002).
+    assert.equal(readServerConfig({ ...env, TRUST_PROXY: '2' }).guardrails.trustProxy, 2);
+  });
+
+  it('reads TRUST_PROXY as a switch where the Variant sets one', () => {
+    assert.equal(readServerConfig({ ...env, TRUST_PROXY: 'false' }).guardrails.trustProxy, false);
+  });
+
+  for (const rejected of ['yes', '0', '-1', '1.5', 'lots']) {
+    it(`refuses TRUST_PROXY of "${rejected}" rather than guessing`, () => {
+      // Every one of these would otherwise reach Fastify as something it quietly reads as "trust
+      // nothing", and the whole internet would land in one rate-limit bucket with the deployment
+      // reporting success. A limiter keying on the wrong address is worse than none (ADR-0010).
+      assert.throws(() => readServerConfig({ ...env, TRUST_PROXY: rejected }), /TRUST_PROXY/);
+    });
+  }
 });

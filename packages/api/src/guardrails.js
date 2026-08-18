@@ -41,8 +41,8 @@ export async function registerGuardrails(app, { corsOrigin, writeRateLimit, writ
   await app.register(fastifyRateLimit, {
     max: writeRateLimit,
     timeWindow: writeRateWindowMs,
-    // Keyed on the client address by default. Whether that address is the real client or the last
-    // proxy in front of it is the trustProxy setting's business, not this plugin's.
+    // Keyed on the client address by default. How far through the forwarded chain that address is
+    // read from is the trustProxy setting's business, not this plugin's.
     allowList: (request) => !WRITE_METHODS.has(request.method),
   });
 }

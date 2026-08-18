@@ -37,13 +37,22 @@ function positiveInteger(env, name, fallback) {
   return value;
 }
 
-function flag(env, name, fallback) {
+// A switch or a count of proxy hops, because the two Variants disagree about their proxies rather
+// than about the app (ADR-0008). Anything else throws instead of falling back to false: this is the
+// value the write rate limiter keys on, and a limiter keyed on the wrong address is worse than no
+// limiter because it answers 201 and 429 as though it were working (ADR-0010). A deployment that
+// meant to count hops and typed something Number() dislikes should not start.
+function flagOrHopCount(env, name, fallback) {
   const value = setting(env, name);
   if (value === undefined) return fallback;
-  if (value !== 'true' && value !== 'false') {
-    throw new Error(`${name} must be "true" or "false", got "${value}"`);
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+
+  const hops = Number(value);
+  if (!Number.isInteger(hops) || hops < 1) {
+    throw new Error(`${name} must be "true", "false", or a hop count of at least 1, got "${value}"`);
   }
-  return value === 'true';
+  return hops;
 }
 
 /**
@@ -67,11 +76,17 @@ function guardrails(env) {
     // Headroom over a personal collection, and the absolute ceiling on what a visitor to the Demo
     // Variant can cost by scripting inserts.
     recipesMax: positiveInteger(env, 'RECIPES_MAX', 500),
-    // Rate limiting keys on the client address, which is the last hop unless this is on: behind the
-    // Demo Variant's CDN every visitor would otherwise share one bucket. Off by default, because
-    // trusting a forwarded header from a client that reaches the process directly lets anyone claim
-    // any address and defeats the limit from the other side.
-    trustProxy: flag(env, 'TRUST_PROXY', false),
+    // Where in X-Forwarded-For the visitor's address is, which is what rate limiting keys on. Off by
+    // default, because a caller reaching the process directly writes that header itself and could
+    // otherwise claim a fresh address per request.
+    //
+    // `true` reads the leftmost entry, and is only correct in front of a proxy that replaces the
+    // header rather than appending to it - the Homelab Variant's `tailscale serve` does. A count
+    // instead names how many proxies stand in front, and resolves that many hops inward from the
+    // socket, discarding everything the caller wrote. The Demo Variant sets 2 for CloudFront and the
+    // reverse proxy behind it, both of which append (ADR-0008). Which value is right is a fact about
+    // the deployment's proxies, so the tests state the chain rather than the arithmetic.
+    trustProxy: flagOrHopCount(env, 'TRUST_PROXY', false),
   };
 }
 
