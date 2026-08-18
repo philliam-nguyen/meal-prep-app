@@ -1,6 +1,6 @@
 # 14 - Unattended backups
 
-Status: ready-for-agent
+Status: done
 
 **What to build:** Recovery stops depending on the Operator remembering anything. A nightly `pg_dump`
 runs unattended, dated dumps are kept for about a month, a copy lives off the homelab so a dead disk
