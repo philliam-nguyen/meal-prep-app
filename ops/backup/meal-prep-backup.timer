@@ -1,0 +1,11 @@
+[Unit]
+Description=Run meal-prep-backup.service nightly
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+# If the host was off at 02:30, run once on the next boot instead of silently waiting a full day -
+# a dead disk found this way is a dead disk found a day sooner.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

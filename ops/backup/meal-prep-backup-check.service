@@ -1,0 +1,9 @@
+[Unit]
+Description=Check that tonight's meal-prep backup actually landed
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/meal-prep-app
+ExecStart=/opt/meal-prep-app/ops/backup/check-backup.sh

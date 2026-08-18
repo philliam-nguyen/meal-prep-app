@@ -1,0 +1,11 @@
+[Unit]
+Description=Nightly pg_dump of the Homelab Variant's Postgres container
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+# Adjust to wherever the checkout actually lives on the host - the runbook's example uses
+# /opt/meal-prep-app.
+WorkingDirectory=/opt/meal-prep-app
+ExecStart=/opt/meal-prep-app/ops/backup/dump.sh

@@ -1,0 +1,78 @@
+#!/usr/bin/env node
+// Test-only shim for the handful of `docker` invocations ops/backup/dump.sh and
+// ops/backup/check-backup.sh make (`inspect --format`, `exec`), forwarded to the real Docker
+// daemon through dockerode.
+//
+// This exists because the sandbox this suite runs in has a Docker Engine reachable at
+// //./pipe/docker_engine (that is how @testcontainers/postgresql already works elsewhere in this
+// repo's suite) but no `docker` CLI binary on PATH for a shell to invoke. The real Homelab Variant
+// host has a real `docker` - the runbook already requires it for Compose - so nothing here is
+// production code and nothing in ops/backup/ knows this file exists. It is only ever prepended
+// onto PATH from inside test/backup.test.js.
+import Docker from 'dockerode';
+
+const docker = new Docker();
+const [, , cmd, ...rest] = process.argv;
+
+async function inspect(args) {
+  const formatIdx = args.indexOf('--format');
+  const format = formatIdx >= 0 ? args[formatIdx + 1] : null;
+  const name = args[args.length - 1];
+  const data = await docker.getContainer(name).inspect();
+  if (format === '{{.State.Running}}') {
+    process.stdout.write(String(data.State.Running));
+  } else {
+    process.stdout.write(JSON.stringify(data));
+  }
+  return 0;
+}
+
+async function exec(args) {
+  const env = [];
+  let stdin = false;
+  let i = 0;
+  for (;;) {
+    if (args[i] === '-e') {
+      env.push(args[i + 1]);
+      i += 2;
+    } else if (args[i] === '-i') {
+      stdin = true;
+      i += 1;
+    } else {
+      break;
+    }
+  }
+  const name = args[i];
+  const cmdArgs = args.slice(i + 1);
+  const container = docker.getContainer(name);
+  const execInstance = await container.exec({
+    Cmd: cmdArgs,
+    Env: env,
+    AttachStdin: stdin,
+    AttachStdout: true,
+    AttachStderr: true,
+  });
+  const stream = await execInstance.start({ hijack: true, stdin });
+  if (stdin) process.stdin.pipe(stream);
+  await new Promise((resolvePromise, reject) => {
+    docker.modem.demuxStream(stream, process.stdout, process.stderr);
+    stream.on('end', resolvePromise);
+    stream.on('error', reject);
+  });
+  const info = await execInstance.inspect();
+  return info.ExitCode ?? 0;
+}
+
+async function main() {
+  if (cmd === 'inspect') return inspect(rest);
+  if (cmd === 'exec') return exec(rest);
+  process.stderr.write(`docker-shim: unsupported subcommand '${cmd}'\n`);
+  return 1;
+}
+
+main()
+  .then((code) => process.exit(code))
+  .catch((err) => {
+    process.stderr.write(`Error: ${err.message}\n`);
+    process.exit(1);
+  });

@@ -131,8 +131,128 @@ as long as the migrations in between were additive.
 
 Postgres writes to the named volume `meal-prep_database`. Recreating containers keeps it, which is
 what `docker compose down` followed by `docker compose up -d` does. `docker compose down -v`
-deletes it, and there is no host directory to recover it from. Scheduled dumps are a separate job
-and this stack does not perform them.
+deletes it, and there is no host directory to recover it from. The nightly backup below is what
+makes that survivable.
+
+## Backups
+
+Ticket 14. Recovery does not depend on the Operator remembering anything: a nightly `pg_dump` of
+the Homelab Variant's Postgres container, dated and named for the stack, roughly a month retained,
+copied off the homelab, with an alert if a dump goes missing or comes back zero bytes. The scripts
+live in `ops/backup/` in this checkout.
+
+**Only the Homelab Variant is dumped.** `ops/backup/dump.sh` names the container it dumps
+explicitly (`HOMELAB_DB_CONTAINER`, default `meal-prep-db-1` - what Compose calls this stack's `db`
+service under the project name `meal-prep`) and refuses to run rather than falling back to
+"whatever Postgres is running" if that container is not there. The Demo Variant's Postgres
+container is never named and never dumped: it has no history worth keeping, and its recovery story
+is the Seed restore timer on its own schedule
+([ticket 12](../../.scratch/postgres-and-two-variants/issues/12-seed-fixture-and-restore.md),
+[ADR-0008](../adr/0008-demo-backend-on-the-homelab.md)). A dump with an ambiguous name is a dump
+somebody restores into the wrong stack later, which is why filenames carry the stack name and the
+date: `homelab-variant_YYYY-MM-DD.sql`.
+
+**What runs, and when.**
+
+| Unit | Schedule | Does |
+| --- | --- | --- |
+| `meal-prep-backup.timer` → `meal-prep-backup.service` | nightly, 02:30 | Runs `ops/backup/dump.sh`: dumps the named container, refuses and alerts on a missing container, refuses and alerts on a zero-byte dump, prunes local dumps past `RETENTION_COUNT` (default 30), copies the new dump offsite, alerts and exits non-zero on any failure including a failed offsite copy. |
+| `meal-prep-backup-check.timer` → `meal-prep-backup-check.service` | daily, 09:00 | Runs `ops/backup/check-backup.sh`: alerts if no dump exists for today at all, or if it exists at zero bytes. This is the watchdog for the failure dump.sh's own alerting cannot catch - the run that never happened because the host was off, the timer was disabled, or the script died before it could alert. |
+
+Both timers set `Persistent=true`: a host that was off at its scheduled time runs the job once on
+the next boot rather than waiting silently for the next day.
+
+**Alerting.** A push notification through [ntfy](https://ntfy.sh) - a single unauthenticated HTTP
+POST, no account, no paid service. `NTFY_TOPIC` in `backup.env` is a long random string standing in
+for a password: anyone who knows it can publish to it and read its history, so it is generated per
+install and never committed. The Operator subscribes to that topic in the ntfy phone app (or at
+`https://ntfy.sh/<topic>` in a browser) before the first real run. Left blank, alerts are logged
+instead of sent - a deliberate choice for a dry run, wrong to leave that way in production.
+Considered and not taken: email, which would need an MTA or a third-party relay configured on a
+host that has neither today; a self-hosted ntfy instance remains open if the public one is ever a
+concern, and `NTFY_URL` in `backup.env` is exactly the setting that repoints it.
+
+**Offsite copy.** `OFFSITE_DEST` in `backup.env` is either a local path - typically a NAS share
+already mounted on this host, copied with `cp` - or `user@host:path`, copied with `rsync` over
+`ssh` reached over the tailnet the same way everything else here is reached, with a key rather than
+a password (`BatchMode=yes` refuses to prompt for one). This is required, not best-effort:
+`dump.sh` fails and alerts if `OFFSITE_DEST` is not configured, because a dump that stays local
+only is not what "a copy lands off the homelab" means.
+
+### Operator install steps (run once, on the host)
+
+Everything above is delivered as files in this checkout. Installing the timers, choosing the
+offsite destination, and subscribing to alerts happen on the real host and are not things this
+repository can do for you.
+
+1. `cp ops/backup/backup.env.example ops/backup/backup.env` and fill in `OFFSITE_DEST` and
+   `NTFY_TOPIC`. `chmod 600 ops/backup/backup.env` - it is gitignored, and stays on the host like
+   `.env` does.
+2. Subscribe to `NTFY_TOPIC` in the ntfy app (or the web UI) before doing anything else, so a test
+   alert has somewhere to land.
+3. Confirm `HOMELAB_DB_CONTAINER` matches reality: `docker compose ps db` and check the container
+   name. It is `meal-prep-db-1` unless something unusual has changed it.
+4. `sudo cp ops/backup/*.service ops/backup/*.timer /etc/systemd/system/` and edit the
+   `WorkingDirectory=` / `ExecStart=` paths in the two `.service` files to match where this
+   checkout actually lives on the host.
+5. `sudo systemctl daemon-reload && sudo systemctl enable --now meal-prep-backup.timer meal-prep-backup-check.timer`
+6. `sudo systemctl start meal-prep-backup.service` to run one dump immediately rather than waiting
+   for 02:30, then `journalctl -u meal-prep-backup.service -n 50` to read what it did. A dump
+   should appear under `BACKUP_DIR` and at `OFFSITE_DEST`.
+7. Break something on purpose once: stop the database container (`docker compose stop db`) and run
+   `sudo systemctl start meal-prep-backup.service` again. It should fail, log the reason, and the
+   ntfy alert should arrive on the phone. Start the database back up afterward.
+
+### The restore drill
+
+Performed once, against a throwaway container, not against either running stack. Steps and actual
+output, recorded here rather than only claimed:
+
+A source container was started fresh (`postgres:17-alpine`), the three files in
+`packages/api/migrations/` were applied against it, and two Recipes were inserted directly:
+
+```
+insert into recipes (name, type) values ('Tomato Soup', 'soup'), ('Roast Chicken', 'dinner');
+```
+
+`ops/backup/dump.sh` was pointed at that container and produced a real dump:
+
+```
+starting dump of meal-prep-restore-drill-source (homelab-variant) to .../homelab-variant_2026-08-17.sql
+dump written: .../homelab-variant_2026-08-17.sql (7486 bytes)
+copied homelab-variant_2026-08-17.sql offsite to .../offsite
+backup complete for 2026-08-17
+```
+
+A second container was started, from the same image, with no migrations applied and no data - an
+empty database. The restore is one command, the same one this section asks the Operator to use for
+real:
+
+```
+docker exec -i <target-container> psql -v ON_ERROR_STOP=1 -U <owner-role> -d <db> < homelab-variant_YYYY-MM-DD.sql
+```
+
+`RESTORE EXIT:0`. Querying the target afterward:
+
+```
+select id, name, type from recipes order by id;
+
+ id  |     name      |  type
+-----+---------------+--------
+R001 | Tomato Soup   | soup
+R002 | Roast Chicken | dinner
+(2 rows)
+```
+
+Identical to the source. `ON_ERROR_STOP=1` matters more than it looks: without it, `psql` keeps
+going past a failed statement and a partially-applied restore can still exit 0.
+
+If the target database is not actually empty - a stale volume, a container reused by mistake - the
+restore is not idempotent the way `dump.sh` is: a plain-SQL dump re-creates tables that already
+exist and fails loudly on the first `CREATE TABLE`, rather than silently overwriting or merging.
+That is the correct failure for this case. Recreate the target from a fresh volume first
+(`docker compose down -v` on a throwaway stack, never on the real one) rather than restoring twice
+into the same database.
 
 ## When something is wrong
 
@@ -144,3 +264,9 @@ and this stack does not perform them.
   bar. Scheme, host, and port all count.
 - **`tailscale serve` answers with 502.** The API is not up on port 8080. Check `docker compose ps`
   and the health endpoint on the host first.
+- **A backup alert arrived.** `journalctl -u meal-prep-backup.service -n 50` (or
+  `-u meal-prep-backup-check.service` for a missing-dump alert) has the full error - both scripts
+  log everything they did, because nobody is watching when they run. A missing-container failure
+  means `HOMELAB_DB_CONTAINER` or the actual container name has drifted; check with
+  `docker compose ps db`. A failed offsite copy means `OFFSITE_DEST` is unreachable - test the
+  `ssh` or the mounted path by hand.
