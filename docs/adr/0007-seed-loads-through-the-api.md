@@ -7,9 +7,10 @@ date: 2026-08-15
 
 The restore command empties the database and then sends the fixture back in as HTTP requests
 against the API it ships with, through Fastify's `inject` rather than a socket. Every seeded Recipe
-arrives by `POST /api/recipes`, every Staple by `PUT /api/ingredients/:id/staple`, every Aisle and
-every Selected Recipe by the route a visitor's own click uses. One statement in the loader is not a
-request: `update recipes set protected = true`, because no endpoint sets that flag and none should.
+arrives by `POST /api/recipes`, every Staple by `PUT /api/ingredients/:id/staple`, every Pantry tick
+by `PUT /api/ingredients/:id/pantry`, every Aisle and every Selected Recipe by the route a visitor's
+own click uses. One statement in the loader is not a request: `update recipes set protected = true`,
+because no endpoint sets that flag and none should.
 
 The spec asks the Seed to validate through the same module the API uses, so that the fixture doubles
 as proof that the guardrails accept legitimate data. Writing the rows any other way would have made

@@ -93,11 +93,10 @@ rather than the parsed object.
 The recorded Best Matches is populated. `bestMatches.js` admits a Recipe on either of two grounds,
 Pantry overlap or nothing Missing, and the second exists for the Recipe whose Ingredients are all
 Staples; the Seed satisfies neither of those on its own. What closes the gap is ticket 26: the fixture
-now names a handful of
-Pantry Ingredients, and `restoreSeed` ticks them through the same Pantry route a visitor's own tick
-would use, after the Staples loop so a tick against a Staple meets the route's refusal rather than
-being silently swallowed. A restored database therefore has ticks the moment the restore finishes,
-live or recorded.
+now names a handful of Pantry Ingredients, and `restoreSeed` ticks them through the same Pantry route
+a visitor's own tick would use, after the Staples loop so a tick against a Staple meets the route's
+refusal rather than being silently swallowed. A restored database therefore has ticks the moment the
+restore finishes, live or recorded.
 
 That fix works in both modes because it changes what a restore produces rather than what the
 recorder does with it. The Seed was built so that ticking a handful of Pantry Ingredients ranks nine
