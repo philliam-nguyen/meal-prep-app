@@ -22,7 +22,7 @@ import { ensureAppRole } from './roles.js';
 const POSTGRES_IMAGE = 'postgres:17-alpine';
 
 const OWNER_ROLE = 'meal_prep_owner';
-export const APP_ROLE = 'meal_prep_app';
+const APP_ROLE = 'meal_prep_app';
 const DATABASE = 'meal_prep';
 
 function throwawayPassword() {

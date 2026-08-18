@@ -1,6 +1,6 @@
 # 23 - TRUST_PROXY accepts a hop count, not only a boolean
 
-Status: done
+Status: ready-for-human
 
 **What to build:** `TRUST_PROXY` grows from a boolean into a boolean or a positive integer, and the
 write rate limiter keys on the visitor's address in both Variants. Today it is boolean only, which is
@@ -39,4 +39,23 @@ in doubt; the deployment is. Write the test so it fails on that mistake.
 - [x] A test proves the limiter keys on the visitor's address through a two-proxy appending chain
 - [x] A test proves a forged leading `X-Forwarded-For` entry cannot move the bucket
 - [x] A test proves the Homelab Variant's replacing-proxy case still works with `true`
-- [x] A proxy that replaces rather than appends fails a test rather than degrading quietly
+- [ ] A proxy that replaces rather than appends fails a test rather than degrading quietly
+
+## Comments
+
+**The sixth box is not closed, and cannot be closed here.** What landed is
+`finds no visitor at all if a proxy replaces the header rather than appending`, which walks `true`,
+`1`, `2` and `3` against a replacing chain and asserts every one of them puts two visitors in a
+single bucket. That is an honest characterisation of the degradation, and it is the opposite of what
+the box asks: it is green exactly when the deployment is broken.
+
+The tests do record the deployment's claim in one place. `DEMO_CHAIN` states that CloudFront and the
+reverse proxy both append, and `trustProxy` is taken as `DEMO_CHAIN.length` rather than written as a
+literal `2`, so editing that constant to `replace` turns the suite red. But editing it is something a
+person has to remember, which is the pattern ticket 21 rejects for exactly this reason.
+
+No in-process test can do better. The header the app sees is the header the test wrote, so the suite
+can only ever check the arithmetic, and this ticket says plainly that the arithmetic is not in doubt
+and the deployment is. The reverse proxy does not exist yet. The check belongs where it is built, so
+ticket 15 carries it: one request through the real chain, asserting the app logged the caller's
+address and not CloudFront's.

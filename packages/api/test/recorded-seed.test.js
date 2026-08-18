@@ -39,13 +39,14 @@ describe('recording the Seed', () => {
     assert.ok(recorded.staples.length > 0, 'the recording holds no Staples');
   });
 
-  // Best Matches is the one list the recording cannot carry anything in, and it is empty because a
-  // restored database is empty of Pantry ticks rather than because anything is missing: the ranking
-  // needs a food in the Pantry, and the Seed marks Staples and shelves Aisles but ticks nothing. A
-  // Reviewer arriving during an outage sees the same empty ranking a Reviewer arriving to a healthy
-  // API sees before their first tick, and the tick itself is a write degraded mode has disabled.
-  // Recording a payload with ticks in it would mean recording a state no restore produces.
-  it('carries an empty ranking, because a restored database has nothing in the Pantry', async (t) => {
+  // Empty because the Seed satisfies neither way into the ranking, not because a recording cannot
+  // hold one. bestMatches.js admits a Recipe on Pantry overlap or on nothing Missing, and the second
+  // exists for the Recipe built from Staples alone; the Seed has no such Recipe, and a restored
+  // database has no Pantry ticks. A Reviewer arriving during an outage therefore sees the same empty
+  // ranking a Reviewer arriving to a healthy API sees before their first tick, and the tick itself is
+  // a write degraded mode has disabled. Ticking here would record a state no restore produces, which
+  // would cost the equivalence the two tests below rest on. Ticket 26 carries the fix.
+  it('carries an empty ranking, because the Seed satisfies neither way into it', async (t) => {
     await startApp(t);
 
     const recorded = await recordTheSeed(t);

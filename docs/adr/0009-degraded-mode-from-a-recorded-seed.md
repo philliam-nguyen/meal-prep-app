@@ -12,8 +12,9 @@ saying the backend is offline and the data is a fixed sample.
 This exists because [0008](./0008-demo-backend-on-the-homelab.md) puts the backend on a home server,
 which will be unreachable sometimes. A Reviewer clicking the link during an outage is the case that
 matters: a dead link reads worse than no link, and it is the only impression that visitor will form.
-A degraded app shows the Recipes, the Pantry, the Shopping List and the Best Matches, which is most
-of what there is to see.
+A degraded app shows the Recipes, the Pantry checklist, the Staples and the Shopping List, which is
+most of what there is to see. It shows Best Matches empty, for the reason the consequences below
+record.
 
 Controls are visibly disabled rather than accepting input and discarding it. A write that silently
 evaporates is worse than a greyed-out button, because the first thing a technical visitor does after
@@ -54,9 +55,10 @@ during an outage, which is when nobody wants to discover it.
 
 ## Consequences
 
-The recorded file is validated in CI against `stateResponse`, the schema already exported from
-`state.js`. It sets `additionalProperties: false`, so a field added to the payload without
-regenerating the recording fails the build rather than the outage.
+The recorded file is validated against `stateResponse`, the schema already exported from `state.js`.
+It sets `additionalProperties: false`, so a field added to the payload without regenerating the
+recording fails the check rather than the outage. The check lives in the test suite, which is what
+there is: this repo has no pipeline yet, and running the suite on a push is ticket 16's.
 
 Degraded mode must not write to the freshness poll's baseline. The recorded payload carries a
 `version`, and if that value became the baseline then recovery would depend on it differing from the
@@ -87,12 +89,20 @@ made now produces, so a Seed edited without a regeneration is a red test rather 
 fallback. A hand-edited recording fails the same way, which is the point of comparing the bytes
 rather than the parsed object.
 
-One thing the recording cannot carry is a ranking. Best Matches needs a food in the Pantry, and a
-restored database has no Pantry ticks, so the recorded list is empty. That is the same empty list a
-Reviewer sees on a healthy API before their first tick, and the tick itself is a write degraded mode
-disables. Recording a payload with ticks in it would mean recording a state no restore produces, so
-the paragraph above overstates it: a degraded app shows the Recipes, the Pantry checklist, the
-Staples and the Shopping List, and shows Best Matches empty.
+The recorded Best Matches is empty, which the introduction above originally failed to say. Not
+because the ranking is unreachable without a Pantry tick: `bestMatches.js` admits a Recipe on either
+of two grounds, Pantry overlap or nothing Missing, and the second exists for the Recipe whose
+Ingredients are all Staples. It is empty because the Seed happens to satisfy neither. No Seed Recipe
+is built from Staples alone, and a restored database has no Pantry ticks, so nothing qualifies.
+
+That is the same empty list a Reviewer meets on a healthy API before their first tick, and the tick
+is a write degraded mode disables. It is recorded that way deliberately, and the cost is named rather
+than hidden: the Seed was built so that ticking a handful of Pantry Ingredients ranks nine of its
+nineteen Recipes at three depths of Missing, and a Reviewer who arrives during an outage sees none of
+that. The recorder is not the place to fix it. Ticking through the API before the capture would make
+the recording a staged scenario rather than the state a restore produces, and it is that equivalence
+which lets the suite check the committed file at all. Ticket 26 proposes the fix that works in both
+modes, by putting the ticks in the Seed itself.
 
 The behaviour is unconditional, so the Homelab Variant carries the recorded file too and never uses
 it: there, the API serves the bundle, so an API that cannot answer cannot serve the page that would

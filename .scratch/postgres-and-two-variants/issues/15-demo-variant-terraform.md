@@ -64,6 +64,11 @@ certificate and an ACME client exist in this stack at all).
 - [ ] No inbound SSH; the instance is managed over Tailscale SSH
 - [ ] CloudFront and the proxy carry the shortened timeouts, proven by timing a request with the
       homelab stack stopped
+- [ ] The reverse proxy appends to `X-Forwarded-For` rather than replacing it, proven by one request
+      through the real chain showing the app saw the caller's address and not CloudFront's. Ticket 23
+      set `TRUST_PROXY=2` on that assumption and could not test it: the header its suite sees is the
+      header its suite wrote, so no in-process test can observe a proxy nobody has built. Get this
+      wrong and every visitor on earth shares one rate-limit bucket while the limiter reports success
 - [ ] Nothing in the demo's configuration can reach the homelab database
 - [ ] Pricing verified in the calculator and recorded before apply
 - [ ] The $5 account budget is revisited against the real figure
