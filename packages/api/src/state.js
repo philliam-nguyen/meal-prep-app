@@ -171,7 +171,15 @@ const shoppingListEntry = {
 /** Fastify serializes the response through this, so a column added later stays off the wire. */
 export const stateResponse = {
   type: 'object',
-  required: ['version', 'recipes', 'shoppingList', 'pantryChecklist', 'staples', 'bestMatches'],
+  required: [
+    'version',
+    'recipes',
+    'shoppingList',
+    'pantryChecklist',
+    'staples',
+    'bestMatches',
+    'notice',
+  ],
   additionalProperties: false,
   properties: {
     // What the freshness poll compares against. Here rather than left to the client's first poll,
@@ -186,6 +194,12 @@ export const stateResponse = {
     pantryChecklist: { type: 'array', items: pantryEntrySchema },
     staples: { type: 'array', items: stapleSchema },
     bestMatches: { type: 'array', items: bestMatchSchema },
+    // The one field here that is configuration rather than data: a line the deployment wants read,
+    // or null where nobody configured one. Declared and required rather than left off when unset,
+    // because this schema is what Fastify serializes through and what the recorded Seed is checked
+    // against, and a field that came and went with an environment variable would make both of those
+    // depend on the machine the response came from.
+    notice: { type: ['string', 'null'] },
   },
 };
 

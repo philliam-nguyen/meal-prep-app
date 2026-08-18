@@ -17,6 +17,7 @@ const app = await buildApp({
   staticRoot: defaultWebDist,
   logger: { level: config.logLevel },
   guardrails: config.guardrails,
+  notice: config.notice,
 });
 
 // Compose and the Demo Variant's scheduler both stop this with a signal, so draining beats being

@@ -54,6 +54,10 @@ export function MealPrepApp() {
   const [pantryChecklist, setPantryChecklist] = useState([]);
   const [staples, setStaples] = useState([]);
   const [bestMatches, setBestMatches] = useState([]);
+  // A line the deployment configured, or null. It arrives in the payload like everything else here
+  // and nothing in this app asks why it is set: the public instance says its data is a fixture
+  // because something set the text, and the homelab says nothing because nothing did (ADR-0002).
+  const [notice, setNotice] = useState(null);
   // Whether what is on screen is the recording rather than anything the API said. Every control that
   // writes reads it, because a write against a backend that cannot answer is a write that evaporates
   // (ADR-0009).
@@ -93,6 +97,10 @@ export function MealPrepApp() {
       setPantryChecklist(state.pantryChecklist);
       setStaples(state.staples);
       setBestMatches(state.bestMatches);
+      // Whatever this payload says, including the recording's null: the notice describes the
+      // deployment that answered, and during an outage nothing answered. That is also why the
+      // offline banner never has to share the screen with this one.
+      setNotice(state.notice ?? null);
       setDegraded(fromRecording);
       if (fromRecording) {
         // None of the three things a live payload leaves behind. The recording is nobody's data to
@@ -126,6 +134,9 @@ export function MealPrepApp() {
       if (cache.pantryChecklist) setPantryChecklist(cache.pantryChecklist);
       if (cache.staples) setStaples(cache.staples);
       if (cache.bestMatches) setBestMatches(cache.bestMatches);
+      // Null rather than left alone when a cache predates the field, so a banner is never restored
+      // from a cache written before the deployment configured one - or after it stopped.
+      setNotice(cache.notice ?? null);
       setLastSynced(cache.savedAt);
       // What the cached payload was current at, so a poll has something to compare against even if
       // the reload below never lands.
@@ -300,6 +311,15 @@ export function MealPrepApp() {
         {NAV_ITEMS.map(n => <button key={n.id} className={`nav-item ${tab === n.id ? 'active' : ''}`} onClick={() => { setEditingId(null); setTab(n.id); }}>{n.icon}<span>{n.label}</span></button>)}
       </nav>
       <div className="page-content" style={{ padding: '24px 20px 100px', maxWidth: 640, margin: '0 auto' }}>
+        {/* On the text being set and on nothing else. There is no flag to consult here, and adding
+            one would be the `isDemo` ADR-0002 exists to keep out. Beige rather than the banner
+            below's reddish warning, because this one is a standing fact about the instance rather
+            than something being wrong with it. */}
+        {notice && (
+          <div role="status" style={{ background: '#F3EDE3', border: '1px solid #E3D8C6', borderRadius: 14, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#6E6455', lineHeight: 1.5 }}>
+            {notice}
+          </div>
+        )}
         {/* Named rather than hinted at. A visitor who is told only that something is wrong reaches
             for the refresh button, and the greyed-out controls below make no sense without it. */}
         {degraded && (

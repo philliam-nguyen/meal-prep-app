@@ -18,7 +18,7 @@ export const TEST_GUARDRAILS = {
   trustProxy: false,
 };
 
-export async function startApp(t, { staticRoot, guardrails } = {}) {
+export async function startApp(t, { staticRoot, guardrails, notice } = {}) {
   // Before, not after: a test that fails halfway through cannot leave rows for the next one.
   await truncateAllTables();
 
@@ -28,6 +28,9 @@ export async function startApp(t, { staticRoot, guardrails } = {}) {
     staticRoot,
     logger: false,
     guardrails: { ...TEST_GUARDRAILS, ...guardrails },
+    // Undefined unless a test is about the banner, which leaves buildApp's own default: no notice
+    // configured is what almost every deployment and every other test here is.
+    notice,
   });
   await app.ready();
 

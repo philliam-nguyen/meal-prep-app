@@ -57,6 +57,10 @@ services:
       WRITE_RATE_WINDOW_MS: ${WRITE_RATE_WINDOW_MS}
       RECIPES_MAX: ${RECIPES_MAX}
       TRUST_PROXY: ${TRUST_PROXY}
+      # A line every visitor reads, or nothing. Passed through like the limits above, and left blank
+      # here: the instance this file deploys is the one holding real data, and it has nothing to
+      # announce to the person who owns it.
+      SITE_NOTICE: ${SITE_NOTICE}
     # Loopback, never the host's other addresses. On the homelab `tailscale serve` is what reaches
     # this port, and it runs on the host; publishing any wider would put an app with no login of its
     # own (ADR-0003) in front of the whole local network, where nothing about the deployment says so.

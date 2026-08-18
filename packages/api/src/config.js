@@ -102,6 +102,16 @@ export function readServerConfig(env = process.env) {
     databaseUrl: required(env, 'DATABASE_URL'),
     port: port(env, 'PORT', 8080),
     logLevel: env.LOG_LEVEL ?? 'info',
+    // A line of text the deployment wants every visitor to read, or nothing. The Demo Variant sets
+    // it to say the data is a fixture; the Homelab Variant sets nothing and so shows nothing, which
+    // is an unset variable rather than a branch (ADR-0002). The name deliberately describes the
+    // banner rather than the Variant: `DEMO_NOTICE` would be a mode flag wearing a string's
+    // clothes, and the next feature would ask to read it.
+    //
+    // Not a guardrail. Nothing here bounds what a visitor can cost, so it would only be there for
+    // the company (ADR-0001). Null rather than undefined because it travels in the payload, where
+    // "nobody configured one" has to be a value the schema can name.
+    notice: setting(env, 'SITE_NOTICE') ?? null,
     guardrails: guardrails(env),
   };
 }

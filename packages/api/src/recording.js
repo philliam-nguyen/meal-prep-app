@@ -68,6 +68,17 @@ export function assertRecorded(payload) {
 export async function recordSeed({ pool, guardrails }) {
   await restoreSeed({ pool, guardrails });
 
+  // No notice is passed, so the recording carries null whatever the machine taking it configured.
+  // Determinism is the first reason: the file is compared byte for byte against a recording made
+  // now, and a build machine with SITE_NOTICE set would otherwise bake its own banner into the
+  // bundle and fail that comparison everywhere else.
+  //
+  // It also settles which banners a visitor can meet at once. The frontend's notice follows the
+  // payload on screen, so degraded mode renders this null and the configured notice is absent for
+  // exactly as long as the backend is unreachable. The offline banner stands alone there, and it
+  // already says the data is a fixed sample of the demo data, which is what the other one would
+  // have been there to say. The two cannot stack by construction rather than by anyone styling
+  // around it.
   const app = await buildApp({ pool, logger: false, guardrails });
   try {
     const response = await app.inject({ method: 'GET', url: '/api/state' });

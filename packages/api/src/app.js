@@ -41,7 +41,13 @@ const REQUIRED_GUARDRAILS = [
 
 // Async because the guardrails have to finish loading before the first route is registered; see
 // registerGuardrails. Every caller awaits it.
-export async function buildApp({ pool, staticRoot = defaultWebDist, logger = true, guardrails }) {
+export async function buildApp({
+  pool,
+  staticRoot = defaultWebDist,
+  logger = true,
+  guardrails,
+  notice = null,
+}) {
   const missing = REQUIRED_GUARDRAILS.filter((limit) => guardrails?.[limit] === undefined);
   if (missing.length > 0) {
     throw new Error(`buildApp needs every guardrail, missing: ${missing.join(', ')}`);
@@ -97,9 +103,16 @@ export async function buildApp({ pool, staticRoot = defaultWebDist, logger = tru
 
   // One request for the whole first paint, replacing the four parallel spreadsheet calls the
   // Sheets-era client opened on load.
-  app.get('/api/state', { schema: { response: { 200: stateResponse } } }, async () =>
-    readState(pool),
-  );
+  //
+  // The notice rides along here rather than through readState, and deliberately never touches the
+  // database: it is something the wrapper configured about this deployment rather than anything the
+  // app stores, and a column for it would be a row the Seed would then have to carry and the
+  // restore would then have to preserve. The frontend needs it on the first paint like everything
+  // else in this payload, which is the only reason it travels with data at all.
+  app.get('/api/state', { schema: { response: { 200: stateResponse } } }, async () => ({
+    ...(await readState(pool)),
+    notice,
+  }));
 
   registerRecipeRoutes(app);
   registerIngredientRoutes(app);
