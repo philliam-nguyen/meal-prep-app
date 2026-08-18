@@ -34,13 +34,26 @@ const browserEnvironment = {
 const NOT_WATCHING = { stop() {} };
 
 /**
+ * What `versionOnScreen` returns while the app is rendering the recorded Seed rather than anything
+ * the API said. The recording carries a version of its own, and adopting it would leave recovery
+ * depending on that value differing from the live one; usually it would, and occasionally it would
+ * not, and then the client would sit on Seed data after the API was healthy (ADR-0009).
+ *
+ * A symbol, so it is equal to no version any API can answer with. That is what makes the refetch
+ * out of degraded mode unconditional rather than a comparison that happens to hold.
+ */
+export const NO_BASELINE = Symbol('no baseline');
+
+/**
  * Watches the API's version for changes and calls `onStale` when it finds one. Returns a handle
  * with `stop()`.
  *
  * `versionOnScreen` is read rather than pushed, so the version the app's data arrived with has one
  * home and this cannot hold a second copy that has fallen behind it. Until it returns something,
  * nothing is asked at all: there is no data to be stale yet, and a version adopted before the
- * payload it belongs to would be a change that silently never arrives.
+ * payload it belongs to would be a change that silently never arrives. `NO_BASELINE` is the other
+ * answer it can give, and it is not that case: degraded mode has a screenful of the recording on it
+ * and every reason to keep asking.
  */
 export function startFreshnessPoll({
   view,
@@ -66,7 +79,8 @@ export function startFreshnessPoll({
       const version = await readVersion();
       // Awaited so that what the refetch arrives with is on screen before the next poll compares
       // against it. A refetch that fails leaves the version where it was, and the next poll asks
-      // again rather than treating the change as delivered.
+      // again rather than treating the change as delivered. Out of degraded mode this is the one
+      // unconditional refetch, since `NO_BASELINE` differs from whatever the API just said.
       if (version !== shown) await onStale();
     } catch {
       // A poll that cannot reach the API is not worth telling the cook about. The next one either
