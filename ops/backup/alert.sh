@@ -6,9 +6,17 @@
 # effectively a shared secret: anyone who knows it can publish to it and read its history, so it is
 # generated per install and lives in backup.env, never in this repository.
 #
-# If NTFY_TOPIC is not configured, alert() logs instead of failing the caller - a backup script
-# should not itself explode because notification was never set up, but the gap belongs in the log
-# so it is not silently invisible either.
+# NTFY_TOPIC is required, checked once at the top of each script by require_alert_channel() below,
+# for the same reason OFFSITE_DEST is required: "an alert reaches the Operator" is load-bearing in
+# the ticket this exists for, not a nicety, so a script that would run its whole night with nowhere
+# to send a failure refuses to start at all rather than quietly doing less than it promises.
+
+require_alert_channel() {
+  if [[ -z "${NTFY_TOPIC:-}" ]]; then
+    log "ERROR: NTFY_TOPIC is not configured - a backup alert would have nowhere to go"
+    exit 1
+  fi
+}
 
 alert() {
   local subject="$1"

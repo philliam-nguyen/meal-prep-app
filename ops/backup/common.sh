@@ -12,6 +12,12 @@ log() {
   fi
 }
 
+# Shared by dump.sh's own zero-byte check and check-backup.sh's - one place to get the
+# GNU-vs-BSD stat fallback right rather than two copies that can drift.
+file_size() {
+  stat -c%s "$1" 2>/dev/null || stat -f%z "$1"
+}
+
 # Settings live in a config file: backup.env beside this script on the host, or wherever
 # BACKUP_CONFIG_FILE points (the tests point it at a scratch file per case, the same way an
 # Operator points it at backup.env). Missing entirely is not an error here - dump.sh and

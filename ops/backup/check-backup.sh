@@ -18,6 +18,8 @@ LOG_TAG="meal-prep-backup-check"
 
 load_backup_config
 
+require_alert_channel
+
 STACK_NAME="${BACKUP_STACK_NAME:-homelab-variant}"
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/meal-prep}"
 
@@ -30,7 +32,7 @@ if [[ ! -f "$DUMP_PATH" ]]; then
   exit 1
 fi
 
-SIZE="$(stat -c%s "$DUMP_PATH" 2>/dev/null || stat -f%z "$DUMP_PATH")"
+SIZE="$(file_size "$DUMP_PATH")"
 if [[ "$SIZE" -eq 0 ]]; then
   log "ERROR: dump for $DATE is zero bytes"
   alert "meal-prep backup empty" "Dump for $DATE at $DUMP_PATH is zero bytes, not a working backup."

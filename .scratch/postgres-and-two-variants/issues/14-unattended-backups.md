@@ -91,12 +91,13 @@ subcommands they call (`inspect --format`, `exec`) to the real daemon through `d
 prepended onto `PATH` only for the child process `test/backup.test.js` spawns. Neither script
 knows it exists; a real host never has it on `PATH` to find.
 
-**Verified by running, not only by inspection.** `test/backup.test.js`, seven tests, all against a
-real disposable `postgres:17-alpine` container: a non-empty dated dump landing both locally and
-offsite; a missing container refusing the dump with a real alert POST received; retention pruning
-five pre-seeded dumps down to three, oldest three gone; a missing `OFFSITE_DEST` failing the run;
-the daily check's zero-byte, missing-dump, and healthy-dump paths, alert received or not received
-as each case demands. Beyond the suite, a restore drill: `packages/api/migrations/` applied to a
+**Verified by running, not only by inspection.** `test/backup.test.js`, ten tests (seven at first
+pass, three more added in the review round below), all against a real disposable
+`postgres:17-alpine` container: a non-empty dated dump landing both locally and offsite; a missing
+container refusing the dump with a real alert POST received; retention pruning five pre-seeded
+dumps down to three, oldest three gone; a missing `OFFSITE_DEST` failing the run; the daily check's
+zero-byte, missing-dump, and healthy-dump paths, alert received or not received as each case
+demands. Beyond the suite, a restore drill: `packages/api/migrations/` applied to a
 throwaway container, two Recipes inserted, `dump.sh` run against it for a real 7,486-byte dump,
 restored with `docker exec -i <target> psql -v ON_ERROR_STOP=1 -U <role> -d <db> < dump.sql` into a
 second, empty container, and the two Recipes read back identical. Full transcript in the runbook's
@@ -115,3 +116,67 @@ nothing else in that file changed. `packages/` was not touched. Offsite retentio
 copies at the far end) was deliberately left undone: the ticket asks for local retention of roughly
 thirty, says nothing about the offsite side, and small personal-recipe-app dumps accumulating
 offsite is a storage question for the Operator to raise later rather than a gap in this ticket.
+
+**2026-08-17: two-axis review found four real bugs and two judgement calls; all fixed.** Verified
+each independently before touching anything - one (the `read_env_value` bug below) reproduced in
+isolation first, the rest confirmed by reading the actual code and unit files against the claim.
+None were wrong.
+
+*Spec axis:*
+
+1. **`read_env_value` died mute under `set -euo pipefail`.** `grep -E "^${key}="` on a key the
+   `.env` file does not carry exits 1; with `pipefail`, that is the whole pipeline's exit status
+   even though `tail`/`cut` both succeed on the empty input, and a bare `VAR="$(read_env_value X)"`
+   at top level lets that non-zero status kill the script before `fail()` is ever reachable - no
+   log, no alert. Confirmed by reproducing it in isolation: an eight-line script with the same
+   `grep | tail | cut` inside `$(...)` under `set -euo pipefail`, run against an env file missing
+   the key, exits 1 before its own `echo "reached"` line runs. Since `compose.yaml` defaults
+   `POSTGRES_DB` and `POSTGRES_OWNER_ROLE`, an Operator's real `.env` omitting either is normal, not
+   an error - this was the exact "silently broken backup masquerading as working" the ticket
+   forbids, one step earlier than the dump itself. Fixed with `|| true` on the pipeline in
+   `read_env_value`, so a missing key now falls through to the `${VAR:-default}` handling already
+   there; `POSTGRES_OWNER_PASSWORD`, which has no default, is still checked explicitly and still
+   fails loudly if blank. New test: "a .env that omits POSTGRES_DB... still dumps rather than
+   dying mute".
+2. **Watchdog false-positive after a missed-night boot.** Both timers are `Persistent=true` with no
+   ordering between them, so a host catching up both missed jobs around boot could run the check
+   before the dump finishes writing and alert "missing" on a run still in progress. Fixed with
+   `After=meal-prep-backup.service` on the check service - ordering only, not a `Requires=`, so it
+   has no effect unless both are actually starting around the same moment, does not pull the backup
+   in on its own, and does not require the backup to have succeeded, only to have finished, so a
+   real failure still reaches the watchdog. Documented in the runbook next to the timer table.
+3. **The `rsync` offsite branch never created the remote directory** (the `cp` branch already did
+   `mkdir -p`), so a first real run against an untouched destination would fail. Fixed with an
+   explicit `ssh ... mkdir -p` before the transfer, chosen over rsync's own `--mkpath` because that
+   flag needs rsync 3.2.3 or newer on the offsite host and nothing here should assume a version
+   there. Noted in the runbook's "Offsite copy" paragraph. Still unverified end-to-end in this
+   sandbox - no `rsync` binary here, same limitation already recorded against the offsite checkbox.
+4. **Blank `NTFY_TOPIC` degraded to a log line while blank `OFFSITE_DEST` hard-failed** -
+   inconsistent, and the ticket makes the alert load-bearing ("a missing dump raises an alert that
+   reaches the Operator"), not optional. Fixed with `require_alert_channel()` in `alert.sh`, called
+   at the top of both scripts right after config loads, exiting 1 before either script touches the
+   database, the container, or the filesystem if `NTFY_TOPIC` is blank. Two new tests, one per
+   script. This also meant every existing test needed `NTFY_TOPIC` set just to get past the new
+   check - `runScript`'s env now defaults it to a placeholder topic, and the "missing offsite
+   destination" test picked up its own alert stub in the process, since it now genuinely triggers
+   `alert()` where it previously hit the no-topic early return.
+
+*Standards axis:*
+
+5. **Two banned-vocabulary uses of "production"** (`backup.env.example`, the runbook's Alerting
+   paragraph) - `CONTEXT.md` names it explicitly under the Homelab Variant's `_Avoid_` list. Both
+   reworded; the runbook one was also stale by then anyway, since it still described the old
+   log-instead-of-send behaviour finding 4 replaced.
+6. **Two judgement calls, stated rather than silently picked:**
+   (a) Both `.service` units run as root - no `User=`. `docker exec` needs the Docker socket, which
+   on stock Ubuntu means root or the `docker` group, and shipping an untested service-account setup
+   this checkout cannot create on the Operator's host felt worse than documenting the choice. Left
+   as root, with a "Running as root" paragraph in the runbook naming the tightening path (a
+   dedicated user in the `docker` group, `chown` on `BACKUP_DIR` and the offsite SSH key,
+   `User=`/`Group=` in both files) for an Operator who wants it.
+   (b) The zero-byte `stat` check was duplicated verbatim between `dump.sh` and `check-backup.sh`.
+   Deduplicated into `file_size()` in `common.sh`, used by both.
+
+Three new tests, ten total, still all green. Full suite: 261 + 23 + 10 + 10 = 304 passing; the one
+pre-existing `test/compose.test.js` failure (`docker` CLI absent from this sandbox's `PATH`) is
+unchanged from before this ticket and unrelated to it.

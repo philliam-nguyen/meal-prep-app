@@ -37,13 +37,24 @@ fail() {
   exit 1
 }
 
+require_alert_channel
+
 [[ -f "$COMPOSE_ENV_FILE" ]] || fail "compose env file not found at $COMPOSE_ENV_FILE"
 
 # Read only the three values pg_dump needs, rather than sourcing the whole compose .env - that
 # file also carries the app role's password and other settings this script has no business holding.
+#
+# `|| true` on the pipeline is load-bearing, not decoration. Under `set -euo pipefail`, grep
+# finding no match exits 1, and pipefail makes that the pipeline's exit status even though tail and
+# cut both succeed on the empty input - so `VAR="$(read_env_value X)"` would kill the script right
+# here, silently, before fail() is ever reachable, for the entirely legitimate case of a key
+# compose.yaml itself defaults and an Operator's .env just doesn't repeat (POSTGRES_DB, say). That
+# is exactly the "silently broken backup" the ticket forbids, just one step earlier than the dump
+# itself. A missing key now falls through as an empty string to the `${VAR:-default}` handling
+# below; POSTGRES_OWNER_PASSWORD has no default and is checked explicitly for that reason.
 read_env_value() {
   local key="$1"
-  grep -E "^${key}=" "$COMPOSE_ENV_FILE" | tail -n1 | cut -d= -f2-
+  grep -E "^${key}=" "$COMPOSE_ENV_FILE" | tail -n1 | cut -d= -f2- || true
 }
 
 POSTGRES_OWNER_ROLE="$(read_env_value POSTGRES_OWNER_ROLE)"
@@ -76,7 +87,7 @@ if ! docker exec -e PGPASSWORD="$POSTGRES_OWNER_PASSWORD" "$CONTAINER" \
   fail "pg_dump exited non-zero against $CONTAINER"
 fi
 
-SIZE="$(stat -c%s "$TMP_PATH" 2>/dev/null || stat -f%z "$TMP_PATH")"
+SIZE="$(file_size "$TMP_PATH")"
 if [[ "$SIZE" -eq 0 ]]; then
   rm -f "$TMP_PATH"
   fail "dump for $DATE is zero bytes - refusing to count it as a backup"
@@ -107,7 +118,16 @@ done
 [[ -n "$OFFSITE_DEST" ]] || fail "OFFSITE_DEST is not configured - the dump stayed local only"
 
 if [[ "$OFFSITE_DEST" == *@*:* ]]; then
-  rsync -a --timeout=60 -e "ssh -o BatchMode=yes -o ConnectTimeout=10" \
+  REMOTE="${OFFSITE_DEST%%:*}"
+  REMOTE_PATH="${OFFSITE_DEST#*:}"
+  SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=10)
+  # rsync does not create the remote directory on its own (unlike the cp branch's `mkdir -p`), and
+  # a first real run against a destination nobody has touched yet would otherwise fail right here.
+  # `--mkpath` does this in one step but only exists from rsync 3.2.3 (2020) onward; an explicit
+  # `ssh mkdir -p` first makes no assumption about the offsite host's rsync version.
+  ssh "${SSH_OPTS[@]}" "$REMOTE" mkdir -p "$REMOTE_PATH" \
+    || fail "could not create offsite destination directory $REMOTE_PATH on $REMOTE"
+  rsync -a --timeout=60 -e "ssh ${SSH_OPTS[*]}" \
       "$DUMP_PATH" "${OFFSITE_DEST%/}/" \
     || fail "offsite copy of $DUMP_NAME to $OFFSITE_DEST failed"
 else

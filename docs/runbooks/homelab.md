@@ -160,24 +160,42 @@ date: `homelab-variant_YYYY-MM-DD.sql`.
 | `meal-prep-backup-check.timer` → `meal-prep-backup-check.service` | daily, 09:00 | Runs `ops/backup/check-backup.sh`: alerts if no dump exists for today at all, or if it exists at zero bytes. This is the watchdog for the failure dump.sh's own alerting cannot catch - the run that never happened because the host was off, the timer was disabled, or the script died before it could alert. |
 
 Both timers set `Persistent=true`: a host that was off at its scheduled time runs the job once on
-the next boot rather than waiting silently for the next day.
+the next boot rather than waiting silently for the next day. That is also the one time these two
+services race each other - both catch up around the same moment at boot, with no other ordering
+between them - so `meal-prep-backup-check.service` carries `After=meal-prep-backup.service`
+specifically so the catch-up check cannot read `BACKUP_DIR` while the catch-up dump is still being
+written and alert "missing" on a run that is simply not finished yet. It does not require the dump
+to have *succeeded*, only to have finished, so a real failure still reaches the watchdog.
 
 **Alerting.** A push notification through [ntfy](https://ntfy.sh) - a single unauthenticated HTTP
 POST, no account, no paid service. `NTFY_TOPIC` in `backup.env` is a long random string standing in
 for a password: anyone who knows it can publish to it and read its history, so it is generated per
 install and never committed. The Operator subscribes to that topic in the ntfy phone app (or at
-`https://ntfy.sh/<topic>` in a browser) before the first real run. Left blank, alerts are logged
-instead of sent - a deliberate choice for a dry run, wrong to leave that way in production.
-Considered and not taken: email, which would need an MTA or a third-party relay configured on a
-host that has neither today; a self-hosted ntfy instance remains open if the public one is ever a
-concern, and `NTFY_URL` in `backup.env` is exactly the setting that repoints it.
+`https://ntfy.sh/<topic>` in a browser) before the first real run. Required, not best-effort: both
+scripts refuse to start at all if `NTFY_TOPIC` is blank, the same as `OFFSITE_DEST` below - "an
+alert reaches the Operator" is a requirement this backup exists to satisfy, so a run with nowhere
+to send a failure does not get to happen instead of quietly doing less than it promises. Considered
+and not taken: email, which would need an MTA or a third-party relay configured on a host that has
+neither today; a self-hosted ntfy instance remains open if the public one is ever a concern, and
+`NTFY_URL` in `backup.env` is exactly the setting that repoints it.
 
 **Offsite copy.** `OFFSITE_DEST` in `backup.env` is either a local path - typically a NAS share
 already mounted on this host, copied with `cp` - or `user@host:path`, copied with `rsync` over
 `ssh` reached over the tailnet the same way everything else here is reached, with a key rather than
-a password (`BatchMode=yes` refuses to prompt for one). This is required, not best-effort:
-`dump.sh` fails and alerts if `OFFSITE_DEST` is not configured, because a dump that stays local
-only is not what "a copy lands off the homelab" means.
+a password (`BatchMode=yes` refuses to prompt for one). For the `rsync` form, `dump.sh` runs
+`ssh ... mkdir -p` against the remote path before the transfer, so the first real run does not fail
+against a destination directory nobody has created yet; this is `ssh mkdir -p` rather than rsync's
+own `--mkpath` because that flag needs rsync 3.2.3 or newer on the offsite host and nothing here
+should have to assume a version there. This is required, not best-effort: `dump.sh` fails and
+alerts if `OFFSITE_DEST` is not configured, because a dump that stays local only is not what "a
+copy lands off the homelab" means.
+
+**Running as root.** Neither `.service` file sets `User=`, so both run as root - `docker exec`
+needs access to the Docker socket, which on a stock Ubuntu install means root or membership in the
+`docker` group, and root was the simpler choice to ship untested rather than a service account this
+checkout cannot create on the Operator's behalf. Tightening it is straightforward if wanted: create
+a service user, add it to the `docker` group, `chown` `BACKUP_DIR` and the offsite SSH key to it,
+and add `User=`/`Group=` to both files before installing them.
 
 ### Operator install steps (run once, on the host)
 
