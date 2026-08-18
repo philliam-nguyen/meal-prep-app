@@ -55,8 +55,10 @@ export async function buildApp({ pool, staticRoot = defaultWebDist, logger = tru
     // Enforced against content-length before a parser is chosen, so an oversized body is refused
     // rather than read.
     bodyLimit: guardrails.bodyLimitBytes,
-    // What makes request.ip the visitor rather than the CDN in front of it, and so what makes
-    // rate limiting per-IP wherever the deployment puts a proxy in the path.
+    // What makes request.ip the visitor rather than the last proxy in front of them, and so what
+    // makes rate limiting per-address wherever the deployment puts a proxy in the path. Passed
+    // through as read: Fastify takes the switch and the hop count alike, and config.js is where the
+    // choice between them is explained.
     trustProxy: guardrails.trustProxy,
   });
   app.decorate('db', pool);

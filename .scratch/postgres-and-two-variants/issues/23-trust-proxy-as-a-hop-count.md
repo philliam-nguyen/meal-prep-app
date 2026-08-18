@@ -1,6 +1,6 @@
 # 23 - TRUST_PROXY accepts a hop count, not only a boolean
 
-Status: ready-for-agent
+Status: done
 
 **What to build:** `TRUST_PROXY` grows from a boolean into a boolean or a positive integer, and the
 write rate limiter keys on the visitor's address in both Variants. Today it is boolean only, which is
@@ -33,10 +33,10 @@ in doubt; the deployment is. Write the test so it fails on that mistake.
 
 **Blocked by:** None.
 
-- [ ] `TRUST_PROXY` parses `true`, `false` and a positive integer, and rejects anything else loudly
-- [ ] `.env.example` documents all three forms and says which Variant uses which, replacing the
+- [x] `TRUST_PROXY` parses `true`, `false` and a positive integer, and rejects anything else loudly
+- [x] `.env.example` documents all three forms and says which Variant uses which, replacing the
       comment that currently says "On for the Demo Variant behind CloudFront"
-- [ ] A test proves the limiter keys on the visitor's address through a two-proxy appending chain
-- [ ] A test proves a forged leading `X-Forwarded-For` entry cannot move the bucket
-- [ ] A test proves the Homelab Variant's replacing-proxy case still works with `true`
-- [ ] A proxy that replaces rather than appends fails a test rather than degrading quietly
+- [x] A test proves the limiter keys on the visitor's address through a two-proxy appending chain
+- [x] A test proves a forged leading `X-Forwarded-For` entry cannot move the bucket
+- [x] A test proves the Homelab Variant's replacing-proxy case still works with `true`
+- [x] A proxy that replaces rather than appends fails a test rather than degrading quietly
