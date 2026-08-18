@@ -15,16 +15,19 @@ import { I } from '../icons.jsx';
  * control sets an Aisle for the first time and corrects one that is wrong, because to a cook
  * standing in the wrong aisle those are the same act.
  */
-function AisleField({ entry, onSetAisle }) {
+function AisleField({ entry, readOnly, onSetAisle }) {
   // The draft doubles as the mode: null is the label, a string is the open box. One piece of state
   // rather than two, so there is no arrangement where the box is open holding nothing.
   const [draft, setDraft] = useState(null);
 
-  if (draft === null) {
+  // Read-only closes the box rather than disabling it, which is what keeps an Aisle typed against an
+  // offline backend from being a correction the cook watched evaporate.
+  if (draft === null || readOnly) {
     return (
       <button
+        disabled={readOnly}
         onClick={() => setDraft(entry.aisle ?? '')}
-        style={{ display: 'block', background: 'none', border: 'none', padding: '2px 0 0', fontSize: 12, color: '#A39E93', cursor: 'pointer', fontFamily: 'inherit' }}
+        style={{ display: 'block', background: 'none', border: 'none', padding: '2px 0 0', fontSize: 12, color: '#A39E93', cursor: readOnly ? 'not-allowed' : 'pointer', opacity: readOnly ? 0.5 : 1, fontFamily: 'inherit' }}
       >
         {entry.aisle ? `Aisle: ${entry.aisle}` : 'Set aisle'}
       </button>
@@ -58,12 +61,12 @@ function AisleField({ entry, onSetAisle }) {
  * adding a forgotten Recipe mid-trip leaves the ticks already earned in the store - which is what
  * makes this the button that can undo a whole shop and worth asking about.
  */
-function ClearGotItButton({ onClearGotIt }) {
+function ClearGotItButton({ readOnly, onClearGotIt }) {
   const [asking, setAsking] = useState(false);
 
-  if (!asking) {
+  if (!asking || readOnly) {
     return (
-      <button className="btn-secondary" onClick={() => setAsking(true)}>
+      <button className="btn-secondary" disabled={readOnly} onClick={() => setAsking(true)}>
         Clear all Got It marks
       </button>
     );
@@ -82,7 +85,7 @@ function ClearGotItButton({ onClearGotIt }) {
   );
 }
 
-export function ShoppingListPage({ shoppingList, onToggleGotIt, onSetAisle, onClearGotIt }) {
+export function ShoppingListPage({ shoppingList, readOnly, onToggleGotIt, onSetAisle, onClearGotIt }) {
   if (shoppingList.length === 0) {
     return (
       <div className="empty-state fade-in">
@@ -107,6 +110,7 @@ export function ShoppingListPage({ shoppingList, onToggleGotIt, onSetAisle, onCl
                 saved. */}
             <button
               className={`checkbox-btn ${entry.gotIt ? 'checked' : ''}`}
+              disabled={readOnly}
               onClick={() => onToggleGotIt(entry)}
               aria-label={entry.gotIt ? `Unmark ${entry.name}` : `Mark ${entry.name} as got it`}
             >
@@ -114,14 +118,14 @@ export function ShoppingListPage({ shoppingList, onToggleGotIt, onSetAisle, onCl
             </button>
             <div style={{ flex: 1, minWidth: 0 }}>
               <span className="item-name" style={{ fontWeight: 600, fontSize: 15 }}>{entry.name}</span>
-              <AisleField entry={entry} onSetAisle={onSetAisle} />
+              <AisleField entry={entry} readOnly={readOnly} onSetAisle={onSetAisle} />
             </div>
             <span style={{ color: '#7A7568', fontSize: 14, fontWeight: 500, whiteSpace: 'nowrap' }}>{formatAmounts(entry.amounts)}</span>
           </div>
         ))}
       </div>
       <div style={{ display: 'flex', justifyContent: 'center', marginTop: 20 }}>
-        <ClearGotItButton onClearGotIt={onClearGotIt} />
+        <ClearGotItButton readOnly={readOnly} onClearGotIt={onClearGotIt} />
       </div>
     </div>
   );

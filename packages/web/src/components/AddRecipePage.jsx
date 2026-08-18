@@ -10,7 +10,7 @@ import { RecipeFileDrop } from './RecipeFileDrop.jsx';
 // The fields themselves are RecipeForm, which the Edit page also uses. What is left here is the
 // part only adding has: choosing between typing and uploading, and starting empty again afterwards.
 
-export function AddRecipePage({ onRecipeAdded, toast }) {
+export function AddRecipePage({ readOnly, onRecipeAdded, toast }) {
   const [mode, setMode] = useState('manual');
   const [initial, setInitial] = useState(BLANK_RECIPE);
   const [uploadError, setUploadError] = useState('');
@@ -41,6 +41,17 @@ export function AddRecipePage({ onRecipeAdded, toast }) {
     reset();
     onRecipeAdded();
   };
+
+  // The one page where greying out the buttons would not be enough. A Recipe is twenty fields of
+  // typing, and a form that takes them all and then cannot save is the write that evaporates, only
+  // more of it. The banner above says why (ADR-0009).
+  if (readOnly) {
+    return (
+      <div className="empty-state fade-in">
+        <p>Adding a recipe needs the backend. Nothing typed here could be saved right now.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="fade-in">
