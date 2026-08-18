@@ -13,6 +13,10 @@ Thumbs.db
 # Local configuration: passwords and connection strings live here and nowhere else
 .env
 
+# The unattended backup's config: no password of its own, but the ntfy topic in it is a bearer
+# credential
+ops/backup/backup.env
+
 # Draft designs: ephemeral, superseded by the spec they become
 docs/drafts/*
 

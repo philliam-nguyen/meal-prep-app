@@ -1,0 +1,11 @@
+[Unit]
+Description=Run meal-prep-backup-check.service daily, after the backup should have run
+
+[Timer]
+# Well after 02:30's dump, and well before the Operator's day is over, so a missed or empty dump
+# reaches a phone that is actually being looked at.
+OnCalendar=*-*-* 09:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

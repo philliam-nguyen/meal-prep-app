@@ -1,0 +1,17 @@
+[Unit]
+Description=Check that tonight's meal-prep backup actually landed
+Wants=network-online.target
+After=network-online.target
+# Both timers are Persistent=true, so a host that missed 02:30 (off, rebooting) catches both
+# services up around the same moment at boot. Without this, the check can read BACKUP_DIR before
+# the backup service has finished writing that day's dump and alert "missing" on a run that is
+# simply still in progress. After= only takes effect when both are actually starting around the
+# same time - it does not pull the backup service in on its own, and it does not require the
+# backup to have succeeded, only to have finished, so a real backup failure still reaches this
+# check and still gets reported.
+After=meal-prep-backup.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/meal-prep-app
+ExecStart=/bin/bash /opt/meal-prep-app/ops/backup/check-backup.sh
