@@ -25,15 +25,20 @@ Tailscale blog post is the only place a supported pattern is written down, in wh
 
 ## 1. Bottom line
 
-**VPC origins with a public-subnet instance: probably yes, but AWS never says so.** There is no first-party
-sentence saying "the resource may be in a public subnet" and none saying it may not. Every marketing
-sentence says "private subnet". The strongest first-party evidence is positive and it is procedural rather
-than declarative: the CloudFront developer guide's own migration runbook has you create the VPC origin, test
-it, promote it, and only then "Remove public access to your VPC origin by making the subnet private." That
-step is meaningless unless the VPC origin was working while the subnet was still public. I am reporting this
-as "very likely supported, verified by a documented AWS procedure, not by an AWS statement", and it is the
-single thing in this document most worth confirming by hand before writing Terraform. See section 1 and
-"Could not verify".
+**VPC origins with a public-subnet instance: yes. Tested on 2026-08-18, and AWS still never says so.** This
+was the document's central unknown and it has since been settled by running the test in section 9. A VPC
+origin against a t4g.nano in a public subnet holding a public IPv4 address reached `Deployed` and served a
+request through a distribution at HTTP 200, and the instance kept its outbound internet access while it did.
+Section 2.1 records what was observed.
+
+The documentation has not moved. There is still no first-party sentence saying "the resource may be in a
+public subnet" and none saying it may not, and every marketing sentence still says "private subnet". The
+strongest written evidence remains procedural rather than declarative: the CloudFront developer guide's own
+migration runbook has you create the VPC origin, test it, promote it, and only then "Remove public access to
+your VPC origin by making the subnet private", a step that is meaningless unless the VPC origin was working
+while the subnet was still public. So the design rests on observed behaviour that AWS has not committed to
+in writing, which is why the fallback in section 3 stays fully documented. See section 2 and "Could not
+verify".
 
 **A certificate on the instance is needed only if you take the fallback.** These two options are not
 equivalent and the difference is exactly the certificate:
@@ -66,6 +71,26 @@ re-pay that cost every 10 seconds. Section 7 gives the numbers and the fix.
 ## 2. CloudFront VPC origins with a public-subnet instance
 
 ### 2.1 The direct question, answered honestly
+
+> **Settled by hand on 2026-08-18: yes, it works.** The rest of this section is the documentary evidence as
+> it stood before the test, kept because it explains why the test was necessary and what the AWS
+> documentation does and does not commit to. What was observed, in account `<account>`, `us-east-1`:
+>
+> | | |
+> |---|---|
+> | Instance | t4g.nano, Amazon Linux 2023 arm64, in the default VPC |
+> | Subnet | public, auto-assign public IPv4 on, in `us-east-1a` = `use1-az6` |
+> | Public IPv4 | assigned and held for the whole test |
+> | Origin domain | the instance's private DNS name |
+> | Security group | created with no inbound rules, then the service-managed group as the sole source on :80 |
+> | VPC origin | `http-only`, port 80, `Deploying` for about nine minutes, then `Deployed` |
+> | Request through the distribution | **HTTP 200**, `x-cache: Miss from cloudfront`, body served by the instance |
+> | Outbound from the instance, during that request | `https://controlplane.tailscale.com/` returned `302` |
+>
+> `create-vpc-origin` accepted the instance ARN with no subnet-type validation, no warning, and no mention
+> of the subnet in the response. The `302` is Tailscale's own redirect on that path, not a defect: it proves
+> DNS resolution, the outbound TCP connection, the TLS handshake and a complete HTTP response all succeeded
+> from the instance while it was serving as a VPC origin.
 
 I could not find a first-party sentence that says either "yes, a public subnet is supported" or "no, the
 subnet must be private". Everything AWS publishes is framed around private subnets, and the brief is right
@@ -111,7 +136,13 @@ from a resource in a public subnet. That is as close to a positive statement as 
   from the internet. The internet gateway is not used for routing traffic to origins inside the subnet, and
   you don't need to update the routing policies."
 
-**Verdict: very likely supported. Not stated. Verify by hand.** Section 9 gives the exact check.
+**Verdict: supported in practice, still not stated in the documentation.** The circumstantial reading above
+turned out to be the correct one, and the test in section 9 confirmed it on 2026-08-18. `CreateVpcOrigin`
+accepted the instance ARN with no subnet-type validation, no warning and no mention of the subnet in the
+response. Treat the `Private subnet` prerequisite heading as a description of AWS's intended deployment; the
+operative requirement is the sentence under it, an available IPv4 address for the service-managed ENI. Since
+AWS has still committed to nothing in writing, this is a behaviour that could change without a deprecation
+notice, and the fallback in section 3 stays documented for that reason.
 
 Sources: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-vpc-origins.html
 and https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_VpcOriginEndpointConfig.html (retrieved
@@ -130,8 +161,14 @@ table having a `0.0.0.0/0` route to the internet gateway plus the instance holdi
 Nothing in the VPC origins feature touches either. Egress security group rules are yours and are untouched.
 
 So the instance in a public subnet, with a public IP, an IGW default route, and permissive egress rules,
-keeps normal outbound internet access and `tailscaled` can dial out. Marked as inference in "Could not
-verify" because AWS does not say it in one sentence.
+keeps normal outbound internet access and `tailscaled` can dial out.
+
+**Confirmed by observation on 2026-08-18.** During the section 9 test the instance rewrote its served page
+every fifteen seconds with a fresh `curl` to `https://controlplane.tailscale.com/`, and the distribution ran
+the managed `CachingDisabled` policy, so the body fetched through CloudFront carried a live egress result
+rather than a boot-time one. It returned Tailscale's `302` redirect, which means DNS resolution, the
+outbound TCP connection, the TLS handshake and a complete HTTP response all succeeded from the instance
+while it was serving as a VPC origin. The reasoning above was right, and it is no longer only reasoning.
 
 ### 2.3 What a VPC origin actually requires
 
@@ -1192,6 +1229,18 @@ https://tailscale.com/kb/1085/auth-keys
 
 ## 9. How to settle question 1 in twenty minutes
 
+> **This was run on 2026-08-18 and it passed. You do not need to run it again.** Kept as the record of what
+> was actually done, and because it is the procedure to repeat if AWS's behaviour ever changes. Results are
+> in section 2.1.
+>
+> Two corrections from running it. The heading's twenty minutes is optimistic: the VPC origin took about
+> nine minutes to deploy and the distribution took longer, and the teardown needs a further deployment cycle
+> to disable the distribution before it can be deleted, so budget 45 to 60 minutes of mostly waiting. And
+> step 7's shell check is avoidable: have the instance rewrite its served page with a fresh outbound `curl`
+> every few seconds and put the distribution on the managed `CachingDisabled` policy, and then one fetch
+> through CloudFront proves the origin path and the live egress together, with no key pair and no instance
+> profile. The under-five-cents figure held.
+
 The whole recommendation hinges on one unverified fact, so here is the smallest experiment that settles it,
 by hand, before any Terraform is written.
 
@@ -1240,22 +1289,27 @@ If step 4 or 6 fails, take the fallback in section 3, and budget the certificate
 
 ## 11. Could not verify
 
-Listed explicitly rather than papered over. The first one is the important one.
+Listed explicitly rather than papered over. Entries 1 and 2 were the important ones, and both have since
+been settled by running the section 9 test; they are kept in place, marked resolved, so the numbering and
+the audit trail survive. Entries 3 onward remain open.
 
-1. **Whether CloudFront VPC origins formally supports a resource in a public subnet.** This is the central
-   unknown and the honest answer is that AWS does not say. Everything in the marketing and in the
-   prerequisites heading says "private subnet". The one piece of positive first-party evidence is the
-   migration procedure's final step, "Remove public access to your VPC origin by making the subnet private",
-   which is only coherent if the VPC origin was already working while the subnet was public. Supporting but
-   circumstantial: `CreateVpcOrigin` takes an instance ARN and no subnet parameter, and the origin domain is
-   the instance's private DNS name, which a public-subnet instance also has. I found no AWS statement, no
-   API error documentation, and no quota or limitation page that either permits or forbids it. **Verify by
-   hand using section 9 before committing to it.** If it turns out not to work, the fallback in section 3
-   is fully documented and adds roughly $1.00 a month for an ACM ACME certificate.
-2. **Whether the instance retains internet gateway egress while serving as a VPC origin.** Reasoned rather
-   than quoted. VPC origins adds a service-managed ENI and a service-managed security group; it does not
-   modify route tables, and AWS says "you don't need to update the routing policies." Outbound access is a
-   route table plus public IP property. I am confident, but there is no sentence saying so.
+1. ~~**Whether CloudFront VPC origins formally supports a resource in a public subnet.**~~ **Resolved
+   2026-08-18: yes, in practice.** Observations in section 2.1. The original entry read: this is the central unknown and the honest answer is that AWS does
+   not say. Everything in the marketing and in the prerequisites heading says "private subnet". The one
+   piece of positive first-party evidence is the migration procedure's final step, "Remove public access to
+   your VPC origin by making the subnet private", which is only coherent if the VPC origin was already
+   working while the subnet was public. Supporting but circumstantial: `CreateVpcOrigin` takes an instance
+   ARN and no subnet parameter, and the origin domain is the instance's private DNS name, which a
+   public-subnet instance also has. I found no AWS statement, no API error documentation, and no quota or
+   limitation page that either permits or forbids it. **That last part is still true after the test.** The
+   behaviour was confirmed; the documentation was not changed by confirming it, so the fallback in section 3
+   stays documented against the day AWS starts enforcing the heading.
+2. ~~**Whether the instance retains internet gateway egress while serving as a VPC origin.**~~ **Resolved
+   2026-08-18: yes.** Observed live through the distribution during the same test, see section 2.2. The
+   original entry read: reasoned rather than quoted. VPC origins adds a service-managed ENI and a
+   service-managed security group; it does not modify route tables, and AWS says "you don't need to update
+   the routing policies." Outbound access is a route table plus public IP property. I am confident, but
+   there is no sentence saying so. The confidence was justified.
 3. **The exact billing treatment of CloudFront-to-VPC-origin bytes.** The `USE1-CloudFront-Out-Bytes` rate
    is $0.00 and the pricing page explicitly names VPC origins as free for origin fetches, so this is as
    verified as it can be from the price list. What I could not confirm is whether traffic over the
@@ -1295,8 +1349,11 @@ Listed explicitly rather than papered over. The first one is the important one.
 
 ### 12.1 The recommendation: VPC origin first, prefix list as a documented fallback
 
-**Take the public-subnet VPC origin, after verifying it with section 9. If verification fails, take the
-prefix-list-locked public instance and buy an ACM ACME certificate for a dollar a month.**
+**Take the public-subnet VPC origin. Section 9's verification was run on 2026-08-18 and it passed, so this
+is now a settled recommendation rather than a conditional one.** The prefix-list-locked public instance,
+with an ACM ACME certificate for a dollar a month, stays documented in section 3 as the fallback, because
+the behaviour is observed rather than promised and section 3 is what you reach for if AWS ever starts
+enforcing the "private subnet" heading.
 
 The reasoning, in order of weight:
 

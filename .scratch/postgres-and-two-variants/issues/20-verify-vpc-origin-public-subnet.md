@@ -1,6 +1,6 @@
 # 20 - Verify a VPC origin serves an instance in a public subnet
 
-Status: ready-for-human
+Status: done
 
 **What to build:** An answer, established by applying it rather than by reading about it, to whether
 CloudFront VPC origins will serve an EC2 instance that sits in a public subnet and holds a public
@@ -44,8 +44,78 @@ ticket is that reasoning was available and insufficient.
 
 **Blocked by:** None. Blocks the ingress Terraform, since the resource list depends on the answer.
 
-- [ ] A VPC origin is created against an instance in a public subnet that holds a public IPv4 address
-- [ ] A request through the distribution reaches the instance, or fails in a way that is recorded
-- [ ] The instance's outbound internet access is confirmed to still work while it serves as an origin
-- [ ] The answer, the date and the observed behaviour are written into the comments below
-- [ ] Every resource created for the test is destroyed
+- [x] A VPC origin is created against an instance in a public subnet that holds a public IPv4 address
+- [x] A request through the distribution reaches the instance, or fails in a way that is recorded
+- [x] The instance's outbound internet access is confirmed to still work while it serves as an origin
+- [x] The answer, the date and the observed behaviour are written into the comments below
+- [x] Every resource created for the test is destroyed
+
+## Comments
+
+**The answer is yes, established by applying it on 2026-08-18.** CloudFront VPC origins serve an EC2
+instance that sits in a public subnet and holds a public IPv4 address. The instance keeps its
+outbound internet access while it does so. The ingress therefore takes the first branch: the
+CloudFront-to-origin hop is private, `http-only` stands as the origin protocol policy, viewer TLS
+terminates on the platform certificate, and no certificate, ACME client, renewal timer or Route 53
+IAM policy goes anywhere near the instance.
+
+What was actually observed, in account `<account>`, region `us-east-1`:
+
+| | |
+|---|---|
+| Instance | `i-0cc9ee95a30f39655`, t4g.nano, `ami-0cded71ff6ab7f608` (Amazon Linux 2023 arm64) |
+| Subnet | `subnet-0810cbb2c88841775` in the default VPC, `us-east-1a` = `use1-az6` |
+| Public IPv4 | `3.81.174.238`, auto-assigned, held for the whole test |
+| Private DNS | `ip-172-31-43-81.ec2.internal`, used as the origin domain |
+| Security group | created with no inbound rules at all |
+| VPC origin | `vo_Ljs9sXYdScICM4cP49HKG5`, `http-only`, port 80 |
+| Distribution | `E2X18J1D0J8PWK` at `d19l9l6tpt1a68.cloudfront.net` |
+
+`create-vpc-origin` accepted the instance ARN without complaint. There was no subnet-type
+validation, no warning, and no mention of the subnet in the response. The origin sat in `Deploying`
+for roughly nine minutes and then reached `Deployed`. The service-managed group
+`CloudFront-VPCOrigins-Service-SG` appeared in the VPC as `sg-06e52edd4b3cf614e` once the origin
+deployed, and was added as the sole inbound source on port 80, which is the restrictive option
+rather than the CloudFront managed prefix list.
+
+A request through the distribution returned **HTTP 200** with `x-cache: Miss from cloudfront`, and
+the body was the page served by the instance. The origin was reachable privately while the subnet
+was public and the instance held a routable address the whole time.
+
+Outbound access was confirmed in the same request rather than over a shell. The instance rewrote its
+index page every fifteen seconds with a fresh `curl` to `https://controlplane.tailscale.com/`, and
+the distribution used the managed `CachingDisabled` policy, so the body read at `2026-08-18
+01:24:07 UTC` was at most fifteen seconds old:
+
+```
+ticket-20 vpc-origin test
+utc: Tue Aug 18 01:24:07 UTC 2026
+egress https://controlplane.tailscale.com -> 302
+```
+
+`302` rather than `200` is Tailscale's own redirect on that path and is not a defect. What the line
+establishes is that DNS resolution, the outbound TCP connection, the TLS handshake and a complete
+HTTP response all succeeded from the instance while it was serving as a VPC origin. Only a `FAIL` or
+a `000` there would have meant no egress. So the Tailscale premise holds: the instance can reach the
+control plane without a NAT Gateway, and CloudFront can still reach the instance privately.
+
+This settles the first entry in section 11 of
+[research 0002](../../../docs/research/0002-cloudfront-ec2-tailscale-ingress.md), which named it the
+research's most consequential unverified claim. The circumstantial reading in section 2.1 was
+correct: the `Private subnet` heading in the AWS prerequisites describes the intended deployment,
+and the operative requirement is an available IPv4 address for the service-managed ENI, not a
+route-table shape.
+
+**Teardown verified 2026-08-18.** `list-vpc-origins` and `list-distributions` both return empty,
+`i-0cc9ee95a30f39655` is `terminated`, and `sg-0be60cfd2344c2b9c` returns `InvalidGroup.NotFound`. A sweep of
+`us-east-1` for orphans found no `available` volumes, no unattached ENIs and no elastic IPs. The
+service-managed group `sg-06e52edd4b3cf614e` removed itself once the last VPC origin was deleted, so no
+manual cleanup was needed there. The terminated instance record stays visible in the EC2 API for about an
+hour and bills nothing.
+
+Two notes for whoever writes the ingress Terraform. Pin the availability zone by ID, because
+`us-east-1e` is `use1-az3` and is excluded from VPC origins; this test used `use1-az6` deliberately.
+And budget more wall clock than section 9's twenty minutes suggests: the VPC origin took about nine
+minutes to deploy and the distribution took longer, with the teardown needing a further deployment
+cycle to disable the distribution before it can be deleted. The money cost was as estimated, a few
+cents.
