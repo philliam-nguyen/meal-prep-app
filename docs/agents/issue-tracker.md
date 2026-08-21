@@ -2,7 +2,7 @@
 
 Issues and specs (you may know a spec as a PRD) for this repo live as markdown files in `.scratch/`.
 
-`.scratch/` is tracked on the working branch so the tickets survive a machine change, and dropped before that branch merges. These files are scratch paper, not the finished work: the authoritative spec lives at `docs/specs/`. Don't expect them on `main`, and don't reference them from files that do reach `main`.
+`.scratch/` is gitignored and local-only: tickets live on this machine and do not survive a machine change unless copied deliberately. These files are scratch paper, not the finished work: the authoritative spec lives at `docs/specs/`. Don't expect them on `main`, and don't reference them from files that do reach `main`.
 
 ## Conventions
 

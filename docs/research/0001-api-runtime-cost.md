@@ -1,5 +1,12 @@
 # Research: what the Demo Variant's API runtime actually costs
 
+> **Status: superseded by [ADR-0008](../adr/0008-demo-backend-on-the-homelab.md), 2026-08-17.** This
+> document's recommendation (Fargate Spot + API Gateway, $28.49/month) was not taken. The decision went to
+> the homelab-backend hybrid this document prices as option four and argues against — the counter-argument
+> that won is in ADR-0008, and the ingress design it needed is [research
+> 0002](./0002-cloudfront-ec2-tailscale-ingress.md). The pricing below remains the record of what the
+> alternatives cost and why they lost.
+
 **Question.** Ticket 15 holds one decision: does the Demo Variant's API run as a container task or as a
 serverless function? Every figure discussed during design was an estimate and none were checked. The
 Operator also asked whether the Demo Variant could instead run for free on the existing homelab
@@ -171,7 +178,8 @@ https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonECR/current/us-eas
 ### EventBridge Scheduler and the Seed restore
 
 EventBridge Scheduler: `"$0 for the first 14 million scheduled invocations"`, then
-`"$1.00 per million scheduled invocations"`. A daily Seed restore is 30 invocations a month.
+`"$1.00 per million scheduled invocations"`. A daily Seed restore is 30 invocations a month. (The
+schedule later settled at six-hourly — roughly 120 a month, still nowhere near the free tier's edge.)
 
 **Scheduler cost: $0.00/month.**
 

@@ -30,7 +30,7 @@ that no longer applies to them.
 
 ## The decision, and what is being accepted
 
-The Demo Variant runs on hardware the Operator already owns, so that the demo costs $7.36 a month
+The Demo Variant runs on hardware the Operator already owns, so that the demo costs $7.37 a month
 rather than $28.49. The price of that is a lateral movement risk and ongoing operational overhead,
 and both are accepted rather than mitigated away.
 

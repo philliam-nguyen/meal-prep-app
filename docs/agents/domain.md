@@ -19,7 +19,7 @@ If either of these doesn't exist, **proceed silently**. Don't flag their absence
 ├── docs/adr/
 │   ├── 0001-<slug>.md
 │   └── 0002-<slug>.md
-└── index.html
+└── packages/
 ```
 
 ADRs are numbered from `0001`, zero-padded to four digits, kebab-case slug. Numbers are never reused. A superseded ADR stays in place with its status recorded in frontmatter, not in the filename.

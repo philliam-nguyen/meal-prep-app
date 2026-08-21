@@ -21,9 +21,10 @@ That last detail earns its place. Ticket 03 asks for proof that migrations apply
 current, and for proof that the API's database role cannot create, alter or drop a table. Both fall
 out of how the fixture boots rather than depending on two tests somebody remembers to write.
 
-This is an ADR rather than a line in ticket 03 because it binds tickets 03 through 18. Every
-derivation the migration moves into SQL, and every guardrail ADR-0001 requires, gets asserted
-through this seam and no other.
+This is an ADR rather than a line in ticket 03 because it binds ticket 03 and every ticket after
+it. Every derivation the migration moves into SQL, and every guardrail ADR-0001 requires, gets
+asserted through this seam and no other. (Bare `test/…` paths in this ADR live in
+`packages/api/test/`; the one suite at the repository root says so where it appears.)
 
 ## Considered options
 
@@ -98,8 +99,9 @@ to a client that asks for it every few seconds, and promises to read that versio
 it travels with. Neither promise is visible in a response body, and both are the kind that a later
 change breaks silently. One test counts the statements a request runs; one lands a write between two
 of them, through the API. The database stays real and the assertions still read HTTP responses. That
-file also holds the last raw statement in the suite, a `delete from recipes`, because ticket 09 has
-not shipped a delete endpoint to send instead; it goes when 09 lands.
+file held the last raw statement in the suite, a `delete from recipes`, because ticket 09 had not
+yet shipped a delete endpoint to send instead; with 09 landed, the call site is a `DELETE` request
+through the API and the raw helper is gone (removed 2026-08-21, later than promised).
 
 Every test reaches Postgres as the restricted role, so a missing grant surfaces on the first run
 that needs it instead of at deployment.

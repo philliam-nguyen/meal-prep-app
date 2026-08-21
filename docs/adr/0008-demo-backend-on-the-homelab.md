@@ -19,7 +19,7 @@ from it, and the frontend keeps the relative paths [0002](./0002-variant-seam-in
 describes. What changes is only which component serves the bundle in this Variant, and the browser
 cannot tell.
 
-The whole AWS footprint is $7.36 a month against $28.49 for a Fargate task and RDS, both figures
+The whole AWS footprint is $7.37 a month against $28.49 for a Fargate task and RDS, both figures
 taken from the AWS Price List Bulk API on 2026-08-17 rather than from the pricing pages, and both
 carrying the caveat that a price is only as current as the day it was read. The workings are in
 [research 0001](../research/0001-api-runtime-cost.md) and
@@ -77,7 +77,7 @@ tailnet's own `ts.net` domain, so it cannot present `meal-prep.phillip-nguyen.de
 **Port forwarding to a reverse proxy.** This is the change [0003](./0003-no-application-auth.md) says
 invalidates it rather than amends it. Not taken.
 
-**Everything on the homelab, including the bundle.** Saves the last $7.36 and deletes every Terraform
+**Everything on the homelab, including the bundle.** Saves the last $7.37 and deletes every Terraform
 artifact the demo exists to show. The repository would then contain a Compose file, which ticket 13
 already delivers.
 
@@ -120,7 +120,10 @@ The instance is a single point of failure that is also always on, and it is a ho
 to patch. That is operational overhead accepted alongside the isolation risk.
 
 Whether the CloudFront-to-instance hop is private, and therefore whether a certificate is needed on
-the instance at all, is not yet established. See ticket 20.
+the instance at all, was settled by ticket 20's research on 2026-08-18: the hop is private — a VPC origin reaching the
+instance's private address over HTTP, inbound sourced only from CloudFront's service-managed
+security group — and the onward proxy-to-homelab hop is WireGuard, so no certificate is needed on
+the instance ([research 0002](../research/0002-cloudfront-ec2-tailscale-ingress.md)).
 
 The tailnet policy is versioned in the repository and synced to Tailscale, not edited in the web
 console. Tailscale's default policy permits everything, so the grant above does not exist until that

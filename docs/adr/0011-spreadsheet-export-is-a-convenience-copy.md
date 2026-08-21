@@ -52,7 +52,8 @@ diff nobody can read is a rubber stamp, and a rubber stamp is the same thing as 
 
 Not the Sheets-era one. [0004](./0004-accept-spreadsheet-exposure-until-cutover.md) accepted that the
 old spreadsheet's id is committed in a public repository and that the sheet is shared with anyone
-holding the link, on the grounds that cutover retires the exposure. Writing the collection back into
+holding the link, on the grounds that cutover retires the exposure (since closed - see 0004's
+amendment; un-sharing the old sheet is the remaining Operator action). Writing the collection back into
 that same sheet would reopen it - the same personal data, the same anonymous readers, now on the far
 side of a migration whose security deadline this was.
 

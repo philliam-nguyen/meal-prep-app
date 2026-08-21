@@ -58,8 +58,8 @@ during an outage, which is when nobody wants to discover it.
 
 The recorded file is validated against `stateResponse`, the schema already exported from `state.js`.
 It sets `additionalProperties: false`, so a field added to the payload without regenerating the
-recording fails the check rather than the outage. The check lives in the test suite, which is what
-there is: this repo has no pipeline yet, and running the suite on a push is ticket 16's.
+recording fails the check rather than the outage. The check lives in the test suite, which CI has
+run on every push since ticket 16 landed (`.github/workflows/ci.yml`).
 
 Degraded mode must not write to the freshness poll's baseline. The recorded payload carries a
 `version`, and if that value became the baseline then recovery would depend on it differing from the

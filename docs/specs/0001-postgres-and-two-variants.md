@@ -3,7 +3,7 @@ id: 0001
 title: Postgres migration and two deployment Variants
 status: accepted
 date: 2026-08-03
-adrs: [0001, 0002, 0003, 0005, 0007]
+adrs: [0001, 0002, 0003, 0005, 0007, 0008, 0010, 0011]
 ---
 
 # Postgres migration and two deployment Variants
@@ -11,9 +11,8 @@ adrs: [0001, 0002, 0003, 0005, 0007]
 Vocabulary in this document follows `CONTEXT.md`. Decisions marked with an ADR reference are
 recorded permanently in `docs/adr/`.
 
-The working issue-tracker copy of this spec lives at
-`.scratch/postgres-and-two-variants/spec.md` and carries the triage status. This committed copy
-is the authoritative content; if the two diverge, this one wins.
+This spec was drafted through a local scratch tracker that is not part of the repository. This
+committed copy is the authoritative content.
 
 ## Problem Statement
 
@@ -140,6 +139,11 @@ mechanics beneath them change with the write path while the interaction does not
 46. As a Reviewer, I want to read the Terraform that produced the running demo, so that I can judge the infrastructure work and not just the app.
 47. As a Reviewer, I want the demo link to work whenever I click it, so that evaluating the work doesn't depend on the author's availability.
 
+Story 45 as written was withdrawn on 2026-08-17: ADR-0010 replaces "structurally unable" with the
+weaker property actually held — separate stacks, a tailnet grant, and egress rules on shared
+hardware, with the acceptance stated in its terms. The story stays for the record because ADR-0010
+cites it.
+
 ### Guardrails
 
 48. As the Operator, I want Recipe Card URLs restricted to `https:`, so that a stranger cannot store a `javascript:` URL that fires against the next visitor.
@@ -151,6 +155,10 @@ mechanics beneath them change with the write path while the interaction does not
 54. As the Operator, I want an AWS budget alarm, so that abuse or a misconfiguration reaches me before it reaches my statement (ADR-0001).
 55. As the Operator, I want CORS restricted to the demo's own origin, so that the API isn't a free backend for other sites.
 56. As the Operator, I want the same guardrails active on the Homelab Variant, so that there is one code path to reason about rather than two (ADR-0002).
+
+The AWS-shaped guardrails here aged out when the demo backend left AWS: ADR-0010 retires the
+budget alarm and the task-count and storage ceilings of stories 50 and 54, and lists what replaced
+them (a volume cap, egress rules, and the six-hourly Seed restore).
 
 ### Operating it
 
@@ -330,7 +338,9 @@ ownership and no DDL rights. An `https:`-only scheme allowlist on Recipe Card UR
 allowlist validation on every user-supplied field, with the Recipe Type allowlist drawn from the
 known set. Numeric range validation on quantity. A request body size limit. Per-IP write rate
 limiting. Absolute row caps on total Recipes and on Recipe Ingredients per Recipe. CORS pinned to
-the demo origin. An AWS budget alarm plus hard ceilings on task count and database storage.
+the demo origin. An AWS budget alarm plus hard ceilings on task count and database storage (the
+AWS-shaped items retired by ADR-0010 when the demo backend left AWS; its replacements are listed
+there).
 
 No web application firewall — rejected on recurring cost rather than merit, and recorded in ADR-0001
 as worth revisiting.
@@ -372,6 +382,10 @@ Terraform, plus a scheduled task that restores the Seed. Always-on rather than a
 because a reviewer clicks the link without warning and a dead link reads worse than no link. The
 database is the entire recurring cost. **All figures discussed were estimates and must be verified
 in the AWS pricing calculator before committing.**
+
+Superseded 2026-08-17 by ADR-0008: the bundle stays on CloudFront + S3, but the API and Postgres
+run on the homelab in a second Compose project, with a small proxy instance joining the tailnet.
+Only the ingress half remains Terraform.
 
 ### Seed
 

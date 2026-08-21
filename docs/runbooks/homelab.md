@@ -268,8 +268,7 @@ service under the project name `meal-prep`) and refuses to run rather than falli
 "whatever Postgres is running" if that container is not there. The Demo Variant's Postgres
 container is never named and never dumped: it has no history worth keeping, and its recovery story
 is the Seed restore timer on its own schedule
-([ticket 12](../../.scratch/postgres-and-two-variants/issues/12-seed-fixture-and-restore.md),
-[ADR-0008](../adr/0008-demo-backend-on-the-homelab.md)). A dump with an ambiguous name is a dump
+([ADR-0008](../adr/0008-demo-backend-on-the-homelab.md)). A dump with an ambiguous name is a dump
 somebody restores into the wrong stack later, which is why filenames carry the stack name and the
 date: `homelab-variant_YYYY-MM-DD.sql`.
 

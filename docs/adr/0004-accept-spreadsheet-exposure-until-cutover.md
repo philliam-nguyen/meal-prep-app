@@ -53,3 +53,21 @@ shutting down at cutover rather than leaving it live beside the new API.
 
 Cutover is now a security deadline and not only a feature milestone. If the migration stalls, this
 decision expires with it and the fresh-spreadsheet option is the one to revisit.
+
+## Amendment, 2026-08-21: cutover happened, and the window this ADR held open is closed
+
+Ticket 17 completed cutover on 2026-08-21. The Sheets read path is deleted, GitHub Pages hosting
+for the personal instance is ended (verified: the Pages API returns no site for the repository),
+and the Apps Script deployment behind the old write path — the sharper risk named above — is shut
+down. The exposure this ADR accepted no longer has a serving app behind it.
+
+**What it did not close.** The old spreadsheet still exists, still link-shared, and its ID sits
+permanently in public git history. "Treat the spreadsheet ID as public knowledge" stands forever.
+The data it holds is the pre-cutover snapshot, which is the same household cooking data now live
+in Postgres.
+
+**The honest remediation named above is now available.** The phone-readable-copy job moved to a
+fresh, unshared spreadsheet ([0011](./0011-spreadsheet-export-is-a-convenience-copy.md)), and
+cutover's only requirement on the old sheet — staying intact so truncate-and-rerun stayed
+possible — is spent. Un-sharing or deleting the old spreadsheet is now pure gain, and doing it is
+the one remaining Operator action under this ADR.

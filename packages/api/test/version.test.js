@@ -12,18 +12,12 @@
 // inside a live request. That one interposes rather than observes, which is the strongest reach in
 // this file, and it is the only way to prove an ordering that exists precisely so that a write
 // arriving mid-request cannot be lost. The write it lands goes through the API like any other.
-//
-// `deleteRecipeDirectly` is the file's one raw statement. Ticket 09 owns the delete endpoint, so
-// until it lands there is no API to arrange this through, and the alternative is shipping untested
-// the property that endpoint will depend on. Its one call site becomes a DELETE request when 09
-// lands, and this helper goes.
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { startApp } from './helpers/app.js';
-import { connect } from './helpers/database.js';
 import { ingredientIdIn, setPantry, setStaple } from './helpers/pantry.js';
-import { createRecipe, setSelected } from './helpers/recipes.js';
+import { createRecipe, deleteRecipe, setSelected } from './helpers/recipes.js';
 
 const SOUP = {
   name: 'Minestrone',
@@ -60,13 +54,6 @@ function interposeOnQueries(t, app, between = async () => {}) {
 
   return sql;
 }
-
-/**
- * Deletes a Recipe as the restricted role, which is the file's one raw statement. See the header:
- * this goes when ticket 09 ships an endpoint to send instead.
- */
-const deleteRecipeDirectly = (db, recipeId) =>
-  db.query('delete from recipes where id = $1', [recipeId]);
 
 /** Asserts that a write is one the polling client finds out about. */
 async function assertAdvances(app, write) {
@@ -122,9 +109,8 @@ describe('the version endpoint', () => {
     const app = await startApp(t);
     const older = await createRecipe(app, SOUP);
     await createRecipe(app, { name: 'Focaccia', type: 'Bread' });
-    const db = await connect(t);
 
-    await assertAdvances(app, () => deleteRecipeDirectly(db, older.id));
+    await assertAdvances(app, () => deleteRecipe(app, older.id));
   });
 
   it('costs one query and a body a phone can ask for all afternoon', async (t) => {

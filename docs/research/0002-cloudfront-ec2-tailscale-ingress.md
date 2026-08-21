@@ -795,6 +795,8 @@ For this design, with the proxy tagged `tag:proxy` and the Demo Variant's homela
    a portfolio artifact whose selling point is reviewable infrastructure. Tailscale supports GitOps for the
    tailnet policy file, and checking the policy into the repo would put the design's primary isolation
    control next to the Terraform where a Reviewer can read it. Worth a ticket.
+   **Resolved since:** the policy is versioned at `ops/tailnet/policy.hujson` and recorded as such in
+   ADR-0008.
 
 Sources: https://tailscale.com/kb/1018/acls, https://tailscale.com/docs/reference/syntax/grants,
 https://tailscale.com/kb/1068/tags, https://tailscale.com/pricing (all retrieved 2026-08-17)
@@ -1217,13 +1219,16 @@ https://tailscale.com/kb/1085/auth-keys
   proxies in front of the API, CloudFront and the EC2 reverse proxy. The reverse proxy must append to
   `X-Forwarded-For` rather than replace it, or every visitor shares one rate-limit bucket keyed on the
   proxy's tailnet address, which is the exact failure `.env.example` warns about for the homelab case.
+  **Superseded since:** the two-proxy subtlety this bullet raises is exactly why `true` was wrong — the
+  settled value is the hop count `2` (ADR-0008, `.env.demo.example`), and the `.env.example` sentence quoted
+  here has been replaced by the hop-count documentation.
 - **The CloudFront distribution is the single origin, so `CORS_ORIGIN` is
   `https://meal-prep.phillip-nguyen.dev`** with no port. Getting it wrong makes the app refuse its own saves,
   and `packages/api/src/config.js` deliberately has no fallback.
 - **The Tailscale policy file is infrastructure that is not in the repository.** Said in section 6.3, repeated
   here because it is an operational hazard as well as a portfolio one: the primary isolation control lives in
   a web console, has no version history in git, and can be changed by anyone with tailnet admin. Tailscale
-  supports GitOps for it. That is a ticket.
+  supports GitOps for it. That is a ticket. **Resolved since:** `ops/tailnet/policy.hujson`, per ADR-0008.
 
 ---
 
@@ -1429,7 +1434,8 @@ the instance would have to hold.
 - **The Tailscale policy file should be in the repository.** It is the design's primary isolation control,
   it is currently a web console setting with no version history, and Tailscale supports GitOps for it. For a
   ticket whose first acceptance box is "the Terraform reads well as a portfolio artifact", having the most
-  important access-control decision live somewhere a Reviewer cannot read is a gap.
+  important access-control decision live somewhere a Reviewer cannot read is a gap. **Resolved since:**
+  `ops/tailnet/policy.hujson`, per ADR-0008.
 - **Two acceptance checks worth adding to ticket 15**, both ten seconds each and both preventing a silent
   months-later outage: confirm in the Tailscale admin console that both nodes show key expiry disabled, and
   confirm the tailnet policy file has a non-empty `grants` section, because the default policy allows
