@@ -114,8 +114,9 @@ the host half cannot.
 - [ ] Container memory and CPU limits are set, and the Postgres volume has a size cap
 - [x] `DOCKER-USER` rules drop demo-network egress to private ranges except its own database
 - [ ] Those rules survive a reboot, checked after one rather than assumed from `systemctl enable`
-- [ ] The Seed restore runs on a six-hour timer as the owner role, and a failed run is noticed
-      rather than silent
+- [x] The Seed restore runs on a six-hour timer as the owner role
+- [ ] A failed restore is noticed rather than silent: the journal records it, but no alert path is
+      wired, unlike ticket 14's dump
 - [x] Migrations apply before the API starts, the same gate ticket 13 documented
 
 ## Comments
@@ -192,3 +193,20 @@ the risk ADR-0010 accepts rather than mitigates. Two host-side bindings are load
 them: ticket 13's decision to bind the Homelab Variant's API to `127.0.0.1` means a demo container
 reaching the host's LAN address finds nothing listening there, and ADR-0010's requirement that the
 local model runtime stay bound away from the network is now a control rather than tidiness.
+
+**2026-08-20: the restore runs, and the stack answers end to end.** `systemctl start
+meal-prep-seed-restore` emptied every table but the migration record, then loaded 19 Recipes, 7
+Staples, 5 Pantry ticks, 2 Selected Recipes and marked every seeded Recipe Protected, in about a
+second. The timer lists its next run at 00:00. Ticket 26's Pantry ticks are in the restore, so a
+Reviewer arriving at any hour gets a populated Best Matches rather than an empty one.
+
+End to end from outside: `curl http://100.78.72.5:8080/api/state` run *on the AWS proxy* returns
+the Seed with `protected: true` on the Recipes. That is the full inner path of the Demo Variant
+working, CloudFront and nginx excepted, and those two are ticket 15's.
+
+**The alert path is the honest gap in the restore.** The script exits non-zero and systemd marks
+the unit failed, so the journal has it. Nothing tells anyone. Ticket 14 built `ops/backup/alert.sh`
+for exactly this and this unit does not use it, which matters more here than for a backup: ADR-0010
+says the restore is the control bounding how long anything an attacker stored survives, and a
+control that silently stops running is worse than one that was never installed. An `OnFailure=`
+pointing at the existing alert path would close it.
