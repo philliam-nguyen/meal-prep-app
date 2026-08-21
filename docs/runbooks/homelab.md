@@ -139,6 +139,122 @@ what `docker compose down` followed by `docker compose up -d` does. `docker comp
 deletes it, and there is no host directory to recover it from. The nightly backup below is what
 makes that survivable.
 
+## Two stacks on one host
+
+Ticket 25. The Demo Variant's API and Postgres run on this same machine, in a Compose project of
+their own ([ADR-0008](../adr/0008-demo-backend-on-the-homelab.md)). The isolation between the two
+stacks is real and it is not structural: they share a kernel, a Docker daemon, a filesystem and a
+root user. [ADR-0010](../adr/0010-demo-guardrails-on-shared-hardware.md) states what is being
+accepted there and on what grounds, and this section does not re-argue it. What this section does
+is record the separating controls as they are actually installed, from the host, as of 2026-08-21.
+
+### Telling them apart at the prompt
+
+One checkout serves both projects, so the directory tells you nothing; the Compose project name is
+the distinguisher, and everything Docker creates carries it as a prefix.
+
+```
+docker compose ls
+NAME             CONFIG FILES
+meal-prep        compose.yaml, compose.build.yaml
+meal-prep-demo   compose.demo.yaml
+```
+
+|                  | Homelab Variant                    | Demo Variant                                          |
+| ---------------- | ---------------------------------- | ----------------------------------------------------- |
+| Compose project  | `meal-prep` (`compose.yaml`)       | `meal-prep-demo` (`compose.demo.yaml`)                |
+| Containers       | `meal-prep-api-1`, `meal-prep-db-1` | `meal-prep-demo-api-1`, `meal-prep-demo-db-1`, `meal-prep-demo-tailscale-1` |
+| Postgres volume  | `meal-prep_database`               | `meal-prep-demo_database` (`meal-prep-demo_tailscale` holds sidecar state) |
+| Network          | `meal-prep_default`                | `meal-prep-demo_default`                              |
+| Host ports       | `127.0.0.1:8080`                   | none; ingress is its own `tailscale` sidecar          |
+| Env file         | `.env`                             | `.env.demo`                                           |
+
+Both Postgres containers run `postgres:17-alpine`, so the image column of `docker ps` cannot tell
+them apart; the name always can. To see one stack alone:
+`docker ps --filter label=com.docker.compose.project=meal-prep-demo` (the label is an exact match,
+so `meal-prep` does not also catch the demo). Compose commands aimed at the demo take
+`-f compose.demo.yaml --env-file .env.demo`; a bare `docker compose` in this directory is the
+Homelab Variant.
+
+One volume is not like the others. `meal-prep-demo_database` binds into
+`/var/lib/meal-prep-demo/pgdata/data`, which sits inside a fixed-size 2 GiB loopback ext4 image
+mounted from `/etc/fstab` before `docker.service`. That mount is ADR-0010's cap on how big the
+demo's database can grow (`ops/demo-volume/`); `df -h /var/lib/meal-prep-demo/pgdata` shows the
+ceiling and how close it is. The Homelab Variant's volume is an ordinary named volume with no cap.
+
+### No shared password
+
+`.env` and `.env.demo` sit side by side, use the same variable names (`POSTGRES_OWNER_PASSWORD`,
+`APP_DB_PASSWORD`), and hold different values - generated separately, per the Passwords section
+above, and confirmed different on the host by comparing hashes rather than reading them. Sharing
+one would turn the separate-Postgres design into decoration: a credential read out of one stack
+must be worth nothing in the other. Both files are `chmod 600`, stay on the host, and are never
+committed.
+
+### The egress rules, as installed
+
+`meal-prep-demo-egress.service` is enabled and runs `ops/demo-egress/egress-rules.sh` after
+`docker.service` on every boot. That re-run *is* the reboot-survival story: the rules are not saved
+with `iptables-persistent`, deliberately, because `DOCKER-USER` is a chain Docker creates at start
+and rules restored before Docker exists vanish. The script reads the demo network's subnet live
+from Docker (`172.19.0.0/16` as of 2026-08-21; a recreated network can land elsewhere, which is why
+it is never hardcoded) and installs seven rules, each marked `--comment meal-prep-demo-egress`,
+across two chains - two chains because `DOCKER-USER` sits in FORWARD and never sees host-destined
+traffic.
+
+In `DOCKER-USER` (traffic routed through the host: other LAN devices, other Docker networks), in
+evaluation order: replies on established connections RETURN, so answering the AWS proxy is never
+mistaken for reaching out; demo subnet to its own subnet RETURN, so the API reaches its own
+Postgres; then demo subnet to `10.0.0.0/8`, `172.16.0.0/12` and `192.168.0.0/16` all DROP. In
+`INPUT` (the host itself, on every address it holds): established replies ACCEPT, everything else
+from the demo subnet DROP - a flat drop rather than a list of exceptions, because the host serves
+nothing the demo stack needs. Net effect: the demo network reaches the internet and its own
+containers, and no private address beyond that.
+
+```
+systemctl status meal-prep-demo-egress        # active (exited) and the last run's exit status
+journalctl -u meal-prep-demo-egress -b        # "installed 7 rules across DOCKER-USER INPUT"
+sudo iptables -S DOCKER-USER | grep meal-prep-demo-egress   # the live chain itself
+```
+
+The script exits 1 and logs FATAL if it counts anything other than seven marked rules, or if the
+demo network is missing entirely, so a green unit is itself evidence the control is on.
+
+### The local model runtime
+
+The other tenant on this host is LM Studio, a per-user install under `/home/llm/.lmstudio`. As
+installed, its API server is not running at all: no process, no listening socket, and the
+serve-on-local-network setting has never been switched on, so starting the server binds
+`127.0.0.1:1234` rather than the LAN. Recorded here as a control, not an accident: an open model
+endpoint would be an unauthenticated service sitting inside the boundary the rules above draw. The
+check, after any LM Studio upgrade or settings visit:
+
+```
+ss -ltn 'sport = :1234'    # expect nothing; if the server is on, the address must be 127.0.0.1
+```
+
+### The Seed restore is a security control
+
+`meal-prep-seed-restore.timer` is enabled: `OnCalendar=00,06,12,18:00:00`, with
+`RandomizedDelaySec=120` and `Persistent=true` so a host that was off at the slot restores once on
+the next boot. It runs `ops/seed-restore/restore.sh`, which runs the demo Compose file's `seed`
+service - the API's own image running `packages/api/src/seed.js`, truncate and reload. Its
+credential is the *demo* owner role: `compose.demo.yaml` assembles `SEED_DATABASE_URL` from
+`POSTGRES_OWNER_ROLE` and `POSTGRES_OWNER_PASSWORD` in `.env.demo`, owner because truncating is
+exactly what the restricted role exists to be unable to do, and nothing of the Homelab Variant's
+`.env` is involved. This is a security control and not housekeeping: the restore clears whatever an
+attacker stored along with whatever a visitor accumulated, so the six-hour interval is the longest
+anything planted in the Demo Variant survives. Lengthening it is a security change and belongs in
+ADR-0010's terms, not in a quick edit to the timer. `systemctl list-timers | grep seed-restore`
+shows the next and last run; failures alert through ticket 14's ntfy channel.
+
+### Where each recovery story lives
+
+The Homelab Variant's is the Backups section below: a nightly dump of `meal-prep-db-1` and nothing
+else. The Demo Variant's is the Seed restore above; its Postgres holds no history worth keeping and
+is deliberately never dumped. Neither story is restated in the other's terms, and the Backups
+section already says why.
+
 ## Backups
 
 Ticket 14. Recovery does not depend on the Operator remembering anything: a nightly `pg_dump` of
@@ -317,7 +433,7 @@ Preview first. It shows the diff, asks nobody and writes nothing:
 
 ```
 docker run --rm \
-  --network host \
+  --network meal-prep_default \
   --env-file .env \
   --volume /path/to/key.json:/key.json:ro \
   --env SHEETS_CREDENTIALS_FILE=/key.json \
@@ -329,15 +445,18 @@ The same image with a different command, the way the migration step and the Seed
 
 ```
 docker run --rm -it \
-  --network host \
+  --network meal-prep_default \
   --env-file .env \
   --volume /path/to/key.json:/key.json:ro \
   --env SHEETS_CREDENTIALS_FILE=/key.json \
   "$MEAL_PREP_IMAGE" node packages/api/src/export.js
 ```
 
-From a checkout with `node_modules` present, `node packages/api/src/export.js` on its own does the
-same thing.
+`--network meal-prep_default` joins the container to the stack's own network, which is why
+`EXPORT_DATABASE_URL` names the host `db:5432`: Compose publishes no Postgres port, so there is no
+`127.0.0.1:5432` to reach and `--network host` fails to connect. For the same reason, running
+`node packages/api/src/export.js` bare from a checkout on the host does not work against this
+stack; use the `docker run` form.
 
 Read the diff before answering. It names the tab, counts the rows that would be added, removed and
 changed, and for a changed row names the column and shows both sides of it. Approving takes the whole
