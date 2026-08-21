@@ -54,6 +54,9 @@ pipeline at all, so the check runs where every other check runs, in `npm test`. 
 carries the box for running the suite on a push, and this becomes true the day that lands. Left `[~]`
 rather than `[x]` because the word in the box is the part that is not yet done.
 
+2026-08-20: that day arrived. Ticket 16's `ci.yml` runs `npm test` on every push, so the check now
+runs in CI, and `npm run record` in both publish jobs regenerates the recording every build.
+
 **Best Matches records empty, and the reason first written down was wrong.** `bestMatches.js` admits
 a Recipe on Pantry overlap or on nothing Missing, the second being the Recipe built from Staples
 alone, so the ranking does not strictly need a Pantry tick. The Seed simply satisfies neither: no

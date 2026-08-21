@@ -14,8 +14,13 @@ checking that it is reachable from exactly one place.
 - HTTPS certificates enabled for the tailnet, on the DNS page of the Tailscale admin console.
   `tailscale serve` needs them and offers to enable them the first time you run it.
 - Both phones already on the tailnet.
-- An image reference to put in `MEAL_PREP_IMAGE`. Until a pipeline publishes one, build it on the
-  host from a checkout, once `.env` exists to name the tag:
+- An image reference to put in `MEAL_PREP_IMAGE`. The pipeline (ticket 16) publishes
+  `ghcr.io/philliam-nguyen/meal-prep-app` on every push to `main`, tagged with the commit SHA and a
+  moving `main`; pin the SHA, never `main` or `latest`. Pulling needs no credential because the
+  package is public. That visibility is inherited from the repository being public, so it flips
+  silently if the repository ever goes private - a pull refused with "denied" months from now means
+  check the package's visibility in GitHub's package settings first, not the credentials. To build
+  locally instead (a checkout with `.env` beside it):
   `docker compose -f compose.yaml -f compose.build.yaml build`. That produces the tag
   `MEAL_PREP_IMAGE` names, so a local build and a pull are the same artifact under the same name.
 
