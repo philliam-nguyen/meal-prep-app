@@ -99,24 +99,24 @@ the host half cannot.
 
 **Unblocks:** 15's four remaining verification boxes, 16's bundle half, and 25 in full.
 
-- [ ] A second Compose project runs on the host with its own Postgres container, its own volume and
+- [x] A second Compose project runs on the host with its own Postgres container, its own volume and
       its own network, tellable apart from `meal-prep` at the prompt
 - [ ] Neither stack's `.env` shares a password with the other
-- [ ] The demo API publishes no port on the host, and the only path to it is the sidecar
+- [x] The demo API publishes no port on the host, and the only path to it is the sidecar
 - [ ] The sidecar enrols tagged `tag:demo`, and the auth key never lands in the repository, in a
       log, or in a shell history
-- [ ] A tailnet policy file is versioned in this repository and synced, carrying the
+- [x] A tailnet policy file is versioned in this repository and synced, carrying the
       `tag:proxy` to `tag:demo` grant, the existing `ssh` rule and the `tagOwners` entries
-- [ ] `tag:proxy` reaches the demo API over the tailnet, and a third tailnet device does not
+- [x] `tag:proxy` reaches the demo API over the tailnet, and a third tailnet device does not
 - [ ] The demo's `.env` sets `TRUST_PROXY=2`, `RECIPES_MAX=200`, the CloudFront origin in
       `CORS_ORIGIN`, and a `SITE_NOTICE` a visitor can read
-- [ ] `.gitignore` covers the demo env file, verified with `git check-ignore`
+- [x] `.gitignore` covers the demo env file, verified with `git check-ignore`
 - [ ] Container memory and CPU limits are set, and the Postgres volume has a size cap
 - [ ] `DOCKER-USER` rules drop demo-network egress to private ranges except its own database, and
       survive a reboot
 - [ ] The Seed restore runs on a six-hour timer as the owner role, and a failed run is noticed
       rather than silent
-- [ ] Migrations apply before the API starts, the same gate ticket 13 documented
+- [x] Migrations apply before the API starts, the same gate ticket 13 documented
 
 ## Comments
 
@@ -124,3 +124,44 @@ the host half cannot.
 believed the backend already existed, which is a reasonable thing to believe when three tickets and
 two ADRs discuss it in the present tense. Worth recording as a tracker failure rather than a memory
 one: ticket 25 names a blocker that does not deliver what it is blocked on, and nothing catches that.
+
+**2026-08-20: the stack is up, and six boxes close on evidence rather than on inspection.**
+`docker compose ls` shows two projects; the demo's volumes are `meal-prep-demo_database` and
+`meal-prep-demo_tailscale` and its network `meal-prep-demo_default`, all distinct from the Homelab
+Variant's. `docker compose config` renders zero `ports:` keys and `docker ps` shows no published
+port on the API. The sidecar enrolled at `100.78.72.5` tagged `tag:demo`, and the migration
+container exited cleanly before the API started, which is ticket 13's gate holding on a second
+stack.
+
+The grant was tested in both directions in the same minute, which is the habit ticket 12 established
+and ticket 13 applied to a deployment. From the AWS proxy,
+`curl http://100.78.72.5:8080/api/health` answers `200`. From a third tailnet device that is neither
+tagged nor the proxy, the same request answers `000`, curl's code for never having connected. A
+positive test alone would have proven only that something answers.
+
+**Two build corrections worth keeping.** The sidecar needs `TS_DEBUG_FIREWALL_MODE=nftables`.
+Ubuntu's iptables is the nftables backend and the container defaults to the legacy binary, which
+fails to create Tailscale's chains with "Table does not exist"; tailscaled carries on and enrols
+anyway, so the symptom is a health warning and absent firewall rules rather than a container that
+stops. It is invisible unless the log is read.
+
+And `meal-prep-app:local` on the host predated ticket 23, so the API crash-looped on
+`TRUST_PROXY must be "true" or "false", got "2"`. `git pull` updates the source and changes nothing
+about what runs. Until ticket 16 publishes to GHCR, a pull needs a rebuild beside it, and the tag
+is shared with the Homelab Variant, so the rebuild is a change to both stacks at their next
+recreate.
+
+**Not closed, and why.** The volume size cap ADR-0010 asks for is not expressible in Compose's local
+driver, so it stays host state and is still absent. The `DOCKER-USER` rules and the restore timer
+are not built. The password box wants one look at the two `.env` files rather than an assumption,
+and the auth-key box wants a decision recorded: `TS_AUTHKEY` reaches the container as an environment
+variable, so it is visible to `docker inspect` on the host, which is a weaker posture than ticket
+15's SSM parameter and should be written down as accepted rather than left unnoticed.
+
+**Unrelated, and the host is now load-bearing.** PID 1 segfaulted on this machine during the work,
+in `libsystemd-shared-259.so`, after containerd failed to start three times in fifteen seconds. The
+host stayed up for ten days before it and the containers kept running throughout, because the shims
+outlive containerd. Recovered with a reboot. `systemd-coredump` is not installed, so there is no
+dump. What killed containerd first is unknown and is the root cause; the systemd crash looks like a
+consequence of the restart loop. ADR-0008 already accepts that the demo depends on this host, but it
+assumed the failure mode was power and internet rather than the init system.
