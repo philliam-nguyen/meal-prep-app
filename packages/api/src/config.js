@@ -139,6 +139,26 @@ const SEED_ORIGIN = 'seed://restore';
 const SEED_WRITE_RATE_LIMIT = Number.MAX_SAFE_INTEGER;
 
 /**
+ * For the export back to the spreadsheet, which only reads.
+ *
+ * A connection string of its own rather than the API's, because this is a command an Operator runs
+ * by hand against whichever deployment they mean to copy, and because it should be the restricted
+ * role: the export has no business holding a credential that can truncate. No guardrails are read -
+ * nothing here answers a browser or accepts a write - and no default is offered for any of the
+ * three, since a spreadsheet nobody named is not a spreadsheet to guess at (ADR-0011).
+ */
+export function readExportConfig(env = process.env) {
+  return {
+    databaseUrl: required(env, 'EXPORT_DATABASE_URL'),
+    spreadsheetId: required(env, 'SHEETS_SPREADSHEET_ID'),
+    // A path to the service account key file rather than the key itself. A PEM private key does not
+    // survive a `.env` line, and a file is the form Google hands it out in, so the credential stays
+    // one thing on disk with its own permissions instead of being reshaped into a variable.
+    credentialsFile: required(env, 'SHEETS_CREDENTIALS_FILE'),
+  };
+}
+
+/**
  * For the Seed restore, which connects as the owner role because it empties the database before it
  * loads, and the API's role deliberately cannot.
  */

@@ -17,6 +17,12 @@ Thumbs.db
 # credential
 ops/backup/backup.env
 
+# The spreadsheet export's Google service account key: a private key in a JSON file. It belongs
+# outside this checkout entirely; this is here so that a copy landing in it by accident is not one
+# `git add .` away from being published.
+*service-account*.json
+*credentials*.json
+
 # Draft designs: ephemeral, superseded by the spec they become
 docs/drafts/*
 
