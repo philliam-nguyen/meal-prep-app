@@ -1,0 +1,17 @@
+[Unit]
+Description=Run meal-prep-seed-restore.service every six hours
+
+[Timer]
+# Six hours, from docs/adr/0010-demo-guardrails-on-shared-hardware.md. This interval is a security
+# parameter: it is the longest anything an attacker stores can stay in the Demo Variant.
+OnCalendar=00,06,12,18:00:00
+# If the host was off at the scheduled time, restore once on the next boot rather than waiting for
+# the next slot. A demo that comes back up still holding a visitor's leftovers is the state this
+# exists to prevent.
+Persistent=true
+# So four instances across a tailnet do not all restore on the same second. Small, because the
+# schedule is a ceiling and not an appointment.
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target

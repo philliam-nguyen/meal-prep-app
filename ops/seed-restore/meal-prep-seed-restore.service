@@ -1,0 +1,13 @@
+[Unit]
+Description=Restore the Demo Variant's Seed, clearing whatever accumulated since the last run
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# Adjust to wherever the checkout actually lives on the host, matching ops/backup's units.
+WorkingDirectory=/opt/meal-prep-app
+# Through bash explicitly, for the reason ops/backup/meal-prep-backup.service records: a checkout
+# without the executable bit would otherwise make an installed unit a silent no-op.
+ExecStart=/bin/bash /opt/meal-prep-app/ops/seed-restore/restore.sh

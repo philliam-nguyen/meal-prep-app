@@ -112,8 +112,8 @@ the host half cannot.
       `CORS_ORIGIN`, and a `SITE_NOTICE` a visitor can read
 - [x] `.gitignore` covers the demo env file, verified with `git check-ignore`
 - [ ] Container memory and CPU limits are set, and the Postgres volume has a size cap
-- [ ] `DOCKER-USER` rules drop demo-network egress to private ranges except its own database, and
-      survive a reboot
+- [x] `DOCKER-USER` rules drop demo-network egress to private ranges except its own database
+- [ ] Those rules survive a reboot, checked after one rather than assumed from `systemctl enable`
 - [ ] The Seed restore runs on a six-hour timer as the owner role, and a failed run is noticed
       rather than silent
 - [x] Migrations apply before the API starts, the same gate ticket 13 documented
@@ -165,3 +165,30 @@ outlive containerd. Recovered with a reboot. `systemd-coredump` is not installed
 dump. What killed containerd first is unknown and is the root cause; the systemd crash looks like a
 consequence of the restart loop. ADR-0008 already accepts that the demo depends on this host, but it
 assumed the failure mode was power and internet rather than the init system.
+
+**2026-08-20: one chain was not enough, and the test that said otherwise was wrong twice.**
+`DOCKER-USER` sits in FORWARD, so it governs traffic routed *through* the host: other LAN devices,
+other Docker networks. Traffic addressed to the host itself is delivered locally through INPUT and
+never reaches DOCKER-USER at all. With only DOCKER-USER installed, a demo container reached
+`192.168.50.106:22` on the first try. The rules now go into both chains, seven in total, and the
+script fails loudly if it does not end with exactly that many.
+
+Two wrong tests preceded the right one, and both are worth keeping because both looked like passes.
+The first aimed at the Homelab Variant's Postgres on another Docker network and came back blocked
+before any rule existed: Docker already isolates separate user-defined bridge networks, so that
+test could never have failed. The second aimed at the host and came back reached with five rules
+installed, which read as the rules not working when it was actually the chain being wrong. A
+control tested only against a target that was already unreachable is a control with no evidence
+behind it.
+
+Proven in the same session, rules present and counted at test time: the host's sshd blocked, the
+router at `192.168.50.1:80` blocked, the demo API still healthy against its own Postgres, and the
+AWS proxy still answering 200 through the tailnet. The last two are what catch an over-broad rule,
+and a flat INPUT drop is the blunt option, so they matter more than the two negatives.
+
+**What DOCKER-USER cannot do, recorded rather than discovered later.** These rules constrain the
+demo *network*. They say nothing about a process that escapes the container onto the host, which is
+the risk ADR-0010 accepts rather than mitigates. Two host-side bindings are load-bearing alongside
+them: ticket 13's decision to bind the Homelab Variant's API to `127.0.0.1` means a demo container
+reaching the host's LAN address finds nothing listening there, and ADR-0010's requirement that the
+local model runtime stay bound away from the network is now a control rather than tidiness.
