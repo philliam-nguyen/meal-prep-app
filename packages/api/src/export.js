@@ -67,12 +67,9 @@ try {
     // implementation of the same rollup answering slightly differently (ADR-0009 records the same
     // reasoning for the recorded Seed).
     tabs: exportTabs(await readState(pool)),
-    approve: previewOnly
-      ? async () => {
-          log('--dry-run: nothing was written.');
-          return false;
-        }
-      : askTheOperator,
+    // A preview declines silently; runExport announces the one outcome either way, and a second
+    // line saying the same thing is one line the Operator learns to skip.
+    approve: previewOnly ? async () => false : askTheOperator,
     log,
   });
 

@@ -1,6 +1,6 @@
 # 18 - Approval-gated export back to the spreadsheet
 
-Status: ready-for-agent
+Status: ready-for-human
 
 **What to build:** The Operator reviews a diff and approves before anything writes to the spreadsheet,
 so it stays a readable copy they trust rather than a mirror of whatever just happened.
@@ -89,3 +89,20 @@ and ADR-0011 says so in as many words. The Operator finds out whether Google ans
 the first run.
 
 **Verification:** `npm test` at the root, all green - 288 API, 23 shared, 17 web, 17 root, 0 failures.
+
+**Reviewed** on the branch, two axes (standards and spec). The spec axis traced the write path and
+confirmed the gate: every read and the whole diff display happen before `approve` is asked, a decline
+or a non-terminal stdin returns before any `writeTab`, and `writeTab` is the only thing that creates
+tabs. Fixed from the review: the Recipes tab header now says `Recipe Type` rather than `Type`; the
+diff summary no longer counts the header row as an unchanged row; `--dry-run` no longer prints two
+lines for one outcome (the preview declines silently and `runExport` announces "not approved: the
+spreadsheet was not touched"); two comments used vocabulary `CONTEXT.md` avoids ("food",
+"production") and now use the glossary's terms. Left as noted, not fixed: the token cache in
+`sheetsClient.js` outlives a single run's needs, `runExport` re-finds a tab by title that `diffTab`
+could have carried, and a row literally named `soup (2)` beside two rows named `soup` would collide
+in the diff keying - all judged too small to churn reviewed code over.
+
+**Status is `ready-for-human`** rather than `done`: `done` requires every checklist item ticked
+(docs/agents/triage-labels.md), and the phone-readability check needs a person with a phone and a
+real spreadsheet. Everything an agent can verify is built, tested and reviewed; the first live
+`--dry-run` and the phone check are the Operator's.

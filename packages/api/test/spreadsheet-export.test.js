@@ -44,7 +44,7 @@ describe('the Recipes tab', () => {
     );
 
     assert.deepEqual(tab(tabs, 'Recipes').rows, [
-      ['Recipe', 'Type', 'Ingredients', 'Recipe Card', 'Selected'],
+      ['Recipe', 'Recipe Type', 'Ingredients', 'Recipe Card', 'Selected'],
       ['Chana Masala', 'dinner', '2 cup chickpeas, salt', 'https://example.test/chana', ''],
     ]);
   });
@@ -83,7 +83,7 @@ describe('the Shopping List tab', () => {
 
 describe('the Pantry tab', () => {
   // Two lists arrive, because a Staple never appears on the Pantry checklist. One tab, because the
-  // question a person asks it is "what does the kitchen hold", and the answer includes the foods
+  // question a person asks it is "what does the kitchen hold", and the answer includes the Ingredients
   // nobody is asked about any more. The Staple column is what keeps the distinction visible.
   it('lists what is on hand and the Staples that are never asked about, by name', () => {
     const tabs = exportTabs(
@@ -161,7 +161,7 @@ describe('the diff against what the spreadsheet holds', () => {
     });
 
     assert.deepEqual(diff.changed, []);
-    assert.equal(diff.unchanged, 2);
+    assert.equal(diff.unchanged, 1);
   });
 
   // Recipe names are not unique the way Ingredient names are: nothing in the schema stops two
@@ -177,7 +177,7 @@ describe('the diff against what the spreadsheet holds', () => {
     assert.deepEqual(diff.added, []);
     assert.deepEqual(diff.removed, []);
     assert.deepEqual(diff.changed, []);
-    assert.equal(diff.unchanged, 3);
+    assert.equal(diff.unchanged, 2);
   });
 });
 
@@ -327,7 +327,7 @@ describe('the diff the Operator reads', () => {
     );
 
     assert.deepEqual(lines, [
-      'Shopping List: 0 added, 0 removed, 1 changed, 1 unchanged',
+      'Shopping List: 0 added, 0 removed, 1 changed, 0 unchanged',
       '  ~ flour',
       '      Aisle: "Baking" -> "Store cupboard"',
     ]);

@@ -1,7 +1,7 @@
 // The approval-gated export back to the spreadsheet (ticket 18).
 
 /**
- * A quantity, a unit and optionally the food, as a person reads it: "2 cup chickpeas", "300 g", or
+ * A quantity, a unit and optionally the Ingredient, as a person reads it: "2 cup chickpeas", "300 g", or
  * just "salt" where nobody quantified it.
  *
  * A null quantity is "to taste" and stays absent rather than becoming a zero, which is the same
@@ -16,7 +16,7 @@ const readable = ({ quantity, unit, name }) =>
 const recipesTab = (recipes) => ({
   title: 'Recipes',
   rows: [
-    ['Recipe', 'Type', 'Ingredients', 'Recipe Card', 'Selected'],
+    ['Recipe', 'Recipe Type', 'Ingredients', 'Recipe Card', 'Selected'],
     ...recipes.map((recipe) => [
       recipe.name,
       recipe.type,
@@ -127,13 +127,17 @@ export function diffTab({ title, current, desired }) {
   const before = new Map(current.map((row) => [keyOfCurrent(row), row]));
   const added = [];
   const changed = [];
+  let unchanged = 0;
 
-  for (const row of desired) {
+  for (const [index, row] of desired.entries()) {
     const key = keyOfDesired(row);
     const was = before.get(key);
     before.delete(key);
     if (!was) added.push({ key, row });
     else if (!sameRow(was, row)) changed.push({ key, before: was, after: row });
+    // The header row is layout rather than data, so a matching one is not an unchanged row - counting
+    // it would overstate every summary the Operator reads by one.
+    else if (index > 0) unchanged += 1;
   }
 
   const removed = [...before].map(([key, row]) => ({ key, row }));
@@ -143,7 +147,7 @@ export function diffTab({ title, current, desired }) {
     added,
     removed,
     changed,
-    unchanged: desired.length - added.length - changed.length,
+    unchanged,
   };
 }
 
@@ -222,7 +226,7 @@ export async function runExport({ client, tabs, approve, log = () => {} }) {
   }
 
   if (!(await approve(diffs))) {
-    log('declined: the spreadsheet was not touched');
+    log('not approved: the spreadsheet was not touched');
     return { diffs, changes: true, approved: false, written: [] };
   }
 

@@ -6,7 +6,7 @@
 // would be the only dependency in this project that the API image carries and never runs: the export
 // is an operator command, the image is what both Variants deploy, and a few dozen lines of `fetch`
 // against two documented endpoints is a smaller thing to own than tens of megabytes of transitive
-// packages sitting in a production image for a command nobody schedules.
+// packages sitting in the image both Variants deploy for a command nobody schedules.
 //
 // There was no Sheets client to inherit. The Sheets-era app read four tabs from the browser with an
 // API key and wrote through an Apps Script web app that was never committed (ADR-0004), so the write
