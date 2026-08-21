@@ -397,3 +397,9 @@ One operational note the next rebuild should remember: instance replacement now 
 CloudFront deployment waits (new origin, then distribution repoint). That is the price of the
 VPC-origin design and it is fine for a demo, but a config-only nginx change is cheaper applied
 by hand over Tailscale SSH than through a rebuild, at the cost of drift until the next apply.
+
+**2026-08-20: housekeeping done and the upstream is real.** The stale `meal-prep-proxy` node is
+deleted from the tailnet. `demo_upstream` now carries the demo stack's tailnet address,
+100.78.72.5, replacing the placeholder. Ticket 27 is finished, so the homelab-stopped state is
+no longer the permanent condition; of the two blockers on the remaining checkboxes only 16 (the
+bundle in the bucket) still stands.
