@@ -1,0 +1,21 @@
+[Unit]
+Description=Egress rules confining the Demo Variant's Docker network
+# After docker.service because DOCKER-USER does not exist until Docker has started, and rules
+# written into a chain that is not there are rules that are never applied.
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# Stays loaded so `systemctl status` shows the last run rather than "inactive (dead)", which reads
+# like the control is off.
+RemainAfterExit=yes
+# Adjust to wherever the checkout actually lives on the host, matching ops/backup's units.
+WorkingDirectory=/opt/meal-prep-app
+# Through bash explicitly, for the reason ops/backup/meal-prep-backup.service records: a checkout
+# without the executable bit would otherwise make an installed unit a silent no-op.
+ExecStart=/bin/bash /opt/meal-prep-app/ops/demo-egress/egress-rules.sh
+
+[Install]
+WantedBy=multi-user.target
