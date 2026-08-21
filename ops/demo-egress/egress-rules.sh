@@ -47,7 +47,7 @@ while read -r rule; do
   [[ -z "$rule" ]] && continue
   # shellcheck disable=SC2086
   iptables -t filter -D DOCKER-USER ${rule#-A DOCKER-USER }
-done < <(iptables-save -t filter | grep -F -- "--comment \"$MARKER\"" | grep '^-A DOCKER-USER' || true)
+done < <(iptables-save -t filter | grep -F -- "--comment $MARKER" | grep '^-A DOCKER-USER' || true)
 
 add() {
   iptables -I DOCKER-USER "$@" -m comment --comment "$MARKER"
@@ -70,4 +70,13 @@ add -s "$DEMO_SUBNET" -d "$DEMO_SUBNET" -j RETURN
 # is never mistaken for the demo reaching out.
 add -s "$DEMO_SUBNET" -m conntrack --ctstate ESTABLISHED,RELATED -j RETURN
 
-log "installed $(iptables-save -t filter | grep -c -F -- "--comment \"$MARKER\"") rules in DOCKER-USER"
+# Counted unquoted on purpose: iptables-save only puts quotes around a comment that contains
+# spaces, and this marker has none. Matching the quoted form found nothing, which reported zero
+# rules installed while five sat in the chain, and left the cleanup above unable to find its own
+# previous generation - so a second run duplicated every rule instead of replacing it.
+installed="$(iptables-save -t filter | grep -c -F -- "--comment $MARKER" || true)"
+log "installed $installed rules in DOCKER-USER"
+if [[ "$installed" -ne 5 ]]; then
+  log "FATAL: expected 5 rules, found $installed"
+  exit 1
+fi
