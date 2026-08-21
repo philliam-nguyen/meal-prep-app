@@ -25,7 +25,7 @@ on its timer, not a backup, and it deliberately has no history worth keeping.
 
 **Blocked by:** 13 (the Homelab Variant running).
 
-- [ ] A dump runs on a nightly schedule with no human involved
+- [x] A dump runs on a nightly schedule with no human involved
       **Script side proven; installation is the Operator's.** `ops/backup/dump.sh` and
       `check-backup.sh` need no interactive input anywhere in their paths - every run in this
       ticket's verification, automated and manual, ran unattended and either succeeded or failed
@@ -180,3 +180,57 @@ None were wrong.
 Three new tests, ten total, still all green. Full suite: 261 + 23 + 10 + 10 = 304 passing; the one
 pre-existing `test/compose.test.js` failure (`docker` CLI absent from this sandbox's `PATH`) is
 unchanged from before this ticket and unrelated to it.
+
+**2026-08-20: reopened. This was marked done with an unticked box, and the backups do not exist.**
+Found while wiring the Demo Variant's restore to this ticket's alert channel: `NTFY_TOPIC` was
+unset, which led to checking whether anything here was installed. Nothing is. On the host,
+`ops/backup/backup.env` does not exist, `systemctl list-timers meal-prep-backup` lists zero timers,
+and `journalctl -u meal-prep-backup` has no entries at all. The Homelab Variant has never been
+dumped.
+
+The ticket itself was honest. Box one is unticked and says in as many words that the timer is
+"delivered but not installed" and names runbook "Operator install steps" 4-6 as what remains. The
+status line contradicted the checklist, and the status line is what anyone reads.
+`docs/agents/triage-labels.md` already states the rule that was broken: write `done` once the work
+is committed *and its checklist items are ticked*.
+
+Worth stating because it is the second tracker failure found today, after ticket 25 naming a
+blocker that did not deliver what it was blocked on. Both were caught by accident while doing
+something else, which means neither would have been caught by reading the tracker.
+
+What this did *not* cost, this time: ticket 17 has not run, so the real collection is still in the
+spreadsheet with its own version history, which is exactly the protection this ticket exists to
+replace. That ordering held by luck rather than by design, and 17 is explicitly blocked by this
+ticket for this reason. Install the timers before cutover, not after.
+
+**2026-08-20: installed on the host, and the last box closes.** Runbook steps 1-6 were run.
+`backup.env` exists with `NTFY_TOPIC` and `OFFSITE_DEST` set, `chmod 600`. Both timers are enabled
+and `systemctl list-timers 'meal-prep-*'` lists the backup at 02:30 and the check at 09:00 with
+next-run times, alongside ticket 27's Seed restore at 00:00. One dump ran to completion and its
+`.sql` landed both in `BACKUP_DIR` and on the offsite share.
+
+Offsite is an SMB share on the Operator's Windows desktop, mounted at `/mnt/backup-pc` over the
+tailnet address so it resolves regardless of which network either machine is on. `noauto` with
+`x-systemd.automount` so a boot with the desktop switched off does not hang, and `file_mode=0600`
+because a dump is the whole Recipe collection in plain SQL and the cifs default would leave it
+world-readable on the homelab. The share is served by a dedicated non-administrator Windows account
+with Modify on one folder, for the same reason the API connects as a role with no DDL rights.
+
+S3 was rejected despite the AWS account already existing.
+[ADR-0010](../../../docs/adr/0010-demo-guardrails-on-shared-hardware.md) rests part of its risk
+acceptance on no long-lived AWS credential being on the homelab, so a backup credential there would
+have quietly removed the property that ADR leans on.
+
+Honest about what this offsite copy is: a second machine in the same house. It covers a dead disk,
+which is what this ticket asks for. It does not cover fire or theft.
+
+**The alert path proved itself on a real failure rather than a drill.** The first run failed because
+`OFFSITE_DEST` was still blank, `dump.sh` refused rather than keeping the dump local, and the
+notification arrived on the phone. Runbook step 7's deliberate breakage is therefore covered by an
+accidental one, which is better evidence.
+
+**Unobserved, and the check timer is the safety net:** nobody has watched a real 02:30 firing yet.
+`Persistent=true` covers a host that was off, and `meal-prep-backup-check.timer` at 09:00 alerts on
+a missing or zero-byte dump, so the first silent failure reports itself rather than waiting to be
+noticed. Ticking on that basis rather than on a fourteen-hour wait, and recording it so the basis is
+visible.
