@@ -108,7 +108,7 @@ the host half cannot.
 - [x] A tailnet policy file is versioned in this repository and synced, carrying the
       `tag:proxy` to `tag:demo` grant, the existing `ssh` rule and the `tagOwners` entries
 - [x] `tag:proxy` reaches the demo API over the tailnet, and a third tailnet device does not
-- [ ] The demo's `.env` sets `TRUST_PROXY=2`, `RECIPES_MAX=200`, the CloudFront origin in
+- [x] The demo's `.env` sets `TRUST_PROXY=2`, `RECIPES_MAX=200`, the CloudFront origin in
       `CORS_ORIGIN`, and a `SITE_NOTICE` a visitor can read
 - [x] `.gitignore` covers the demo env file, verified with `git check-ignore`
 - [ ] Container memory and CPU limits are set, and the Postgres volume has a size cap
@@ -210,3 +210,25 @@ for exactly this and this unit does not use it, which matters more here than for
 says the restore is the control bounding how long anything an attacker stored survives, and a
 control that silently stops running is worse than one that was never installed. An `OnFailure=`
 pointing at the existing alert path would close it.
+
+**2026-08-20: the Site Notice is in the payload, and the alert path is wired.** `GET /api/state`
+through the AWS proxy carries
+`"notice":"This is a public demo. The data is a fixture and it is restored every six hours."`, so
+ticket 24's app half is reading this Variant's `.env` rather than a default. `TRUST_PROXY=2` is
+proven by the API starting at all: `flagOrHopCount` throws on anything that is not `true`, `false`
+or a positive integer, so a process that came up read the hop count.
+
+The restore now alerts through ticket 14's `ops/backup/alert.sh` rather than growing a second
+channel, on both failure paths: a run that fails, and a run that cannot start because a file is
+missing. The second is the quieter one, since the timer keeps firing and every run exits 1.
+
+It deliberately does *not* call `require_alert_channel()`, which ticket 14's scripts do. That
+refuses to start when no channel is configured, on the grounds that a backup nobody hears about is
+worse than none. The reasoning inverts here: ADR-0010 makes this restore the control bounding how
+long anything an attacker stored survives, so refusing to run because ntfy is unset would trade a
+real control for a reporting one. `alert()` already logs loudly when it has nowhere to send.
+
+The files being under `ops/backup/` while a non-backup script sources them is untidy and recorded
+rather than fixed: what they actually are is this host's one way of reaching the Operator. Worth
+moving to `ops/common/` next time either is touched, which is a change to ticket 14's delivered
+work and so not this ticket's to make.
