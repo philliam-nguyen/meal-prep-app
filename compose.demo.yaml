@@ -1,0 +1,146 @@
+# The Demo Variant's backend: API and Postgres on the homelab, in a Compose project of their own,
+# reached from the AWS proxy over the tailnet (docs/adr/0008-demo-backend-on-the-homelab.md).
+#
+#   docker compose -f compose.demo.yaml --env-file .env.demo up -d
+#
+# Separate project, separate Postgres container, separate volume, separate network, separate .env.
+# Not a second database in the Homelab Variant's cluster: Postgres roles are global to a cluster, so
+# separation inside one is a GRANT statement, which is a promise rather than a mechanism.
+#
+# Nothing here builds, for the reason compose.yaml records. Until ticket 16 publishes to GHCR, build
+# the tag on the host with compose.build.yaml against compose.yaml and both stacks run the result.
+#
+# What is deliberately absent: any `ports:` key. The Homelab Variant publishes to 127.0.0.1 because
+# `tailscale serve` runs on the host. This stack's Tailscale node is the sidecar below, so the API
+# needs no host binding at all, and giving it one would put an anonymous writable service on the
+# host's loopback beside the real one.
+
+name: meal-prep-demo
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env.demo}
+      POSTGRES_USER: ${POSTGRES_OWNER_ROLE:?set POSTGRES_OWNER_ROLE in .env.demo}
+      POSTGRES_PASSWORD: ${POSTGRES_OWNER_PASSWORD:?set POSTGRES_OWNER_PASSWORD in .env.demo}
+    volumes:
+      - database:/var/lib/postgresql/data
+    # ADR-0010: container limits and a volume cap are what replaced the AWS Budgets alarm and the
+    # task and storage ceilings, on hardware where exhaustion means a full disk rather than a bill.
+    # The volume cap is not expressible here; see the `database` volume at the bottom of this file.
+    mem_limit: 512m
+    cpus: 1.0
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  migrate:
+    image: ${MEAL_PREP_IMAGE:?set MEAL_PREP_IMAGE in .env.demo to the image tag you mean to run}
+    command: ['node', 'packages/api/src/migrate.js']
+    environment:
+      MIGRATION_DATABASE_URL: postgres://${POSTGRES_OWNER_ROLE}:${POSTGRES_OWNER_PASSWORD}@db:5432/${POSTGRES_DB}
+      APP_DB_ROLE: ${APP_DB_ROLE:?set APP_DB_ROLE in .env.demo}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?set APP_DB_PASSWORD in .env.demo}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: 'no'
+
+  # The Demo Variant's own Tailscale node. Kernel networking rather than the image's default
+  # userspace mode, because the API below shares this container's network namespace and a userspace
+  # tailnet address is not an interface anything can bind to. That is what /dev/net/tun and
+  # NET_ADMIN are for.
+  #
+  # TS_ACCEPT_DNS is off on purpose: tailscaled would otherwise point resolv.conf at MagicDNS and
+  # the API would stop resolving `db` through Docker's embedded resolver.
+  tailscale:
+    image: tailscale/tailscale:stable
+    hostname: meal-prep-demo
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:?set TS_AUTHKEY in .env.demo to a tag:demo auth key}
+      TS_EXTRA_ARGS: --advertise-tags=tag:demo
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: 'false'
+      TS_ACCEPT_DNS: 'false'
+    volumes:
+      - tailscale:/var/lib/tailscale
+    devices:
+      - /dev/net/tun
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
+
+  api:
+    image: ${MEAL_PREP_IMAGE}
+    # Shares the sidecar's network namespace, so the API answers on the tailnet address and on
+    # nothing else. The tailnet grant in ops/tailnet/policy.hujson is what decides who may reach it,
+    # and it names tag:proxy alone.
+    network_mode: service:tailscale
+    environment:
+      DATABASE_URL: postgres://${APP_DB_ROLE}:${APP_DB_PASSWORD}@db:5432/${POSTGRES_DB}
+      PORT: 8080
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      CORS_ORIGIN: ${CORS_ORIGIN:?set CORS_ORIGIN in .env.demo to the CloudFront hostname}
+      BODY_LIMIT_BYTES: ${BODY_LIMIT_BYTES}
+      WRITE_RATE_LIMIT: ${WRITE_RATE_LIMIT}
+      WRITE_RATE_WINDOW_MS: ${WRITE_RATE_WINDOW_MS}
+      RECIPES_MAX: ${RECIPES_MAX}
+      # Two appending proxies stand in front of this: CloudFront, then nginx on the AWS instance.
+      # The count is only right while both append (ticket 23, ADR-0008).
+      TRUST_PROXY: ${TRUST_PROXY}
+      # Set here, unlike the Homelab Variant, because this instance has something to announce.
+      SITE_NOTICE: ${SITE_NOTICE}
+    mem_limit: 512m
+    cpus: 1.0
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      tailscale:
+        condition: service_started
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:8080/api/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    restart: unless-stopped
+
+  # The scheduled restore, run by a systemd timer rather than by Compose:
+  #
+  #   docker compose -f compose.demo.yaml --env-file .env.demo run --rm seed
+  #
+  # Behind a profile so `up` never starts it. It truncates and reloads, so it clears whatever an
+  # attacker stored as well as whatever a visitor accumulated, which is why ADR-0010 lists its
+  # six-hour schedule among security controls rather than among housekeeping. Owner credentials,
+  # because truncating is not something the API's restricted role may do.
+  seed:
+    image: ${MEAL_PREP_IMAGE}
+    command: ['node', 'packages/api/src/seed.js']
+    profiles: ['seed']
+    environment:
+      SEED_DATABASE_URL: postgres://${POSTGRES_OWNER_ROLE}:${POSTGRES_OWNER_PASSWORD}@db:5432/${POSTGRES_DB}
+      RECIPES_MAX: ${RECIPES_MAX}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: 'no'
+
+volumes:
+  # ADR-0010 wants a size cap on this. Compose's local driver has no size option, so the cap is host
+  # state: back this path with a fixed-size filesystem (a loopback ext4 image, or an XFS project
+  # quota) and record it in the runbook per ticket 25. Left uncapped, a visitor writing up to
+  # RECIPES_MAX every six hours is bounded, but a bug or an unbounded log is not.
+  database:
+  tailscale:
