@@ -148,7 +148,9 @@ before(async () => {
   const deadline = Date.now() + 30_000;
   for (;;) {
     const execInstance = await container.exec({
-      Cmd: ['pg_isready', '-U', dbRole],
+      // TCP, not the default unix socket: the image's init-phase temporary server listens on the
+      // socket only, so a socket probe can report ready during init and race the real restart.
+      Cmd: ['pg_isready', '-h', '127.0.0.1', '-U', dbRole],
       AttachStdout: true,
       AttachStderr: true,
     });
