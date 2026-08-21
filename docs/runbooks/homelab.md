@@ -272,6 +272,78 @@ That is the correct failure for this case. Recreate the target from a fresh volu
 (`docker compose down -v` on a throwaway stack, never on the real one) rather than restoring twice
 into the same database.
 
+## The spreadsheet export
+
+Ticket 18. The spreadsheet the app came off keeps one job after cutover: being readable on a phone by
+somebody with no app in front of them. This is a command you run when you feel like it, and **it is
+not the backup** - the backup is the section above.
+
+Say that part out loud once, because the mistake is only discovered on the day it matters. The
+export's recovery point is the last time you approved a run. Its tabs carry no ids, no Recipe
+Ingredient rows and no foreign keys, so nothing loads back out of them: restoring from this
+spreadsheet is not a slow path, it is not a path. `docs/adr/0011-spreadsheet-export-is-a-convenience-copy.md`
+has the whole contract.
+
+Nothing depends on it running. No Compose service, no timer, no route. Skipping it forever changes
+nothing about the deployment.
+
+### Setting it up (once)
+
+1. **Make a new, empty spreadsheet.** Not the Sheets-era one. That sheet's id is committed in this
+   repository's history and it is shared with anyone holding the link
+   ([ADR-0004](../adr/0004-accept-spreadsheet-exposure-until-cutover.md)), so exporting into it would
+   republish the collection cutover just took private - and it is the extract's own source, which
+   ticket 17 needs left intact. Copy the new sheet's id out of its URL:
+   `https://docs.google.com/spreadsheets/d/<the id>/edit`. Share it with nobody.
+2. **Make a Google service account and a key for it.** In the Google Cloud console: a project, the
+   Google Sheets API enabled on it, a service account, then a JSON key on that service account. Put
+   the key file somewhere outside this checkout, `chmod 600` it, and never commit it. Nothing else in
+   the project is granted to it - no roles, no permissions.
+3. **Share the spreadsheet with the service account's email address, as Editor.** That share is the
+   entire access grant: the credential can reach that one file and nothing else in your Drive.
+4. **Fill in three lines of `.env`.** `EXPORT_DATABASE_URL`, `SHEETS_SPREADSHEET_ID` and
+   `SHEETS_CREDENTIALS_FILE`, all documented in `.env.example`. Use the restricted role in the
+   connection string, not the owner: the export only selects. Compose reads none of the three, so
+   leaving them blank is what a host that never exports looks like.
+
+### Running it
+
+Preview first. It shows the diff, asks nobody and writes nothing:
+
+```
+docker run --rm \
+  --network host \
+  --env-file .env \
+  --volume /path/to/key.json:/key.json:ro \
+  --env SHEETS_CREDENTIALS_FILE=/key.json \
+  "$MEAL_PREP_IMAGE" node packages/api/src/export.js --dry-run
+```
+
+The same image with a different command, the way the migration step and the Seed restore are. Drop
+`--dry-run` and add `-it` to be asked for real:
+
+```
+docker run --rm -it \
+  --network host \
+  --env-file .env \
+  --volume /path/to/key.json:/key.json:ro \
+  --env SHEETS_CREDENTIALS_FILE=/key.json \
+  "$MEAL_PREP_IMAGE" node packages/api/src/export.js
+```
+
+From a checkout with `node_modules` present, `node packages/api/src/export.js` on its own does the
+same thing.
+
+Read the diff before answering. It names the tab, counts the rows that would be added, removed and
+changed, and for a changed row names the column and shows both sides of it. Approving takes the whole
+word `yes`; anything else declines and the spreadsheet is not touched. Without `-it` there is no
+terminal to ask at, so the run declines by itself and writes nothing - that is deliberate, and it is
+why an export can never happen by accident from a cron job somebody added.
+
+The tabs are `Recipes`, `Shopping List` and `Pantry`, one row per thing. A tab that would not change
+is not rewritten, and a tab the spreadsheet does not have yet is created by the write, after the
+approval, never before it.
+
 ## When something is wrong
 
 - **The API container restarts in a loop.** `docker compose logs api`. A missing or unparseable
@@ -288,3 +360,12 @@ into the same database.
   means `HOMELAB_DB_CONTAINER` or the actual container name has drifted; check with
   `docker compose ps db`. A failed offsite copy means `OFFSITE_DEST` is unreachable - test the
   `ssh` or the mounted path by hand.
+- **The export refuses without asking anything.** It said stdin is not a terminal. Add `-it` to the
+  `docker run`, or drop `--dry-run` if that is what you passed. It declines rather than blocking, so
+  nothing was written either way.
+- **The export fails with a Google refusal.** The whole body is in the output, because that is where
+  Google puts the reason. `403` on a spreadsheet that exists means the service account was never
+  shared on it; `404` means `SHEETS_SPREADSHEET_ID` is not that sheet's id.
+- **The export proposes to rewrite every row.** Something renamed the tabs or edited them by hand.
+  The export owns those three tabs entirely; put anything you want to keep on a tab of your own,
+  which it never touches.

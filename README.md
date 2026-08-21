@@ -118,6 +118,36 @@ and the suite fails when the committed file differs from what a recording made n
 editing the Seed without rerunning the build is a red test rather than a fallback describing the
 previous fixture. Edit `seedFixture.js`, run `npm run record`, commit both.
 
+## The spreadsheet export
+
+The app came off a Google spreadsheet, and the spreadsheet keeps one job afterwards: being readable
+on a phone by somebody with no app in front of them. An Operator command reads the database, shows
+what would change in three tabs, and writes only what a person answered yes to:
+
+```
+node packages/api/src/export.js --dry-run   # show the diff, ask nobody, write nothing
+node packages/api/src/export.js             # show the diff, then ask
+```
+
+**This is a convenience copy and it is not the backup.** Its recovery point is the last time somebody
+approved a run, the tabs carry no ids and no foreign keys, and nothing loads back out of them. The
+backup is the nightly `pg_dump` in `ops/backup/`, which runs unattended, keeps a month and alerts
+when a dump goes missing. `docs/adr/0011-spreadsheet-export-is-a-convenience-copy.md` covers the
+whole contract, including why the target is a fresh spreadsheet rather than the Sheets-era one.
+
+Nothing in the app or in either deployment depends on this running. There is no Compose service, no
+Terraform resource, no timer and no route: a spreadsheet nobody has exported to since March costs the
+deployment nothing.
+
+It reads three variables, all documented in `.env.example` and none of them read by Compose:
+`EXPORT_DATABASE_URL` (the restricted role - the export only selects), `SHEETS_SPREADSHEET_ID` and
+`SHEETS_CREDENTIALS_FILE`, a path to a Google service account key file that lives outside the
+checkout and is never committed. `docs/runbooks/homelab.md` has the one-time setup.
+
+The tabs are one row per thing and narrow enough to read on a phone: `Recipes` (name, Recipe Type,
+its Recipe Ingredients in one cell, Recipe Card, whether it is a Selected Recipe), `Shopping List`
+(Ingredient, amount per unit, Aisle, Got It) and `Pantry` (Ingredient, in the Pantry, Staple).
+
 ## Tests
 
 ```
