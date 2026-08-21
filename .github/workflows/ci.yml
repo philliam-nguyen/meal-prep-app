@@ -40,3 +40,23 @@ jobs:
           docker build -t "$IMAGE:$GITHUB_SHA" -t "$IMAGE:main" .
           docker push "$IMAGE:$GITHUB_SHA"
           docker push "$IMAGE:main"
+  publish-bundle:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm run build
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.DEMO_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+      - run: aws s3 sync packages/web/dist "s3://${{ vars.DEMO_BUCKET }}" --delete
+      - run: aws cloudfront create-invalidation --distribution-id ${{ vars.DEMO_DISTRIBUTION_ID }} --paths "/*"
