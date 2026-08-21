@@ -1,6 +1,6 @@
 # 27 - Demo Variant: the second Compose stack on the homelab
 
-Status: ready-for-human
+Status: done
 
 **What to build:** The Demo Variant's API and Postgres, running on the homelab in a Compose project
 of their own, reachable from the AWS proxy over the tailnet and from nothing else.
@@ -114,7 +114,7 @@ the host half cannot.
 - [x] Container memory and CPU limits are set on the demo's db and api containers
 - [x] The Postgres volume has a size cap, installed on the host rather than only scripted
 - [x] `DOCKER-USER` rules drop demo-network egress to private ranges except its own database
-- [ ] Those rules survive a reboot, checked after one rather than assumed from `systemctl enable`
+- [x] Those rules survive a reboot, checked after one rather than assumed from `systemctl enable`
 - [x] The Seed restore runs on a six-hour timer as the owner role
 - [x] A failed restore is noticed rather than silent: the journal records it and the alert path
       delivers, proven with a controlled failure rather than read off the code
@@ -286,3 +286,14 @@ unticketed systemd crash. Only the reboot box remains open.
 `sudo iptables-save -t filter | grep -cF -- '--comment meal-prep-demo-egress'` must print 7,
 `findmnt /var/lib/meal-prep-demo/pgdata` must show the loop mount (only after the install script
 has run), and `curl http://100.78.72.5:8080/api/health` from the AWS proxy must answer 200.
+
+**2026-08-20 19:31: a real boot, and everything came back on its own. Ticket closed.** The
+Operator rebooted deliberately to close the last box. Booted 19:31:06;
+`meal-prep-demo-egress.service` ran at 19:31:31 with `ExecMainStatus=0` and the marked rule count
+the Operator read back was exactly 7, so the rules were rewritten into Docker's fresh chains rather
+than surviving by luck. The loop mount returned from fstab before Docker (`/dev/loop25` under the
+demo volume's bind path), all five containers across both stacks came back healthy unattended, and
+all three timers relisted. The grant was retested in both directions in the same minute after
+boot: proxy 200, untagged host 000. That is the whole of ADR-0008 and ADR-0010's host half
+demonstrated to reassemble itself from power-on, which is the property the demo actually depends
+on. Every box is ticked with evidence in these comments; `Status: done`.
