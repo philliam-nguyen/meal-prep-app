@@ -112,7 +112,7 @@ the host half cannot.
       `CORS_ORIGIN`, and a `SITE_NOTICE` a visitor can read
 - [x] `.gitignore` covers the demo env file, verified with `git check-ignore`
 - [x] Container memory and CPU limits are set on the demo's db and api containers
-- [ ] The Postgres volume has a size cap, installed on the host rather than only scripted
+- [x] The Postgres volume has a size cap, installed on the host rather than only scripted
 - [x] `DOCKER-USER` rules drop demo-network egress to private ranges except its own database
 - [ ] Those rules survive a reboot, checked after one rather than assumed from `systemctl enable`
 - [x] The Seed restore runs on a six-hour timer as the owner role
@@ -271,6 +271,16 @@ refuses to start and a restore that alerts, never silent uncapped writes. Verifi
 `docker compose config` accepts the new volume definition and a full restore runs clean against the
 existing volume, so nothing breaks before the script is run; until it is run, the cap does not
 exist and the box above stays open.
+
+**2026-08-20 evening: the volume cap is installed and holding data.** The Operator ran
+`ops/demo-volume/install-volume-cap.sh`; verified afterwards from host state rather than from the
+script's own output. `findmnt` shows `/dev/loop25` ext4 on `/var/lib/meal-prep-demo/pgdata`, `df`
+reports 2.0G with 47M used, which is the size a fresh cluster should be. The volume's device is
+`/var/lib/meal-prep-demo/pgdata/data`, the fstab line is present with
+`x-systemd.before=docker.service`, and all three demo containers came back healthy after the swap.
+End to end through the proxy, `/api/state` serves 19 Recipes, all Protected, with the Site Notice,
+so the Seed restore landed in the new volume. `systemd-coredump` is also now installed for the
+unticketed systemd crash. Only the reboot box remains open.
 
 **Post-reboot checklist for the two boot-survival claims, for whichever reboot comes first:**
 `sudo iptables-save -t filter | grep -cF -- '--comment meal-prep-demo-egress'` must print 7,
