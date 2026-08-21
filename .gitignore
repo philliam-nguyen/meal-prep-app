@@ -33,3 +33,4 @@ docs/drafts/*
 
 # Vendored agent skills, restorable from the committed skills-lock.json
 .claude/
+.scratch/
