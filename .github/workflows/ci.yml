@@ -18,7 +18,7 @@ jobs:
       - run: npm test
   publish-image:
     needs: test
-    if: github.ref == 'refs/heads/postgres-migration'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
