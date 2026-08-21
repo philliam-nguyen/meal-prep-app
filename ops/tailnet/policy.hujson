@@ -1,0 +1,83 @@
+// The tailnet policy for this project's two Variants, versioned here rather than edited in the web
+// console (docs/adr/0008-demo-backend-on-the-homelab.md). The grant restricting tag:demo is the
+// primary containment control for the Demo Variant running on shared hardware, and a control that
+// important should not live somewhere with no history and no review.
+//
+// Sync this file to Tailscale rather than editing the console. The console is downstream of here.
+{
+    // Only tag:demo and tag:proxy are used by this project. autogroup:admin owns both because there
+    // is one user on this tailnet; a second person would want a group here instead.
+    "tagOwners": {
+        "tag:proxy": ["autogroup:admin"],
+        "tag:demo":  ["autogroup:admin"],
+    },
+
+    "grants": [
+        // The Operator's own devices reach each other, which is what the phones use to reach the
+        // Homelab Variant through `tailscale serve` on llm-ubuntu. autogroup:self is devices owned
+        // by the same user, so it excludes tagged devices by construction: neither proxy nor the
+        // demo is reachable through this rule, and neither can use it as a source.
+        {"src": ["autogroup:member"], "dst": ["autogroup:self"], "ip": ["*"]},
+
+        // Tailscale SSH needs this as well as the ssh block below. The ssh rules say who may open a
+        // session and as whom; this says the packets may arrive at all. Without it, SSH to the proxy
+        // fails with the ssh rule sitting right there looking correct. The proxy has no inbound 22
+        // from anywhere else, so this is its only management path.
+        {"src": ["autogroup:member"], "dst": ["tag:proxy"], "ip": ["22"]},
+
+        // The demo path, and the whole point of this file. The AWS proxy reaches the Demo Variant's
+        // API and nothing else about it. The port follows the sidecar wiring chosen in ticket 27; if
+        // that lands on `tailscale serve` terminating TLS instead of plain HTTP over WireGuard, this
+        // becomes 443 and the nginx upstream on the proxy changes with it.
+        {"src": ["tag:proxy"], "dst": ["tag:demo"], "ip": ["8080"]},
+
+        // There is deliberately no grant with tag:demo as src. A compromised demo container can
+        // open no connection to any node on this tailnet: not the homelab host it runs on, not the
+        // phones, not the proxy that calls it. This absence is the control. Adding tag:demo to any
+        // src list re-opens the lateral movement ADR-0010 accepts on the grounds that it cannot.
+    ],
+
+    "ssh": [
+        // Tailscale's default: the Operator into their own devices, with re-authentication.
+        {
+            "action": "check",
+            "src":    ["autogroup:member"],
+            "dst":    ["autogroup:self"],
+            "users":  ["autogroup:nonroot", "root"],
+        },
+        // The AWS proxy. `accept` rather than `check` because a browser re-auth every 12h on the
+        // only management path an instance has is friction with no inbound SSH to fall back on.
+        // Swap to `check` if that friction ever becomes acceptable.
+        {
+            "action": "accept",
+            "src":    ["autogroup:member"],
+            "dst":    ["tag:proxy"],
+            "users":  ["ec2-user", "root"],
+        },
+        // No ssh rule for tag:demo. The demo containers are managed with `docker compose` on the
+        // host, not over the tailnet.
+    ],
+
+    // Named here so the tests below read as intent rather than as four-octet trivia. Tailnet
+    // addresses are stable per node and not per name: replacing the proxy instance mints a new one,
+    // so the second entry needs updating on every rebuild. That is a feature rather than a chore,
+    // because the test fails loudly instead of quietly asserting nothing.
+    "hosts": {
+        "homelab": "100.95.60.68",
+        "proxy":   "100.122.41.65",
+    },
+
+    // Run on every save. These exist because removing the stock allow-all grant is a tailnet-wide
+    // change, and the failure mode is losing access to the thing you are standing on.
+    "tests": [
+        {
+            "src": "philn0415@gmail.com",
+            "accept": [
+                // The Homelab Variant through `tailscale serve`, which is the phones' path.
+                "homelab:443",
+                // The management path to the AWS proxy. No inbound 22 exists anywhere else.
+                "proxy:22",
+            ],
+        },
+    ],
+}

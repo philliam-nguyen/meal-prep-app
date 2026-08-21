@@ -44,7 +44,9 @@ rules as they actually sit in the chain, the model runtime's actual binding, the
 actually runs. That is host state only the Operator can see, so the section is written from the host
 rather than from the repository.
 
-**Blocked by:** 15 (the Demo Variant's stack really running on this host).
+**Blocked by:** 27 (the Demo Variant's stack really running on this host). This said 15 until
+2026-08-20, which was wrong: 15 builds the AWS half and says so, and the stack this section describes
+had no ticket at all. See 27.
 
 - [ ] The runbook says which Compose project is which, and how to tell the two Postgres containers,
       volumes and networks apart at the prompt

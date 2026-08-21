@@ -10,8 +10,13 @@ Thumbs.db
 .vscode/
 *.swp
 
-# Local configuration: passwords and connection strings live here and nowhere else
+# Local configuration: passwords and connection strings live here and nowhere else. The glob covers
+# the second stack's file too (.env.demo), because two stacks in one checkout means two of these and
+# a pattern matching only the bare name would leave the demo's passwords one `git add .` from being
+# published. The negation keeps the committed examples tracked.
 .env
+.env.*
+!.env*.example
 
 # The unattended backup's config: no password of its own, but the ntfy topic in it is a bearer
 # credential
