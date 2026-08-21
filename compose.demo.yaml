@@ -61,7 +61,12 @@ services:
     image: tailscale/tailscale:stable
     hostname: meal-prep-demo
     environment:
-      TS_AUTHKEY: ${TS_AUTHKEY:?set TS_AUTHKEY in .env.demo to a tag:demo auth key}
+      # Needed at first enrolment only. The enrolled identity persists in the `tailscale` volume,
+      # and anything in this map is readable by `docker inspect` on the host, so the key is removed
+      # from .env.demo once the node is up rather than left as a permanent inspect-visible secret
+      # (ticket 15 put the proxy's key in SSM for the same reason). Re-enrolling after a volume
+      # loss means minting a fresh tag:demo key in the admin console and setting this once more.
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
       TS_EXTRA_ARGS: --advertise-tags=tag:demo
       TS_STATE_DIR: /var/lib/tailscale
       TS_USERSPACE: 'false'
@@ -143,9 +148,16 @@ services:
     restart: 'no'
 
 volumes:
-  # ADR-0010 wants a size cap on this. Compose's local driver has no size option, so the cap is host
-  # state: back this path with a fixed-size filesystem (a loopback ext4 image, or an XFS project
-  # quota) and record it in the runbook per ticket 25. Left uncapped, a visitor writing up to
-  # RECIPES_MAX every six hours is bounded, but a bug or an unbounded log is not.
+  # ADR-0010's size cap, which Compose's local driver cannot express, so the cap is host state:
+  # this path sits inside a fixed-size loopback ext4 image mounted by /etc/fstab before
+  # docker.service. ops/demo-volume/install-volume-cap.sh builds the image, the mount and this
+  # volume; run it once per host before `up` can create the volume. If the mount is absent the
+  # bind source is missing and the db container refuses to start, which is the loud version of
+  # that failure - the directory underneath is kept immutable so nothing writes there uncapped.
   database:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/lib/meal-prep-demo/pgdata/data
   tailscale:

@@ -101,9 +101,9 @@ the host half cannot.
 
 - [x] A second Compose project runs on the host with its own Postgres container, its own volume and
       its own network, tellable apart from `meal-prep` at the prompt
-- [ ] Neither stack's `.env` shares a password with the other
+- [x] Neither stack's `.env` shares a password with the other
 - [x] The demo API publishes no port on the host, and the only path to it is the sidecar
-- [ ] The sidecar enrols tagged `tag:demo`, and the auth key never lands in the repository, in a
+- [x] The sidecar enrols tagged `tag:demo`, and the auth key never lands in the repository, in a
       log, or in a shell history
 - [x] A tailnet policy file is versioned in this repository and synced, carrying the
       `tag:proxy` to `tag:demo` grant, the existing `ssh` rule and the `tagOwners` entries
@@ -111,12 +111,13 @@ the host half cannot.
 - [x] The demo's `.env` sets `TRUST_PROXY=2`, `RECIPES_MAX=200`, the CloudFront origin in
       `CORS_ORIGIN`, and a `SITE_NOTICE` a visitor can read
 - [x] `.gitignore` covers the demo env file, verified with `git check-ignore`
-- [ ] Container memory and CPU limits are set, and the Postgres volume has a size cap
+- [x] Container memory and CPU limits are set on the demo's db and api containers
+- [ ] The Postgres volume has a size cap, installed on the host rather than only scripted
 - [x] `DOCKER-USER` rules drop demo-network egress to private ranges except its own database
 - [ ] Those rules survive a reboot, checked after one rather than assumed from `systemctl enable`
 - [x] The Seed restore runs on a six-hour timer as the owner role
-- [ ] A failed restore is noticed rather than silent: the journal records it, but no alert path is
-      wired, unlike ticket 14's dump
+- [x] A failed restore is noticed rather than silent: the journal records it and the alert path
+      delivers, proven with a controlled failure rather than read off the code
 - [x] Migrations apply before the API starts, the same gate ticket 13 documented
 
 ## Comments
@@ -232,3 +233,46 @@ The files being under `ops/backup/` while a non-backup script sources them is un
 rather than fixed: what they actually are is this host's one way of reaching the Operator. Worth
 moving to `ops/common/` next time either is touched, which is a change to ticket 14's delivered
 work and so not this ticket's to make.
+
+**2026-08-20 evening: no password is shared, checked as hashes rather than by eye.** Every value in
+both `.env` files was hashed and compared without printing a secret. The two stacks share exactly
+one value, `MEAL_PREP_IMAGE`, which is the intended state until ticket 16 splits the tags. Both
+passwords, both role names and both database names are distinct between the files.
+
+**2026-08-20 evening: the auth key posture was changed rather than accepted.** `TS_AUTHKEY` reached
+the sidecar as an environment variable, so `docker inspect` on the host revealed it, a weaker
+posture than ticket 15's SSM parameter. The fix is that the key is only needed at first enrolment:
+the enrolled identity lives in the `meal-prep-demo_tailscale` volume, so the key was removed from
+`.env.demo` (a comment marks where it goes for the next enrolment), made optional in
+`compose.demo.yaml`, and the sidecar recreated. `docker inspect` now shows `TS_AUTHKEY=` empty, the
+node came back at the same `100.78.72.5` tagged `tag:demo`, and the grant was retested in both
+directions in the same minute: `curl` from the AWS proxy answers `200`, from this untagged host
+`000`. The reusable key itself now exists only in the Tailscale admin console until its expiry;
+re-enrolment after a volume loss means minting a fresh one there. Honest note for the record: the
+key sat in `.env.demo` and in the container environment from first enrolment until today.
+
+**2026-08-20 evening: the alert path is proven, not just wired.** A controlled failure
+(`ENV_FILE=/nonexistent bash ops/seed-restore/restore.sh`) exited 1, logged the FATAL line, and the
+ntfy topic read back a message titled "meal-prep demo Seed restore cannot run" when polled from the
+server. That is the missing-file path end to end; the failing-run path uses the same `alert()` on
+the same channel. A second restore run straight after finished clean, so the test left nothing
+behind.
+
+**2026-08-20 evening: the volume cap is scripted and awaiting one sudo run.** The root filesystem
+is ext4, so of ADR-0010's two mechanisms the loopback image is the available one.
+`ops/demo-volume/install-volume-cap.sh` builds a 2G loopback ext4 image at
+`/var/lib/meal-prep-demo/pgdata.img`, mounts it via `/etc/fstab` ordered before `docker.service`,
+and swaps `meal-prep-demo_database` onto a bind of a directory inside it; the compose file now
+declares the volume that way. 2G because a fresh Postgres 17 cluster is ~40M and default
+`max_wal_size` lets WAL alone approach 1G, so smaller risks capping normal operation instead of a
+runaway. The swap discards the demo database, which costs one Seed restore, and the script runs it.
+The mountpoint is left immutable while unmounted, so a missing mount at boot is a db container that
+refuses to start and a restore that alerts, never silent uncapped writes. Verified today that
+`docker compose config` accepts the new volume definition and a full restore runs clean against the
+existing volume, so nothing breaks before the script is run; until it is run, the cap does not
+exist and the box above stays open.
+
+**Post-reboot checklist for the two boot-survival claims, for whichever reboot comes first:**
+`sudo iptables-save -t filter | grep -cF -- '--comment meal-prep-demo-egress'` must print 7,
+`findmnt /var/lib/meal-prep-demo/pgdata` must show the loop mount (only after the install script
+has run), and `curl http://100.78.72.5:8080/api/health` from the AWS proxy must answer 200.
