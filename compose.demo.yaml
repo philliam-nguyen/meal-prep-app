@@ -66,6 +66,11 @@ services:
       TS_STATE_DIR: /var/lib/tailscale
       TS_USERSPACE: 'false'
       TS_ACCEPT_DNS: 'false'
+      # Ubuntu's iptables is the nftables backend, and the container defaults to the legacy binary,
+      # which fails to create Tailscale's chains with "Table does not exist". tailscaled carries on
+      # and enrols anyway, so the symptom is a health warning and absent firewall rules rather than
+      # a container that stops. Naming the mode is what makes the failure not happen quietly.
+      TS_DEBUG_FIREWALL_MODE: nftables
     volumes:
       - tailscale:/var/lib/tailscale
     devices:
