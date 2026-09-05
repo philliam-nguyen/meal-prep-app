@@ -16,8 +16,28 @@ jobs:
           node-version: 24
       - run: npm ci
       - run: npm test
+  browser-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium webkit
+      - run: npm run test:browser
+      # The report and the failure traces, so a red run on the mobile project can be inspected
+      # without a phone.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
   publish-image:
-    needs: test
+    needs: [test, browser-tests]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
@@ -41,7 +61,7 @@ jobs:
           docker push "$IMAGE:$GITHUB_SHA"
           docker push "$IMAGE:main"
   publish-bundle:
-    needs: test
+    needs: [test, browser-tests]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:

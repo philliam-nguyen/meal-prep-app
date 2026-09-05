@@ -34,3 +34,7 @@ docs/drafts/*
 # Vendored agent skills, restorable from the committed skills-lock.json
 .claude/
 .scratch/
+
+# The browser suite's report and traces; CI uploads them as an artifact instead
+playwright-report/
+test-results/

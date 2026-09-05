@@ -16,6 +16,10 @@
     "start": "npm start --workspace @meal-prep/api",
     "migrate": "npm run migrate --workspace @meal-prep/api",
     "record": "npm run record --workspace @meal-prep/api",
-    "test": "npm test --workspaces --if-present && node --test \"test/**/*.test.js\""
+    "test": "npm test --workspaces --if-present && node --test \"test/**/*.test.js\"",
+    "test:browser": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0"
   }
 }
