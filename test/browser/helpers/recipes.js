@@ -60,3 +60,10 @@ export const fewIngredients = [
   { name: 'Potato', quantity: 500, unit: 'g' },
   { name: 'Butter', quantity: 50, unit: 'g' },
 ];
+
+/** More Recipe Ingredients than a phone's sheet can show at once, so the list has to scroll. */
+export const manyIngredients = Array.from({ length: 40 }, (_, i) => ({
+  name: `Ingredient ${String(i + 1).padStart(2, '0')}`,
+  quantity: i + 1,
+  unit: 'g',
+}));
