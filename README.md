@@ -160,6 +160,45 @@ are in `docs/adr/0005-http-tests-against-real-postgres.md`: unit suites in `pack
 `packages/web`, and the assertions on `compose.yaml` at the repository root. The suite needs a
 running Docker daemon and fails rather than degrades without one.
 
+### Browser suite
+
+```
+npx playwright install --with-deps chromium webkit   # once per machine
+npm run test:browser
+```
+
+Playwright drives the real frontend against the real API on a throwaway Postgres, so a green run
+means the whole stack worked in a browser and not a mock of it. One command does all of it:
+`playwright.config.js` starts the API on a Postgres that did not exist a moment ago (`npm run
+throwaway` in `packages/api`, which boots the same container the API suite uses and needs no
+frontend bundle), starts Vite proxying to it, runs the tests, and tears both down. It needs Docker
+and the two installed browsers, and refuses to start if either of its ports (8091 for the API, 5191
+for Vite) is already taken, so a stack left running is an error rather than yesterday's database.
+
+It is deliberately separate from `npm test`. The Node runner and the browser suite each boot their
+own stack and never share a database, a port or a process, so neither can break the other; the
+browser specs are `test/browser/*.spec.js`, a name the Node glob never matches. It is not the
+degraded-mode bundle, which disables every write, and it is not a mock of the API: it is
+`docs/adr/0005-http-tests-against-real-postgres.md` carried into a browser, and that ADR's
+amendment says where the line between the two suites falls.
+
+Two projects, chosen by file name and declared in `playwright.config.js`:
+
+- **Desktop**, Chromium at a desktop viewport, runs `*.desktop.spec.js` and any bare `*.spec.js`.
+- **Mobile**, WebKit with Playwright's iPhone descriptor and touch enabled, runs `*.mobile.spec.js`
+  and any bare `*.spec.js`. WebKit rather than Chromium because the Homelab Variant is used from
+  iPhones, and touch and scroll edge cases differ between engines.
+
+A test belongs to Mobile if a finger is what it is about, to Desktop if a mouse is, and to both if
+the page merely has to render. To add one: put a spec in `test/browser/`, seed the data it needs
+through the running API with the helpers in `test/browser/helpers/recipes.js` (they mirror the API
+suite's helpers, speak HTTP to the throwaway port, and fail the test with the API's own message if
+a write is refused), and assert what a person would see. Recipes are named uniquely per test
+because the database is shared by every worker in a run and never truncated between tests. Never
+read a fixture or the recorded Seed. The spec that created the pattern, and the first tests, is
+`docs/specs/0002-browser-test-harness-and-swipe-to-close.md`. A red run leaves an HTML report in
+`playwright-report/` and a trace per failure in `test-results/`; CI uploads both as an artifact.
+
 ## Access
 
 There is no setup screen, no API key to paste and nothing to share by link. The frontend calls the

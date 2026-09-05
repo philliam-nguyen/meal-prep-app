@@ -153,3 +153,16 @@ sitting in `src`, which no server path reaches and the production install omits.
 Test duration now depends on Docker image pull and container start. Expect the first run on a clean
 machine to be slow and later runs to be quick, and revisit this if the suite grows enough that one
 container per run becomes the bottleneck.
+
+The browser suite (spec 0002, 2026-09-05) overturned the line above that components have no tests
+and are not meant to. What changed the answer was a touch gesture: the Recipe sheet's pull-to-close
+is a scroll interaction and a finger's travel, which no request can exercise and jsdom does not
+model. The suite is Playwright driving the real frontend against the real API on a throwaway
+Postgres, booted through the same `src/throwawayPostgres.js` the API suite and the recording use,
+so the seam this ADR fixed is intact: nothing is mocked, the database is real, and a test's data is
+arranged through the API. Two things about it are decided here rather than in the spec. It is a
+second suite with its own command, own stack and own CI job, never a project inside the Node
+runner, because a browser run is slow and occasionally flaky in ways an API run is not, and the
+fast path has to stay fast and trustworthy. And what belongs to it is only what a person does with
+a pointer or a finger and sees on a screen; a rule that can be asserted through HTTP still goes
+through HTTP, and a pure frontend module is still `node --test`.
