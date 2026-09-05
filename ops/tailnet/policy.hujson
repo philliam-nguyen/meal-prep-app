@@ -5,25 +5,20 @@
 //
 // Sync this file to Tailscale rather than editing the console. The console is downstream of here.
 {
-    // Only tag:demo and tag:proxy are used by this project. autogroup:admin owns both because there
-    // is one user on this tailnet; a second person would want a group here instead.
+    // Only tag:demo and tag:proxy are used by this project. autogroup:admin owns both: the tailnet
+    // now has two users, but only the Operator manages tagged nodes.
     "tagOwners": {
         "tag:proxy": ["autogroup:admin"],
         "tag:demo":  ["autogroup:admin"],
     },
 
     "grants": [
-        // The Operator's own devices reach each other, which is what the phones use to reach the
-        // Homelab Variant through `tailscale serve` on llm-ubuntu. autogroup:self is devices owned
-        // by the same user, so it excludes tagged devices by construction: neither proxy nor the
-        // demo is reachable through this rule, and neither can use it as a source.
-        {"src": ["autogroup:member"], "dst": ["autogroup:self"], "ip": ["*"]},
-
-        // Tailscale SSH needs this as well as the ssh block below. The ssh rules say who may open a
-        // session and as whom; this says the packets may arrive at all. Without it, SSH to the proxy
-        // fails with the ssh rule sitting right there looking correct. The proxy has no inbound 22
-        // from anywhere else, so this is its only management path.
-        {"src": ["autogroup:member"], "dst": ["tag:proxy"], "ip": ["22"]},
+        // Every human member reaches everything, which is how both users' phones reach the Homelab
+        // Variant through `tailscale serve` on llm-ubuntu. autogroup:member is untagged devices
+        // only, so neither the proxy nor the demo can use this rule as a source; the containment
+        // that matters here is what tag:demo can originate, not what can reach it. This also
+        // carries the packet path Tailscale SSH needs alongside the ssh block below.
+        {"src": ["autogroup:member"], "dst": ["*"], "ip": ["*"]},
 
         // The demo path, and the whole point of this file. The AWS proxy reaches the Demo Variant's
         // API and nothing else about it. The port follows the sidecar wiring chosen in ticket 27; if
