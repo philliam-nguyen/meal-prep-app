@@ -46,7 +46,7 @@ const guardrails = {
 
 log('starting a throwaway Postgres');
 const postgres = await startThrowawayPostgres();
-const pool = createPool(postgres.appUrl);
+const pool = createPool(postgres.appUrl, 'meal-prep-throwaway');
 
 // No staticRoot on purpose: buildApp's default is where a build would land, and a stale dist there
 // is served by this origin but never asked for, because the browser is pointed at Vite.

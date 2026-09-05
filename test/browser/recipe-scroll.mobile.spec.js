@@ -29,14 +29,14 @@ test('a pull while the list is scrolled down scrolls the list and leaves the she
   const recipe = await createRecipeWith(request, manyIngredients);
   await openRecipe(page, recipe.name);
   const box = await sheet(page, recipe.name).boundingBox();
-  const firstRow = page.getByText('Ingredient 01');
-  const lastRow = page.getByText('Ingredient 40');
-  await expect(lastRow).not.toBeInViewport();
+  const firstIngredient = page.getByText('Ingredient 01');
+  const lastIngredient = page.getByText('Ingredient 40');
+  await expect(lastIngredient).not.toBeInViewport();
 
   // Scroll the list down inside the sheet.
-  await lastRow.scrollIntoViewIfNeeded();
-  await expect(lastRow).toBeInViewport();
-  await expect(firstRow).not.toBeInViewport();
+  await lastIngredient.scrollIntoViewIfNeeded();
+  await expect(lastIngredient).toBeInViewport();
+  await expect(firstIngredient).not.toBeInViewport();
   const moves = await watchTouchMoves(page);
 
   await dragDown(sheet(page, recipe.name), box.height * 0.8, {
@@ -55,13 +55,13 @@ test('once the list is back at the top, a further pull closes the sheet', async 
   const recipe = await createRecipeWith(request, manyIngredients);
   await openRecipe(page, recipe.name);
   const box = await sheet(page, recipe.name).boundingBox();
-  const firstRow = page.getByText('Ingredient 01');
+  const firstIngredient = page.getByText('Ingredient 01');
   await page.getByText('Ingredient 40').scrollIntoViewIfNeeded();
-  await expect(firstRow).not.toBeInViewport();
+  await expect(firstIngredient).not.toBeInViewport();
 
   // Back to the top, then the pull.
-  await firstRow.scrollIntoViewIfNeeded();
-  await expect(firstRow).toBeInViewport();
+  await firstIngredient.scrollIntoViewIfNeeded();
+  await expect(firstIngredient).toBeInViewport();
   await dragDown(sheet(page, recipe.name), box.height * 0.8);
 
   await expectSheetClosed(page, recipe.name);

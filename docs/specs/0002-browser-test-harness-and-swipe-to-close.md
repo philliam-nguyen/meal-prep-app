@@ -108,7 +108,7 @@ The gesture lives in the Recipe sheet's container, the component that already ow
 the slide-up animation. No shared gesture library is introduced for one gesture. If a second sheet
 ever wants it, that is the moment to extract.
 
-### Test data
+### Arranging Recipes
 
 The browser tests create the Recipe they open through the API before the test, using the same
 helpers the API tests use for creating Recipes, rather than reading a fixture. This keeps the

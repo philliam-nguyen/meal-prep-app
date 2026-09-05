@@ -17,17 +17,25 @@ import { I } from '../icons.jsx';
 // The close gesture: pull the sheet down. It lives here, in the component that owns open, close
 // and the slide-up, rather than in a gesture library, because there is one sheet that wants it.
 //
-// Every number is a fraction of the sheet's height rather than a pixel, so a short Recipe and a
+// The thresholds are fractions of the sheet's height rather than pixels, so a short Recipe and a
 // long one close at the same point of the pull. The choices, which the spec left to this ticket:
 // a pull past 30% of the height closes; so does a flick, a pull faster than 0.6px/ms that has
 // covered at least 15%, because a quick short pull is how a phone is told to dismiss anything.
-// Anything less snaps back. A finger has to move 8px before a touch is a drag at all, which is
-// roughly the slop a browser allows a tap, so a tap on a button stays a tap.
+// A flick is read off the last move, so a finger that stops and rests before lifting has stopped
+// flicking. Anything less snaps back. The one pixel constant is the slop: a finger has to move
+// 8px before a touch is a drag at all, roughly what a browser allows a tap, so a tap on a button
+// stays a tap.
 const CLOSE_FRACTION = 0.3;
 const FLICK_VELOCITY = 0.6;
 const FLICK_MIN_FRACTION = 0.15;
+const FLICK_STALE_MS = 100;
 const DRAG_SLOP_PX = 8;
-const SETTLE_MS = 250;
+const SNAP_BACK_MS = 250;
+// The close is the slide-up in reverse: same duration and curve as `slideUp` in styles.css, fading
+// as it goes, so the sheet leaves the way it arrived.
+const CLOSE_MS = 400;
+const CLOSE_EASING = 'cubic-bezier(0.16, 1, 0.3, 1)';
+const AT_REST = 'translateY(0)';
 
 // Native listeners rather than React's onTouchMove, and the reason is the one surprise the spec
 // said to expect: React attaches touchmove as a passive listener, and a passive listener's
@@ -45,46 +53,53 @@ function useDragToClose(sheetRef, onClose) {
   useEffect(() => {
     const sheet = sheetRef.current;
     if (!sheet) return undefined;
-    let touch = null;
+    let drag = null;
 
-    const settle = (transform) => {
-      sheet.style.transition = `transform ${SETTLE_MS}ms ease-out`;
-      sheet.style.transform = transform;
+    const snapBack = () => {
+      sheet.style.transition = `transform ${SNAP_BACK_MS}ms ease-out`;
+      sheet.style.transform = AT_REST;
     };
 
     const onStart = (event) => {
       // The drag takes over only with the content at the top. Scrolled down, the finger is scrolling
       // the list, and the browser keeps it; once the list is back at the top, the next pull is this.
-      if (touch?.closing || event.touches.length !== 1 || sheet.scrollTop > 0) return;
+      if (drag?.closing || event.touches.length !== 1 || sheet.scrollTop > 0) return;
       const { clientY } = event.touches[0];
-      touch = { startY: clientY, lastY: clientY, lastTime: event.timeStamp, velocity: 0, dragging: false, closing: false };
+      drag = { startY: clientY, lastY: clientY, lastTime: event.timeStamp, velocity: 0, dragging: false, closing: false };
     };
 
     const onMove = (event) => {
-      if (!touch || touch.closing) return;
+      if (!drag || drag.closing) return;
       const { clientY } = event.touches[0];
-      const travelled = clientY - touch.startY;
-      if (!touch.dragging) {
+      const travelled = clientY - drag.startY;
+      if (!drag.dragging) {
         // Upward, or not yet past the slop: not a drag. Left to the browser, which may scroll.
         if (travelled < DRAG_SLOP_PX) return;
-        touch.dragging = true;
+        // Checked again here, not only at touchstart: a finger that went up first has scrolled
+        // the list in the meantime, and the browser owns a touch it has begun scrolling with
+        // (the event is no longer cancelable). Either way this touch is the list's, not the sheet's.
+        if (sheet.scrollTop > 0 || !event.cancelable) {
+          drag = null;
+          return;
+        }
+        drag.dragging = true;
         sheet.style.transition = 'none';
         // The slide-up may still be running; while it is, its transform wins over the finger's.
         sheet.style.animation = 'none';
       }
       event.preventDefault();
-      touch.velocity = (clientY - touch.lastY) / Math.max(1, event.timeStamp - touch.lastTime);
-      touch.lastY = clientY;
-      touch.lastTime = event.timeStamp;
+      drag.velocity = (clientY - drag.lastY) / Math.max(1, event.timeStamp - drag.lastTime);
+      drag.lastY = clientY;
+      drag.lastTime = event.timeStamp;
       // Clamped at the rest position: the sheet follows the finger down and no further up.
       sheet.style.transform = `translateY(${Math.max(0, travelled)}px)`;
     };
 
     const onEnd = (event) => {
-      if (!touch || touch.closing) return;
-      const state = touch;
+      if (!drag || drag.closing) return;
+      const state = drag;
       if (!state.dragging) {
-        touch = null;
+        drag = null;
         return;
       }
       // A lifted finger synthesizes a click at where it lifted. After a drag that is never what
@@ -94,10 +109,12 @@ function useDragToClose(sheetRef, onClose) {
 
       const height = sheet.getBoundingClientRect().height;
       const travelled = Math.max(0, state.lastY - state.startY);
-      const flicked = state.velocity >= FLICK_VELOCITY && travelled >= height * FLICK_MIN_FRACTION;
+      const stillMoving = event.timeStamp - state.lastTime < FLICK_STALE_MS;
+      const flicked =
+        stillMoving && state.velocity >= FLICK_VELOCITY && travelled >= height * FLICK_MIN_FRACTION;
       if (travelled < height * CLOSE_FRACTION && !flicked) {
-        settle('');
-        touch = null;
+        snapBack();
+        drag = null;
         return;
       }
 
@@ -106,21 +123,25 @@ function useDragToClose(sheetRef, onClose) {
       // transitionend that never arrives, which a sheet unmounted for another reason produces.
       state.closing = true;
       let closed = false;
-      const finish = () => {
+      const finish = (transition) => {
+        // Only the sheet's own transform ending: a child's transition bubbles up here too.
+        if (transition && (transition.target !== sheet || transition.propertyName !== 'transform')) return;
         if (closed) return;
         closed = true;
         sheet.removeEventListener('transitionend', finish);
         closeRef.current();
       };
       sheet.addEventListener('transitionend', finish);
-      setTimeout(finish, SETTLE_MS + 50);
-      settle('translateY(100%)');
+      setTimeout(finish, CLOSE_MS + 50);
+      sheet.style.transition = `transform ${CLOSE_MS}ms ${CLOSE_EASING}, opacity ${CLOSE_MS}ms ${CLOSE_EASING}`;
+      sheet.style.transform = 'translateY(100%)';
+      sheet.style.opacity = '0';
     };
 
     const onCancel = () => {
-      if (!touch || touch.closing) return;
-      if (touch.dragging) settle('');
-      touch = null;
+      if (!drag || drag.closing) return;
+      if (drag.dragging) snapBack();
+      drag = null;
     };
 
     sheet.addEventListener('touchstart', onStart, { passive: true });

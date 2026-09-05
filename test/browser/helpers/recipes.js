@@ -33,9 +33,9 @@ export async function createRecipe(request, body) {
  * Creates a Recipe with the given Recipe Ingredients, named uniquely for this run, and returns it.
  * The one most tests here want: something to open in the sheet.
  */
-export async function createRecipeWith(request, ingredients, { name = 'Leek and Potato Soup' } = {}) {
+export async function createRecipeWith(request, ingredients) {
   return createRecipe(request, {
-    name: uniqueName(name),
+    name: uniqueName('Leek and Potato Soup'),
     type: 'Soup',
     cardUrl: 'https://example.com/leek-and-potato',
     ingredients,

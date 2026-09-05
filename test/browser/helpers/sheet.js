@@ -34,23 +34,25 @@ export function sheet(page, name) {
 }
 
 /**
- * A finger on `target`, moved straight down by `distance` pixels (up, if negative) in `steps`
+ * A finger on `target`, moved straight down by `distance` pixels (up, if negative) in a few
  * moves, held there while `whileHeld` runs, then lifted. Playwright has no touch drag of its own,
  * so this dispatches the touch events a finger produces, which is what the sheet listens for; a
  * synthetic touch cannot scroll content natively, which the scroll tests account for.
  */
-export async function dragDown(target, distance, { steps = 8, whileHeld } = {}) {
+const DRAG_STEPS = 8;
+
+export async function dragDown(target, distance, { whileHeld } = {}) {
   const box = await target.boundingBox();
   const x = box.x + box.width / 2;
   const y = box.y + Math.min(box.height / 2, 40);
   const touchAt = (clientY) => [{ identifier: 1, clientX: x, clientY }];
 
   await target.dispatchEvent('touchstart', { touches: touchAt(y), changedTouches: touchAt(y) });
-  for (let step = 1; step <= steps; step += 1) {
+  for (let step = 1; step <= DRAG_STEPS; step += 1) {
     // A frame apart, the way a finger's moves arrive. The sheet reads a velocity off the moves, and
     // moves dispatched as fast as the protocol allows would read as a flick whatever the distance.
     await target.page().waitForTimeout(16);
-    const clientY = y + (distance * step) / steps;
+    const clientY = y + (distance * step) / DRAG_STEPS;
     await target.dispatchEvent('touchmove', { touches: touchAt(clientY), changedTouches: touchAt(clientY) });
   }
   if (whileHeld) await whileHeld();
