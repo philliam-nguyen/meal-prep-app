@@ -9,6 +9,8 @@
 export { RECIPE_TYPES } from './recipeTypes.js';
 export {
   AISLE_MAX,
+  BATCH_MAX,
+  BATCH_MIN,
   CARD_URL_MAX,
   INGREDIENT_NAME_MAX,
   QUANTITY_MAX,

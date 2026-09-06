@@ -7,6 +7,7 @@
       "type": "Dessert",
       "cardUrl": "https://recipes.example.com/apple-and-walnut-crumble",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -53,6 +54,7 @@
       "type": "Breakfast",
       "cardUrl": "https://recipes.example.com/banana-oat-pancakes",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -99,6 +101,7 @@
       "type": "Stew",
       "cardUrl": "https://recipes.example.com/beef-and-ale-stew",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -151,6 +154,7 @@
       "type": "Bread",
       "cardUrl": "https://recipes.example.com/cheddar-and-thyme-soda-bread",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -191,6 +195,7 @@
       "type": "Dinner",
       "cardUrl": "https://recipes.example.com/chicken-and-leek-pie",
       "selected": true,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -249,6 +254,7 @@
       "type": "Lunch",
       "cardUrl": null,
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -289,6 +295,7 @@
       "type": "Stew",
       "cardUrl": "https://recipes.example.com/chickpea-and-tomato-stew",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -341,6 +348,7 @@
       "type": "Dessert",
       "cardUrl": "https://recipes.example.com/dark-chocolate-mousse",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -375,6 +383,7 @@
       "type": "Snack",
       "cardUrl": "https://recipes.example.com/honey-and-oat-flapjacks",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -409,6 +418,7 @@
       "type": "Lunch",
       "cardUrl": "https://recipes.example.com/leek-and-cheddar-tart",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -455,6 +465,7 @@
       "type": "Soup",
       "cardUrl": "https://recipes.example.com/leek-and-potato-soup",
       "selected": true,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -507,6 +518,7 @@
       "type": "Dessert",
       "cardUrl": "https://recipes.example.com/lemon-posset",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -535,6 +547,7 @@
       "type": "Dinner",
       "cardUrl": "https://recipes.example.com/mushroom-stroganoff",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -587,6 +600,7 @@
       "type": "Breakfast",
       "cardUrl": "https://recipes.example.com/mushroom-and-bacon-hash",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -633,6 +647,7 @@
       "type": "Bread",
       "cardUrl": "https://recipes.example.com/overnight-white-loaf",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -667,6 +682,7 @@
       "type": "Soup",
       "cardUrl": "https://recipes.example.com/red-lentil-and-carrot-soup",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -713,6 +729,7 @@
       "type": "Dinner",
       "cardUrl": "https://recipes.example.com/roast-chicken-traybake",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -765,6 +782,7 @@
       "type": "Dinner",
       "cardUrl": "https://recipes.example.com/spaghetti-tomato-basil",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -811,6 +829,7 @@
       "type": "Snack",
       "cardUrl": null,
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {

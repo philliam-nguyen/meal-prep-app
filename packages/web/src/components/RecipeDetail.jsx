@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { BATCH_MAX, BATCH_MIN } from '@meal-prep/shared';
 import { formatAmount } from '../format.js';
 import { getTypeBadge } from '../typeBadge.js';
 import { I } from '../icons.jsx';
@@ -164,6 +165,40 @@ function useDragToClose(sheetRef, onClose) {
   }, [sheetRef]);
 }
 
+/**
+ * The Batch: how many times the Recipe is being made, from 1 to 9. Bounded by the same numbers the
+ * API refuses, imported rather than written here, so the button that stops going up and the request
+ * that would be refused agree.
+ *
+ * A stepper rather than a number box, because this is set on a phone with one thumb while the other
+ * hand holds a pan, and because a box that can hold "12" would have to explain why it cannot.
+ */
+function BatchStepper({ batch, readOnly, onChange }) {
+  const step = (to) => (
+    <button
+      className="batch-step"
+      type="button"
+      disabled={readOnly || to < BATCH_MIN || to > BATCH_MAX}
+      // Named for what it does to the shop rather than for the arithmetic: "increase" says nothing
+      // to a cook who has not seen the number.
+      aria-label={to > batch ? 'Make one more batch' : 'Make one fewer batch'}
+      onClick={() => onChange(to)}
+    >
+      {to > batch ? '+' : '\u2212'}
+    </button>
+  );
+
+  return (
+    <div className="batch-stepper" role="group" aria-label="Batch">
+      {step(batch - 1)}
+      {/* Announced on change rather than silently, because the two buttons around it say what they
+          do and not what happened. */}
+      <span className="batch-count" role="status">{`${batch}\u00d7`}</span>
+      {step(batch + 1)}
+    </div>
+  );
+}
+
 const dangerButtonStyle = {
   flex: 1,
   justifyContent: 'center',
@@ -172,11 +207,33 @@ const dangerButtonStyle = {
   border: 'none',
 };
 
-export function RecipeDetail({ recipe, readOnly, onClose, onToggleSelected, onEdit, onDelete }) {
+export function RecipeDetail({ recipe, readOnly, onClose, onToggleSelected, onSetBatch, onEdit, onDelete }) {
   const { ingredients } = recipe;
   // Deleting is the one thing here nothing undoes, so it asks. In place rather than through the
   // browser's confirm dialog, which a phone renders as a modal on top of a modal.
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  // Made once unless the Recipe says otherwise. The fallback is for the cache: a first paint
+  // restored from one written before Batch existed hands this component a Recipe with no Batch on
+  // it, and a stepper reading "undefined" for the moment before the reload lands is worse than one
+  // reading the number every such Recipe means.
+  const storedBatch = recipe.batch ?? BATCH_MIN;
+  // The Batch of a Recipe that is not on the Shopping List yet, which nothing has stored anywhere:
+  // it is what Add will send. Once the Recipe is selected the stored Batch is the only truth, so
+  // this stops being read - which is what makes a failed write revert on screen, since the revert
+  // happens in the Recipe rather than here.
+  const [draftBatch, setDraftBatch] = useState(storedBatch);
+  const batch = recipe.selected ? storedBatch : draftBatch;
+  // Selected, and the write goes now: the Shopping List is wrong until it lands, and a cook who
+  // stepped from two to three has already said what they meant. Not selected, and there is nothing
+  // to write to yet, so the number waits for Add.
+  const changeBatch = (next) => (recipe.selected ? onSetBatch(recipe, next) : setDraftBatch(next));
+  // Removing takes the Batch back to 1 here as well as on the server, which resets it in the same
+  // statement that deselects. The sheet usually closes on this, so it is what a cook sees when they
+  // open the Recipe again rather than a moment later.
+  const toggleSelected = () => {
+    if (recipe.selected) setDraftBatch(BATCH_MIN);
+    onToggleSelected(recipe, batch);
+  };
   const sheetRef = useRef(null);
   useDragToClose(sheetRef, onClose);
 
@@ -215,9 +272,17 @@ export function RecipeDetail({ recipe, readOnly, onClose, onToggleSelected, onEd
             ))}
           </div>
         )}
-        <button className="btn-primary" style={{ width: '100%', justifyContent: 'center' }} disabled={readOnly} onClick={() => onToggleSelected(recipe)}>
-          {I.cart} <span>{recipe.selected ? 'Remove from Shopping List' : 'Add to Shopping List'}</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'stretch', gap: 10 }}>
+          <BatchStepper batch={batch} readOnly={readOnly} onChange={changeBatch} />
+          <button
+            className="btn-primary"
+            style={{ flex: 1, justifyContent: 'center' }}
+            disabled={readOnly}
+            onClick={toggleSelected}
+          >
+            {I.cart} <span>{recipe.selected ? 'Remove from Shopping List' : 'Add to Shopping List'}</span>
+          </button>
+        </div>
 
         {!recipe.protected && (
           confirmingDelete ? (

@@ -155,6 +155,9 @@ describe('browsing Recipes', () => {
       type: 'Soup',
       cardUrl: 'https://example.com/leek-and-potato',
       selected: true,
+      // Made once, because nothing asked for more. Every Recipe carries a Batch, and the Shopping
+      // List multiplies by it.
+      batch: 1,
       protected: false,
       ingredients: [{ ingredientId: 'I001', name: 'Leek', quantity: 3, unit: '' }],
     });

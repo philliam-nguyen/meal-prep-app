@@ -35,6 +35,18 @@ export const QUANTITY_MAX = 100000;
 // the column, so accepting it would store exactly the value the range refuses.
 export const QUANTITY_MIN = 0.001;
 
+// How many times a Selected Recipe can be said to be being made. Whole numbers only: half a Batch
+// produces amounts the Shopping List cannot show honestly. Nine is a party, and a stepper a cook
+// taps their way up is no way to reach a hundred anyway.
+//
+// Two constants rather than a schema, which is the one thing in this file that is not one. The
+// Selected Recipe route declares its own body schema, because a checkbox has nothing to validate
+// before it sends and a shared schema would have a single importer; but the stepper on the Recipe
+// sheet has to stop at the same numbers the route refuses, and one pair of numbers here is what
+// keeps the stepper's ceiling and the route's from drifting apart.
+export const BATCH_MIN = 1;
+export const BATCH_MAX = 9;
+
 // A per-Recipe ceiling, which is also the first half of the row caps ADR-0001 asks for. The cap on
 // total Recipes belongs to the ticket that adds it, because it counts rows rather than reading one
 // request.

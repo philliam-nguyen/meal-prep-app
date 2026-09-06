@@ -74,17 +74,23 @@ export async function deleteRecipe(recipeId) {
 }
 
 /**
- * Marks a Recipe as a Selected Recipe, or unmarks it. Sends the value it wants rather than asking
- * for a flip, so a retry after a dropped response cannot undo the write it is retrying.
+ * Marks a Recipe as a Selected Recipe, or unmarks it, and says how many times it is being made.
+ * Sends the values it wants rather than asking for a flip, so a retry after a dropped response
+ * cannot undo the write it is retrying.
+ *
+ * The Batch travels on this write rather than on one of its own, because setting one is what a cook
+ * does while adding the Recipe to the list, and changing the Batch of a Recipe already on the list
+ * is this same write with the new number. A deselect sends none: the server resets it to 1, so
+ * sending a Batch there would be describing a state that cannot exist.
  *
  * Nothing comes back. The Shopping List this changes is derived on the server, so the caller reads
  * it with the next state request rather than from this reply.
  */
-export async function setRecipeSelected(recipeId, selected) {
+export async function setRecipeSelected(recipeId, selected, batch) {
   const response = await fetch(`/api/recipes/${encodeURIComponent(recipeId)}/selected`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ selected }),
+    body: JSON.stringify(selected ? { selected, batch } : { selected }),
   });
 
   if (!response.ok) {

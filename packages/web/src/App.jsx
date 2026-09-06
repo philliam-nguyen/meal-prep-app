@@ -175,21 +175,45 @@ export function MealPrepApp() {
   // The toggle lands on screen before the write does, because a cook changing their mind about four
   // Recipes should not wait four times. A write that fails puts the Recipe back the way it was and
   // says so, so nothing stays ticked that never saved.
-  const handleToggleSelected = useCallback(async recipe => {
+  const handleToggleSelected = useCallback(async (recipe, batch = 1) => {
     const selected = !recipe.selected;
-    const show = value => setRecipes(prev => prev.map(r => (r.id === recipe.id ? { ...r, selected: value } : r)));
+    // Deselecting resets the Batch on the server, in the same statement that clears the flag, so it
+    // resets here too rather than waiting for the reload to say so.
+    const show = (value, batchValue) => setRecipes(prev => prev.map(r => (r.id === recipe.id ? { ...r, selected: value, batch: batchValue } : r)));
 
-    show(selected);
+    show(selected, selected ? batch : 1);
     try {
-      await setRecipeSelected(recipe.id, selected);
+      await setRecipeSelected(recipe.id, selected, batch);
     } catch {
-      show(!selected);
+      show(!selected, recipe.batch);
       toast(`Could not ${selected ? 'add' : 'remove'} ${recipe.name}. Nothing was saved.`);
       return;
     }
     toast(selected ? `Added ${recipe.name} to your shopping list` : `Removed ${recipe.name} from your shopping list`);
     // The Shopping List is a query now, not a calculation this app can redo, so what changed comes
     // back from the server rather than from here.
+    loadData(true);
+  }, [loadData, toast]);
+
+  // Changing the Batch of a Recipe already on the Shopping List. The same write the toggle makes,
+  // with the flag left where it is: there is no endpoint of its own, because a Batch is only ever
+  // set on a Recipe that is being added or is already there.
+  //
+  // Optimistic like the toggle, and for the same reason: a cook stepping from one to three taps
+  // twice and should see the number move both times. No toast on success, as the Pantry and Got It
+  // toggles have none - a confirmation per tap on a stepper would be noise. The reload is what
+  // brings back the Shopping List this changed, which only the server can say.
+  const handleSetBatch = useCallback(async (recipe, batch) => {
+    const show = value => setRecipes(prev => prev.map(r => (r.id === recipe.id ? { ...r, batch: value } : r)));
+
+    show(batch);
+    try {
+      await setRecipeSelected(recipe.id, true, batch);
+    } catch {
+      show(recipe.batch);
+      toast(`Could not change how many times you are making ${recipe.name}. Nothing was saved.`);
+      return;
+    }
     loadData(true);
   }, [loadData, toast]);
 
@@ -351,7 +375,7 @@ export function MealPrepApp() {
           />
         ) : (
           <>
-            {tab === 'recipes' && <RecipesPage recipes={recipes} readOnly={degraded} onToggleSelected={handleToggleSelected} onEdit={recipe => setEditingId(recipe.id)} onDelete={handleDelete} />}
+            {tab === 'recipes' && <RecipesPage recipes={recipes} readOnly={degraded} onToggleSelected={handleToggleSelected} onSetBatch={handleSetBatch} onEdit={recipe => setEditingId(recipe.id)} onDelete={handleDelete} />}
             {tab === 'shopping' && (
               <ShoppingListPage
                 shoppingList={shoppingList}

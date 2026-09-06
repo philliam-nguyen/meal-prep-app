@@ -28,6 +28,9 @@ const recipesQuery = (where = '') => `
     r.type,
     r.card_url as "cardUrl",
     r.selected,
+    -- How many times this Recipe is being made, which is what the Shopping List multiplies by.
+    -- Always 1 unless the Recipe is a Selected Recipe: deselecting resets it.
+    r.batch,
     r.protected,
     coalesce(
       (
@@ -81,7 +84,13 @@ const SHOPPING_LIST_QUERY = `
       -- sum() skips nulls, so an unquantified Recipe Ingredient contributes nothing rather than the
       -- zero the Sheets-era parseFloat(...) || 0 turned it into. A unit every Selected Recipe leaves
       -- unquantified sums to null and is dropped below, so "to taste" never becomes an amount.
-      sum(ri.quantity) as quantity
+      --
+      -- Each Recipe's amount is scaled by its own Batch before the sum, not after: two Selected
+      -- Recipes sharing an Ingredient are each being made their own number of times, so one factor
+      -- outside the sum would be arithmetic about neither of them. Null times anything is null, so
+      -- "to taste" survives the multiplication unquantified, which is the point of doing it here
+      -- rather than in a client that would have to remember not to.
+      sum(ri.quantity * r.batch) as quantity
     from recipe_ingredients ri
     join recipes r on r.id = ri.recipe_id
     where r.selected
@@ -128,7 +137,7 @@ const recipeIngredient = {
 
 export const recipeSchema = {
   type: 'object',
-  required: ['id', 'name', 'type', 'cardUrl', 'selected', 'protected', 'ingredients'],
+  required: ['id', 'name', 'type', 'cardUrl', 'selected', 'batch', 'protected', 'ingredients'],
   additionalProperties: false,
   properties: {
     id: { type: 'string' },
@@ -136,6 +145,9 @@ export const recipeSchema = {
     type: { type: 'string' },
     cardUrl: { type: ['string', 'null'] },
     selected: { type: 'boolean' },
+    // A whole number of times, 1 to 9, and 1 for anything not selected. Declared as an integer
+    // rather than a number because half a Batch produces amounts this app cannot show honestly.
+    batch: { type: 'integer' },
     protected: { type: 'boolean' },
     ingredients: { type: 'array', items: recipeIngredient },
   },

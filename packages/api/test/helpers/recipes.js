@@ -27,12 +27,16 @@ export async function deleteRecipe(app, recipeId) {
   assert.equal(response.statusCode, 204, response.body);
 }
 
-/** Marks a Recipe as a Selected Recipe, or unmarks it. */
-export async function setSelected(app, recipeId, selected) {
+/**
+ * Marks a Recipe as a Selected Recipe, or unmarks it. A Batch says how many times the Recipe is
+ * being made; left out, the endpoint is sent no Batch at all, which is the request every caller
+ * before Batch existed made.
+ */
+export async function setSelected(app, recipeId, selected, batch) {
   const response = await app.inject({
     method: 'PUT',
     url: `/api/recipes/${recipeId}/selected`,
-    payload: { selected },
+    payload: batch === undefined ? { selected } : { selected, batch },
   });
   assert.equal(response.statusCode, 204, response.body);
 }
