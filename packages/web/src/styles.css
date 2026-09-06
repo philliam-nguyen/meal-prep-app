@@ -133,13 +133,16 @@ input:focus, textarea:focus, select:focus { outline: 2px solid #5B7C5A; outline-
 .ingredient-row .unit-input { width: 90px; flex: none; }
 
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200; display: flex; align-items: flex-end; justify-content: center; }
-/* overscroll-behavior: the list inside the sheet ends where it ends. Without it, a phone reaching
+/* A fixed three quarters of the screen on a phone, whatever the Recipe holds, so every sheet opens
+   to the same place and a short Recipe does not arrive as a strip along the bottom. dvh where the
+   browser has it, because iOS Safari's vh counts the space under its own toolbar.
+   overscroll-behavior: the list inside the sheet ends where it ends. Without it, a phone reaching
    the bottom of a long Recipe hands the rest of the finger's travel to the page behind the dim. */
-.modal-content { background: #FAF6F1; border-radius: 24px 24px 0 0; width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto; overscroll-behavior: contain; padding: 24px; }
+.modal-content { background: #FAF6F1; border-radius: 24px 24px 0 0; width: 100%; max-width: 600px; height: 75vh; height: 75dvh; overflow-y: auto; overscroll-behavior: contain; padding: 24px; }
 .modal-handle { width: 40px; height: 4px; background: #E5DED3; border-radius: 4px; margin: 0 auto 20px; }
 
 @media (min-width: 768px) {
-  .modal-content { border-radius: 24px; margin-bottom: 40px; max-height: 80vh; }
+  .modal-content { border-radius: 24px; margin-bottom: 40px; height: auto; max-height: 80vh; }
   .nav-bar { position: fixed; top: 0; bottom: auto; border-top: none; border-bottom: 1px solid #F0EBE3; padding: 0; }
   .nav-item { flex-direction: row; gap: 8px; padding: 14px 20px; font-size: 14px; }
   .page-content { padding-top: 60px !important; }

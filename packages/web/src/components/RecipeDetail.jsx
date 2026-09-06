@@ -31,9 +31,10 @@ const FLICK_MIN_FRACTION = 0.15;
 const FLICK_STALE_MS = 100;
 const DRAG_SLOP_PX = 8;
 const SNAP_BACK_MS = 250;
-// The close is the slide-up in reverse: same duration and curve as `slideUp` in styles.css, fading
-// as it goes, so the sheet leaves the way it arrived.
-const CLOSE_MS = 400;
+// The close is the slide-up in reverse, on the same curve as `slideUp` in styles.css but in half the
+// time, and the dim behind the sheet fades with it. On a phone, a sheet that has gone while the
+// dim is still there for even a moment reads as the app hanging on the way out.
+const CLOSE_MS = 200;
 const CLOSE_EASING = 'cubic-bezier(0.16, 1, 0.3, 1)';
 const AT_REST = 'translateY(0)';
 
@@ -136,6 +137,12 @@ function useDragToClose(sheetRef, onClose) {
       sheet.style.transition = `transform ${CLOSE_MS}ms ${CLOSE_EASING}, opacity ${CLOSE_MS}ms ${CLOSE_EASING}`;
       sheet.style.transform = 'translateY(100%)';
       sheet.style.opacity = '0';
+      // The overlay is the parent, and it is what a person sees as the darkened page.
+      const overlay = sheet.parentElement;
+      if (overlay) {
+        overlay.style.transition = `opacity ${CLOSE_MS}ms ${CLOSE_EASING}`;
+        overlay.style.opacity = '0';
+      }
     };
 
     const onCancel = () => {
