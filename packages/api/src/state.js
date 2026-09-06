@@ -12,6 +12,7 @@
 // Best Matches is derived the same way and for the same reason, and lives in bestMatches.js because
 // the match rule is a thing in its own right rather than a shape this payload happens to need.
 
+import { aisleSchema, readAisles } from './aisles.js';
 import { bestMatchSchema, readBestMatches } from './bestMatches.js';
 import {
   pantryEntrySchema,
@@ -178,6 +179,7 @@ export const stateResponse = {
     'pantryChecklist',
     'staples',
     'bestMatches',
+    'aisles',
     'notice',
   ],
   additionalProperties: false,
@@ -194,6 +196,9 @@ export const stateResponse = {
     pantryChecklist: { type: 'array', items: pantryEntrySchema },
     staples: { type: 'array', items: stapleSchema },
     bestMatches: { type: 'array', items: bestMatchSchema },
+    // In walk order, which is the whole of what position means to a client: the array says where
+    // each section comes, so nothing here has to carry the number the API maintains.
+    aisles: { type: 'array', items: aisleSchema },
     // The one field here that is configuration rather than data: a line the deployment wants read,
     // or null where nobody configured one. Declared and required rather than left off when unset,
     // because this schema is what Fastify serializes through and what the recorded Seed is checked
@@ -221,12 +226,13 @@ export const stateResponse = {
  */
 export async function readState(db) {
   const version = await readVersion(db);
-  const [recipes, shoppingList, pantryChecklist, staples, bestMatches] = await Promise.all([
+  const [recipes, shoppingList, pantryChecklist, staples, bestMatches, aisles] = await Promise.all([
     db.query(RECIPES_QUERY),
     db.query(SHOPPING_LIST_QUERY),
     readPantryChecklist(db),
     readStaples(db),
     readBestMatches(db),
+    readAisles(db),
   ]);
   return {
     version,
@@ -235,6 +241,7 @@ export async function readState(db) {
     pantryChecklist,
     staples,
     bestMatches,
+    aisles,
   };
 }
 

@@ -148,3 +148,52 @@ export async function clearGotItMarks() {
     throw new Error(`DELETE /api/shopping-list/got-it returned ${response.status}`);
   }
 }
+
+/**
+ * One request against the Aisle routes. Two of them answer with the Aisle they wrote and two
+ * answer with nothing, so a 204 is a null rather than a body nobody sent.
+ *
+ * A refusal is shown verbatim for the reason a refused Recipe write is: the server knows things the
+ * page cannot check - that a name is already taken, that the walk on screen has gone stale - and
+ * flattening those into "could not save" throws away the only sentence that helps.
+ */
+async function sendAisle(method, path, body) {
+  const response = await fetch(path, {
+    method,
+    ...(body ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}),
+  });
+
+  if (response.status === 204) return null;
+  if (response.ok) return response.json();
+
+  const refusal = await response.json().catch(() => null);
+  throw new Error(refusal?.message ?? `${method} ${path} returned ${response.status}`);
+}
+
+/**
+ * Adds an Aisle to the end of the walk. The API refuses a name another Aisle already has, whatever
+ * its case, and the refusal names the Aisle that is there, which is the half the cook cannot see:
+ * they typed the other spelling. Worth showing verbatim rather than flattening into a status code.
+ */
+export async function createAisle(name) {
+  return sendAisle('POST', '/api/aisles', { name });
+}
+
+/** Fixes an Aisle's name without moving it in the walk or touching what is filed under it. */
+export async function renameAisle(aisleId, name) {
+  return sendAisle('PUT', `/api/aisles/${encodeURIComponent(aisleId)}`, { name });
+}
+
+/** Removes an Aisle. Nothing comes back; the walk closes up behind it on the server. */
+export async function deleteAisle(aisleId) {
+  return sendAisle('DELETE', `/api/aisles/${encodeURIComponent(aisleId)}`);
+}
+
+/**
+ * Rewrites the walk from the full ordered list of Aisle ids. Ids and never positions: the order is
+ * the array, and the API is the only thing that knows what number each place carries. A partial
+ * list is refused, so this always sends every Aisle on screen.
+ */
+export async function reorderAisles(ids) {
+  return sendAisle('PUT', '/api/aisles/order', { ids });
+}

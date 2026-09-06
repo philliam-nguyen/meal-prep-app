@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import fastifyStatic from '@fastify/static';
 import Fastify from 'fastify';
 import { ajvOptions } from '@meal-prep/shared';
+import { registerAisleRoutes } from './aisles.js';
 import { defaultWebDist } from './config.js';
 import { registerGuardrails } from './guardrails.js';
 import { registerIngredientRoutes } from './ingredients.js';
@@ -116,6 +117,7 @@ export async function buildApp({
 
   registerRecipeRoutes(app);
   registerIngredientRoutes(app);
+  registerAisleRoutes(app);
   registerVersionRoute(app);
 
   if (bundleExists(staticRoot)) {
