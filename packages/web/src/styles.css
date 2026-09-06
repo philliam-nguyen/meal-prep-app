@@ -131,6 +131,11 @@ input:focus, textarea:focus, select:focus { outline: 2px solid #5B7C5A; outline-
 .ingredient-row input { flex: 1; }
 .ingredient-row .qty-input { width: 70px; flex: none; }
 .ingredient-row .unit-input { width: 90px; flex: none; }
+/* One Step to a row, in the shape of an Ingredient row so the two read as one form: the number the
+   cook will read it by, the line itself, and the controls that move or remove it. */
+.step-row { display: flex; gap: 8px; align-items: center; }
+.step-row input { flex: 1; }
+.step-number { width: 20px; flex: none; text-align: right; color: #A39E93; font-weight: 700; font-size: 13px; }
 
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200; display: flex; align-items: flex-end; justify-content: center; }
 /* A fixed four fifths of the screen on a phone, whatever the Recipe holds, so every sheet opens

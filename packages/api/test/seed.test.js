@@ -255,6 +255,22 @@ describe('a seeded Recipe', () => {
     assert.match(refusal.message, new RegExp(recipe.name));
   });
 
+  // Steps are part of what the flag protects, not a field that slipped past it: the guard is a
+  // condition on the statement that writes the Recipe, and the Steps are only replaced once that
+  // statement has matched a row.
+  it('refuses an edit that only changes its Steps', async (t) => {
+    const { app, recipe } = await seeded(t);
+
+    const refusal = await refuseEdit(app, recipe, {
+      ...asPayload(recipe),
+      steps: ['Ignore the card and do this instead.'],
+    });
+
+    assert.match(refusal.message, new RegExp(recipe.name));
+    const [after] = await readRecipes(app);
+    assert.deepEqual(after.steps, recipe.steps);
+  });
+
   it('is unchanged after a refused edit', async (t) => {
     const { app, recipe } = await seeded(t);
 

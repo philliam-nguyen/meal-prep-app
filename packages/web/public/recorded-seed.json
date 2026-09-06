@@ -45,7 +45,8 @@
           "quantity": 75,
           "unit": "g"
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R008",
@@ -91,7 +92,8 @@
           "quantity": 100,
           "unit": "g"
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R011",
@@ -143,7 +145,8 @@
           "quantity": 4,
           "unit": "sprigs"
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R017",
@@ -183,7 +186,8 @@
           "quantity": 2,
           "unit": "sprigs"
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R001",
@@ -241,7 +245,8 @@
           "quantity": 3,
           "unit": "sprigs"
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R006",
@@ -281,7 +286,8 @@
           "quantity": 200,
           "unit": "g"
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R012",
@@ -333,7 +339,8 @@
           "quantity": 400,
           "unit": "g"
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R013",
@@ -367,7 +374,8 @@
           "quantity": 4,
           "unit": ""
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R018",
@@ -401,7 +409,8 @@
           "quantity": 300,
           "unit": "g"
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R005",
@@ -447,7 +456,8 @@
           "quantity": 200,
           "unit": "g"
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R009",
@@ -499,7 +509,8 @@
           "quantity": 500,
           "unit": "g"
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R015",
@@ -527,7 +538,8 @@
           "quantity": 3,
           "unit": ""
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R002",
@@ -579,7 +591,8 @@
           "quantity": 300,
           "unit": "g"
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R007",
@@ -625,7 +638,8 @@
           "quantity": 600,
           "unit": "g"
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R016",
@@ -659,7 +673,8 @@
           "quantity": 3,
           "unit": "g"
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R010",
@@ -705,7 +720,8 @@
           "quantity": 200,
           "unit": "g"
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R003",
@@ -757,7 +773,8 @@
           "quantity": 4,
           "unit": "sprigs"
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R004",
@@ -803,7 +820,8 @@
           "quantity": 800,
           "unit": "g"
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R019",
@@ -843,7 +861,8 @@
           "quantity": null,
           "unit": ""
         }
-      ]
+      ],
+      "steps": []
     }
   ],
   "shoppingList": [

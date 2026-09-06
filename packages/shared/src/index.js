@@ -16,6 +16,8 @@ export {
   RECIPE_ID_MAX,
   RECIPE_INGREDIENTS_MAX,
   RECIPE_NAME_MAX,
+  RECIPE_STEPS_MAX,
+  STEP_MAX,
   UNIT_MAX,
   ajvOptions,
   createRecipeBody,

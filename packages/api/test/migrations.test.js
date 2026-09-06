@@ -3,6 +3,9 @@
 
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
+import { copyFile, mkdtemp, readdir, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import pg from 'pg';
 import { migrationsDir } from '../src/config.js';
@@ -42,6 +45,34 @@ test('migrations apply from empty to current', async (t) => {
     rows.map((row) => row.filename),
     result.applied,
   );
+});
+
+/** A directory holding every migration but the newest, cleaned up when the test ends. */
+async function everyMigrationBeforeTheNewest(t) {
+  const filenames = (await readdir(migrationsDir)).filter((name) => name.endsWith('.sql')).sort();
+  const dir = await mkdtemp(join(tmpdir(), 'migration-history-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+
+  for (const filename of filenames.slice(0, -1)) {
+    await copyFile(join(migrationsDir, filename), join(dir, filename));
+  }
+  return { dir, newest: filenames.at(-1) };
+}
+
+// The other half of "from empty": a deployment that is already running applies only what it has not
+// seen, onto the schema the migrations before it left. The test above proves a fresh database
+// reaches the current schema; this proves the newest migration is one an existing database can take,
+// which is what every homelab restart and every Demo restore actually does.
+test('the newest migration applies to a database holding the one before it', async (t) => {
+  const client = await emptyDatabase(t);
+  const { dir, newest } = await everyMigrationBeforeTheNewest(t);
+  const history = await runMigrations({ client, dir });
+  assert.ok(!history.applied.includes(newest), `${newest} was not held back`);
+
+  const result = await runMigrations({ client, dir: migrationsDir });
+
+  assert.deepEqual(result.applied, [newest]);
+  assert.deepEqual(result.alreadyApplied, history.applied);
 });
 
 test('a second run is a no-op', async (t) => {
