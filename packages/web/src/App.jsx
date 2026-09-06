@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   fetchVersion,
   deleteRecipe,
-  clearGotItMarks,
+  doneShopping,
   setIngredientAisle,
   setIngredientGotIt, 
   setIngredientPantry, 
@@ -266,26 +266,24 @@ export function MealPrepApp() {
     loadData(true);
   }, [loadData, toast]);
 
-  // Deliberate, and the only thing that clears a mark. Nothing else does: adding a forgotten Recipe
-  // mid-trip has to leave the ticks already earned in the store.
-  const handleClearGotIt = useCallback(async () => {
-    // The marks alone, not the list they sit on. Putting a whole captured list back would throw away
-    // a background reload that landed while the write was in flight, which is the stale snapshot
-    // ticket 06's review caught in RecipesPage. An entry that arrived since keeps what it arrived
-    // with.
-    const marks = new Map(shoppingList.map(entry => [entry.ingredientId, entry.gotIt]));
-
-    setShoppingList(prev => prev.map(entry => ({ ...entry, gotIt: false })));
+  // The end of a trip: every Recipe deselected and every Got It mark cleared, in one request the
+  // server runs as one transaction. The cook has already confirmed on the page before this runs.
+  //
+  // This one waits for the server and shows nothing optimistically, like the delete above and
+  // unlike the ticks. Emptying the page before the write lands would mean putting a whole list back
+  // if it failed, and a Shopping List reappearing after a cook watched it go is worse than a
+  // moment's wait. What replaces it is the server's own answer, which is also the only thing that
+  // knows what a second phone did while this was in flight.
+  const handleDoneShopping = useCallback(async () => {
     try {
-      await clearGotItMarks();
+      await doneShopping();
     } catch {
-      setShoppingList(prev => prev.map(entry => ({ ...entry, gotIt: marks.get(entry.ingredientId) ?? entry.gotIt })));
-      toast('Could not clear your marks. Nothing was saved.');
+      toast('Could not clear your list. Nothing was saved.');
       return;
     }
-    toast('Cleared every Got It mark');
+    toast('Shopping trip cleared');
     loadData(true);
-  }, [loadData, shoppingList, toast]);
+  }, [loadData, toast]);
 
   // This one waits for its write, unlike the two above. It moves an Ingredient between two lists
   // rather than flipping a field, and a cook does it when they notice one rather than twelve times
@@ -358,7 +356,7 @@ export function MealPrepApp() {
                 readOnly={degraded}
                 onToggleGotIt={handleToggleGotIt}
                 onSetAisle={handleSetAisle}
-                onClearGotIt={handleClearGotIt}
+                onDoneShopping={handleDoneShopping}
               />
             )}
             {tab === 'pantry' && (

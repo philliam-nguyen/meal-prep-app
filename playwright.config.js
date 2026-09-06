@@ -35,12 +35,12 @@ export default defineConfig({
   },
   // Which project a test runs on is a fact about the file's name, declared here, rather than a
   // skip inside the test: `*.desktop.spec.js` runs on Desktop only, `*.mobile.spec.js` on Mobile
-  // only, and a bare `*.spec.js` on both.
+  // only, `*.instance.spec.js` alone at the end, and a bare `*.spec.js` on both of the first two.
   projects: [
     {
       name: 'desktop',
       use: { ...devices['Desktop Chrome'] },
-      testIgnore: '**/*.mobile.spec.js',
+      testIgnore: ['**/*.mobile.spec.js', '**/*.instance.spec.js'],
     },
     {
       // WebKit rather than Chromium because the Homelab Variant is used from iPhones, and touch
@@ -48,7 +48,24 @@ export default defineConfig({
       // it is the closest thing a CI runner can launch.
       name: 'mobile',
       use: { ...devices['iPhone 14'] },
-      testIgnore: '**/*.desktop.spec.js',
+      testIgnore: ['**/*.desktop.spec.js', '**/*.instance.spec.js'],
+    },
+    {
+      // The one project that runs alone. Every test above arranges data nobody else can see, by
+      // giving its Recipe a name no other test in the run uses, because the database is shared and
+      // never truncated. That trick has nothing to offer a test about an action that is defined
+      // over the whole instance: Done Shopping deselects every Recipe there is, and the empty page
+      // it leaves is only empty if nothing else is selecting a Recipe at the time.
+      //
+      // So this project depends on the other two, which Playwright honours by running it only once
+      // they have finished. The cost is that a failure up there skips it rather than running it, a
+      // trade worth making for a suite that can be trusted rather than one that is usually right.
+      // A phone's viewport, because a cook taps this in a car park.
+      name: 'whole-instance',
+      use: { ...devices['iPhone 14'] },
+      testMatch: '**/*.instance.spec.js',
+      dependencies: ['desktop', 'mobile'],
+      fullyParallel: false,
     },
   ],
   // Playwright's own orchestration, in order: the API first, because Vite proxies to it. Both are
