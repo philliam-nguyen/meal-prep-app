@@ -4,7 +4,6 @@ import {
   createAisle,
   deleteAisle,
   deleteRecipe,
-  clearGotItMarks,
   renameAisle,
   reorderAisles,
   doneShopping,
