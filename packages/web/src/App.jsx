@@ -1,14 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   fetchVersion,
+  createAisle,
+  deleteAisle,
   deleteRecipe,
   clearGotItMarks,
+  renameAisle,
+  reorderAisles,
   setIngredientAisle,
   setIngredientGotIt, 
   setIngredientPantry, 
   setIngredientStaple, 
   setRecipeSelected 
 } from './api.js';
+import { walkAfterMoving } from './aisleOrder.js';
 import { loadCache, saveCache } from './cache.js';
 import { OFFLINE_NOTICE, readRenderableState } from './degraded.js';
 import { NO_BASELINE, startFreshnessPoll } from './freshness.js';
@@ -54,6 +59,9 @@ export function MealPrepApp() {
   const [pantryChecklist, setPantryChecklist] = useState([]);
   const [staples, setStaples] = useState([]);
   const [bestMatches, setBestMatches] = useState([]);
+  // The store's sections in the order they are walked. Position never reaches here: the array is
+  // the order, and a move sends the whole list of ids back.
+  const [aisles, setAisles] = useState([]);
   // A line the deployment configured, or null. It arrives in the payload like everything else here
   // and nothing in this app asks why it is set: the public instance says its data is a fixture
   // because something set the text, and the homelab says nothing because nothing did (ADR-0002).
@@ -97,6 +105,10 @@ export function MealPrepApp() {
       setPantryChecklist(state.pantryChecklist);
       setStaples(state.staples);
       setBestMatches(state.bestMatches);
+      // A payload from before Aisles became a list has none, which is the recording and an old
+      // cache. Empty rather than left alone, so the section reads as "no aisles yet" instead of
+      // showing a walk the backend no longer has.
+      setAisles(state.aisles ?? []);
       // Whatever this payload says, including the recording's null: the notice describes the
       // deployment that answered, and during an outage nothing answered. That is also why the
       // offline banner never has to share the screen with this one.
@@ -134,6 +146,7 @@ export function MealPrepApp() {
       if (cache.pantryChecklist) setPantryChecklist(cache.pantryChecklist);
       if (cache.staples) setStaples(cache.staples);
       if (cache.bestMatches) setBestMatches(cache.bestMatches);
+      if (cache.aisles) setAisles(cache.aisles);
       // Null rather than left alone when a cache predates the field, so a banner is never restored
       // from a cache written before the deployment configured one - or after it stopped.
       setNotice(cache.notice ?? null);
@@ -301,6 +314,64 @@ export function MealPrepApp() {
     loadData(true);
   }, [loadData, toast]);
 
+  // These four wait for the server rather than landing on screen first, unlike the Got It and
+  // Pantry ticks. A cook sets the walk up once and then leaves it alone, so there is no run of taps
+  // to keep ahead of, and the refusals here are ones only the server can make - a name another Aisle
+  // already has, a walk that has gone stale on this screen - which are worth showing as they are
+  // written rather than being flattened into "could not save".
+  const handleAddAisle = useCallback(async name => {
+    let added;
+    try {
+      added = await createAisle(name);
+    } catch (error) {
+      toast(error.message);
+      return;
+    }
+    // The name the server stored rather than the one that was typed, so a trimmed name is confirmed
+    // as what it actually became.
+    toast(`Added ${added.name}`);
+    loadData(true);
+  }, [loadData, toast]);
+
+  // Compared as typed rather than trimmed, for the reason handleSetAisle sends what it was given:
+  // trimming here would be the server's rule written a second time in the browser, which is the
+  // drift ADR-0005 keeps out. What this skips is a box closed without a keystroke in it.
+  const handleRenameAisle = useCallback(async (aisle, name) => {
+    if (name === aisle.name) return;
+    try {
+      await renameAisle(aisle.id, name);
+    } catch (error) {
+      toast(error.message);
+      return;
+    }
+    loadData(true);
+  }, [loadData, toast]);
+
+  // The whole walk goes back, computed from what is on screen. A button at either end of the list
+  // is already disabled, so a null here is a screen that has moved on rather than a mis-tap.
+  const handleMoveAisle = useCallback(async (aisle, step) => {
+    const walk = walkAfterMoving(aisles, aisle.id, step);
+    if (!walk) return;
+    try {
+      await reorderAisles(walk);
+    } catch (error) {
+      toast(error.message);
+      return;
+    }
+    loadData(true);
+  }, [aisles, loadData, toast]);
+
+  const handleRemoveAisle = useCallback(async aisle => {
+    try {
+      await deleteAisle(aisle.id);
+    } catch (error) {
+      toast(error.message);
+      return;
+    }
+    toast(`Removed ${aisle.name}`);
+    loadData(true);
+  }, [loadData, toast]);
+
   // Looked up on every render rather than held, so a Recipe that disappears takes its form with it.
   const editing = recipes.find(r => r.id === editingId) ?? null;
 
@@ -376,7 +447,18 @@ export function MealPrepApp() {
             {tab === 'add' && (
               <AddRecipePage readOnly={degraded} onRecipeAdded={() => loadData(true)} toast={toast} />
             )}
-            {tab === 'settings' && <SettingsPage onRefresh={handleRefresh} refreshing={refreshing} />}
+            {tab === 'settings' && (
+              <SettingsPage
+                aisles={aisles}
+                readOnly={degraded}
+                onRefresh={handleRefresh}
+                refreshing={refreshing}
+                onAddAisle={handleAddAisle}
+                onRenameAisle={handleRenameAisle}
+                onMoveAisle={handleMoveAisle}
+                onRemoveAisle={handleRemoveAisle}
+              />
+            )}
           </>
         )}
       </div>

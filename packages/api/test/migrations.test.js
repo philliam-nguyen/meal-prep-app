@@ -3,11 +3,20 @@
 
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
+import { copyFile, mkdtemp, readdir, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import pg from 'pg';
 import { migrationsDir } from '../src/config.js';
 import { runMigrations } from '../src/migrations.js';
 import { ownerDatabaseUrl } from './helpers/database.js';
+
+// Applying from empty is the other half of this: every deployment that already exists is on the
+// schema as it stood before, and a migration that only works on a fresh database is one nobody can
+// deploy. So the Aisle table is asked for twice - once at the end of a run from nothing, and once
+// on top of the schema the previous migration left.
+const AISLES_MIGRATION = '0004_aisles.sql';
 
 /** An empty database owned by the migration role, dropped when the test ends. */
 async function emptyDatabase(t) {
@@ -29,6 +38,22 @@ async function emptyDatabase(t) {
   });
 
   return client;
+}
+
+/**
+ * A directory holding the migrations that come before `upTo`, so a database can be brought to the
+ * schema as it stood before that file and the file can then be applied onto it. Filename order is
+ * the order the runner applies in, which is what makes "before" a string comparison.
+ */
+async function migrationsBefore(t, upTo) {
+  const dir = await mkdtemp(join(tmpdir(), 'meal-prep-migrations-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+
+  const filenames = (await readdir(migrationsDir)).filter((name) => name < upTo).sort();
+  for (const filename of filenames) {
+    await copyFile(join(migrationsDir, filename), join(dir, filename));
+  }
+  return { dir, filenames };
 }
 
 test('migrations apply from empty to current', async (t) => {
@@ -64,3 +89,20 @@ test('a migration edited after it was applied fails loudly', async (t) => {
 
   await assert.rejects(() => runMigrations({ client, dir: migrationsDir }), /changed after it was applied/);
 });
+
+test('the Aisle table arrives on top of the schema that came before it', async (t) => {
+  const client = await emptyDatabase(t);
+  const { dir, filenames } = await migrationsBefore(t, AISLES_MIGRATION);
+  const before = await runMigrations({ client, dir });
+  assert.deepEqual(before.applied, filenames);
+
+  const { applied } = await runMigrations({ client, dir: migrationsDir });
+
+  assert.ok(
+    applied.includes(AISLES_MIGRATION),
+    `expected ${AISLES_MIGRATION} to apply onto the prior schema, applied ${applied.join(', ')}`,
+  );
+  const { rows } = await client.query('select to_regclass($1) as table', ['public.aisles']);
+  assert.equal(rows[0].table, 'aisles');
+});
+
