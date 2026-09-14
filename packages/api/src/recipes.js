@@ -38,6 +38,15 @@ const INSERT_RECIPE_INGREDIENT = `
   values ($1, $2, $3, $4)
 `;
 
+// One statement for the whole list, because the position is the array's own ordinality rather than
+// anything the handler has to count. A Recipe's Steps are small and always written together, so
+// there is nothing to be gained by sending them one at a time.
+const INSERT_RECIPE_STEPS = `
+  insert into recipe_steps (recipe_id, position, text)
+  select $1, ordinality, step
+  from unnest($2::text[]) with ordinality as given (step, ordinality)
+`;
+
 // The Protected guard is in the statement rather than in a read the handler does first, so there is
 // no window between checking the flag and writing the row. `selected` and `protected` are absent on
 // purpose: neither is a field the body carries, and an edit that cleared the Selected Recipe flag
@@ -59,6 +68,11 @@ const UPDATE_RECIPE = `
 // what is here now is what the cook is looking at. Reconciling would be three statements deciding
 // which rows to keep, to answer a question the request has already answered.
 const DELETE_RECIPE_INGREDIENTS = 'delete from recipe_ingredients where recipe_id = $1';
+
+// Its Steps are replaced the same way and in the same transaction, for the same reason: the request
+// carries the whole list in the order the cook is looking at, so reconciling would be work done to
+// answer a question already answered. An empty list clears them.
+const DELETE_RECIPE_STEPS = 'delete from recipe_steps where recipe_id = $1';
 
 // recipe_ingredients cascades and the Shopping List is derived, so this is the whole of removing a
 // Recipe from the app. The Ingredients it named stay: each has an identity of its own carrying
@@ -141,6 +155,10 @@ function normalize(body) {
       quantity: ingredient.quantity ?? null,
       unit: (ingredient.unit ?? '').trim(),
     })),
+    // Trimmed for the reason the name is: a Step is read as a line, and leading whitespace a paste
+    // brought along is not part of the instruction. The schema has already refused a Step that is
+    // nothing but whitespace, so trimming cannot empty one here.
+    steps: (body.steps ?? []).map((step) => step.trim()),
   };
 }
 
@@ -223,11 +241,18 @@ async function insertRecipeIngredients(client, recipeId, ingredients) {
   }
 }
 
+/** Writes the Steps of a Recipe in the order they were sent. No rows when there are none. */
+async function insertRecipeSteps(client, recipeId, steps) {
+  if (steps.length === 0) return;
+  await client.query(INSERT_RECIPE_STEPS, [recipeId, steps]);
+}
+
 async function insertRecipe(client, recipe) {
   const { rows } = await client.query(INSERT_RECIPE, [recipe.name, recipe.type, recipe.cardUrl]);
   const recipeId = rows[0].id;
 
   await insertRecipeIngredients(client, recipeId, recipe.ingredients);
+  await insertRecipeSteps(client, recipeId, recipe.steps);
 
   return recipeId;
 }
@@ -368,6 +393,9 @@ export function registerRecipeRoutes(app) {
 
         await client.query(DELETE_RECIPE_INGREDIENTS, [id]);
         await insertRecipeIngredients(client, id, recipe.ingredients);
+
+        await client.query(DELETE_RECIPE_STEPS, [id]);
+        await insertRecipeSteps(client, id, recipe.steps);
 
         // The write an edit makes that a create cannot: the foods it stops naming leave their
         // Ingredients behind, so rewriting one Recipe with fresh names over and over grows the

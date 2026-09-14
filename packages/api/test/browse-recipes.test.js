@@ -157,6 +157,9 @@ describe('browsing Recipes', () => {
       selected: true,
       protected: false,
       ingredients: [{ ingredientId: 'I001', name: 'Leek', quantity: 3, unit: '' }],
+      // Empty rather than absent: a Recipe whose instructions are only its Recipe Card still says
+      // so, and this is the shape every reader of the payload is written against.
+      steps: [],
     });
   });
 });

@@ -40,6 +40,16 @@ export const QUANTITY_MIN = 0.001;
 // request.
 export const RECIPE_INGREDIENTS_MAX = 100;
 
+// One instruction, not a method. Long enough for the longest sentence a Recipe writes ("Brown the
+// beef in batches over a high heat, then set it aside while the vegetables soften") and short enough
+// that a pasted essay is refused as one Step rather than stored as one. The form shows the refusal
+// before it sends, because it compiles this same object.
+export const STEP_MAX = 300;
+
+// The per-Recipe ceiling on Steps, for the reason RECIPE_INGREDIENTS_MAX has one (ADR-0001): an
+// array with no maxItems is a row cap with a hole in it. Well past any Recipe anyone cooks from.
+export const RECIPE_STEPS_MAX = 100;
+
 // Scheme allowlist for the Recipe Card, and the whole of the stored-XSS fix: this URL is the one
 // user-supplied value that reaches an href, which React's text escaping does not cover. Matching
 // the literal scheme is what makes "javascript:" unrepresentable rather than filtered.
@@ -84,6 +94,15 @@ export const createRecipeBody = {
       type: 'array',
       maxItems: RECIPE_INGREDIENTS_MAX,
       items: recipeIngredient,
+    },
+    // Optional, and absent means none: a Recipe that only has a Recipe Card still saves. A blank
+    // Step is refused rather than dropped here, because the form drops its blank rows before it
+    // sends and a blank arriving from anything else is a caller sending nothing and calling it an
+    // instruction.
+    steps: {
+      type: 'array',
+      maxItems: RECIPE_STEPS_MAX,
+      items: { type: 'string', minLength: 1, maxLength: STEP_MAX, pattern: HAS_CONTENT },
     },
   },
 };

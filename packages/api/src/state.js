@@ -49,7 +49,18 @@ const recipesQuery = (where = '') => `
         where ri.recipe_id = r.id
       ),
       '[]'::json
-    ) as ingredients
+    ) as ingredients,
+    -- Steps nest for the reason Recipe Ingredients do: a Step is meaningless without its Recipe. An
+    -- array of strings rather than of objects, because the position is the array's own order and a
+    -- Step carries nothing else.
+    coalesce(
+      (
+        select json_agg(s.text order by s.position)
+        from recipe_steps s
+        where s.recipe_id = r.id
+      ),
+      '[]'::json
+    ) as steps
   from recipes r
   ${where}
   -- By name, because this is a browse list and the cook is looking for one they half-remember.
@@ -129,7 +140,7 @@ const recipeIngredient = {
 
 export const recipeSchema = {
   type: 'object',
-  required: ['id', 'name', 'type', 'cardUrl', 'selected', 'protected', 'ingredients'],
+  required: ['id', 'name', 'type', 'cardUrl', 'selected', 'protected', 'ingredients', 'steps'],
   additionalProperties: false,
   properties: {
     id: { type: 'string' },
@@ -139,6 +150,10 @@ export const recipeSchema = {
     selected: { type: 'boolean' },
     protected: { type: 'boolean' },
     ingredients: { type: 'array', items: recipeIngredient },
+    // Empty for a Recipe whose instructions are only its Recipe Card, which is most of them. Always
+    // present, never absent: a field that came and went with the data would leave every reader
+    // asking whether a Recipe has no Steps or this response forgot to say.
+    steps: { type: 'array', items: { type: 'string' } },
   },
 };
 
