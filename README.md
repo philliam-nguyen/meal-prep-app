@@ -182,15 +182,22 @@ degraded-mode bundle, which disables every write, and it is not a mock of the AP
 `docs/adr/0005-http-tests-against-real-postgres.md` carried into a browser, and that ADR's
 amendment says where the line between the two suites falls.
 
-Two projects, chosen by file name and declared in `playwright.config.js`:
+Three projects, chosen by file name and declared in `playwright.config.js`:
 
 - **Desktop**, Chromium at a desktop viewport, runs `*.desktop.spec.js` and any bare `*.spec.js`.
 - **Mobile**, WebKit with Playwright's iPhone descriptor and touch enabled, runs `*.mobile.spec.js`
   and any bare `*.spec.js`. WebKit rather than Chromium because the Homelab Variant is used from
   iPhones, and touch and scroll edge cases differ between engines.
+- **Whole-instance**, a phone viewport again, runs `*.instance.spec.js` and runs it alone: the
+  project depends on the other two, so Playwright starts it only once they have finished. It is for
+  the few tests about an action defined over everything in the instance rather than over one
+  Recipe - Done Shopping deselects every Recipe there is, and the empty page it leaves is only empty
+  while nothing else is selecting one. A failure in either project above skips this one rather than
+  running it, which is the price of the isolation.
 
-A test belongs to Mobile if a finger is what it is about, to Desktop if a mouse is, and to both if
-the page merely has to render. To add one: put a spec in `test/browser/`, seed the data it needs
+A test belongs to Mobile if a finger is what it is about, to Desktop if a mouse is, to both if the
+page merely has to render, and to Whole-instance only if a unique Recipe name cannot keep it out of
+another test's way. To add one: put a spec in `test/browser/`, seed the data it needs
 through the running API with the helpers in `test/browser/helpers/recipes.js` (they mirror the API
 suite's helpers, speak HTTP to the throwaway port, and fail the test with the API's own message if
 a write is refused), and assert what a person would see. Recipes are named uniquely per test

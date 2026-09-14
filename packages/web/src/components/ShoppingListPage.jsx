@@ -58,26 +58,28 @@ function AisleField({ entry, readOnly, onSetAisle }) {
 }
 
 /**
- * The one action that clears every Got It mark, behind one confirmation. Nothing else clears them -
- * adding a forgotten Recipe mid-trip leaves the ticks already earned in the store - which is what
- * makes this the button that can undo a whole shop and worth asking about.
+ * The end of a trip: every Recipe deselected and every Got It mark cleared, behind one
+ * confirmation. It empties the page a cook is standing in front of, and the tap that sends it
+ * happens in a car park with a phone in one hand, so it asks first. Asking inline rather than in a
+ * dialog, in the position and style the control it replaces stood in.
  */
-function ClearGotItButton({ readOnly, onClearGotIt }) {
+function DoneShoppingButton({ readOnly, onDoneShopping }) {
   const [asking, setAsking] = useState(false);
 
+  // Read-only never opens the question, so there is no Yes to press that could not be honoured.
   if (!asking || readOnly) {
     return (
       <button className="btn-secondary" disabled={readOnly} onClick={() => setAsking(true)}>
-        Clear all Got It marks
+        Done Shopping
       </button>
     );
   }
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
-      <span style={{ fontSize: 13, color: '#7A7568' }}>Clear every mark?</span>
-      <button className="btn-primary" style={{ padding: '8px 18px', fontSize: 14 }} onClick={() => { setAsking(false); onClearGotIt(); }}>
-        Yes, clear them
+      <span style={{ fontSize: 13, color: '#7A7568' }}>Clear the list and start fresh?</span>
+      <button className="btn-primary" style={{ padding: '8px 18px', fontSize: 14 }} onClick={() => { setAsking(false); onDoneShopping(); }}>
+        Yes, I'm done
       </button>
       <button className="btn-secondary" style={{ padding: '8px 18px' }} onClick={() => setAsking(false)}>
         Cancel
@@ -86,7 +88,7 @@ function ClearGotItButton({ readOnly, onClearGotIt }) {
   );
 }
 
-export function ShoppingListPage({ shoppingList, readOnly, onToggleGotIt, onSetAisle, onClearGotIt }) {
+export function ShoppingListPage({ shoppingList, readOnly, onToggleGotIt, onSetAisle, onDoneShopping }) {
   if (shoppingList.length === 0) {
     return (
       <div className="empty-state fade-in">
@@ -126,7 +128,7 @@ export function ShoppingListPage({ shoppingList, readOnly, onToggleGotIt, onSetA
         ))}
       </div>
       <div style={{ display: 'flex', justifyContent: 'center', marginTop: 20 }}>
-        <ClearGotItButton readOnly={readOnly} onClearGotIt={onClearGotIt} />
+        <DoneShoppingButton readOnly={readOnly} onDoneShopping={onDoneShopping} />
       </div>
     </div>
   );

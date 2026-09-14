@@ -145,13 +145,19 @@ export async function setIngredientAisle(ingredientId, aisle) {
 }
 
 /**
- * The one action that clears every Got It mark, for a cook starting a new list. Nothing else clears
- * them: adding a forgotten Recipe mid-trip has to leave the ticks already earned in the store.
+ * Done Shopping: the trip is over, so every Recipe is deselected and every Got It mark cleared.
+ *
+ * One request rather than two, and the server does both in one transaction, because a phone that
+ * loses its connection in the car park would otherwise leave a list half cleared. It lands the same
+ * way however many times it arrives, so the retry after a dropped response is safe to send.
+ *
+ * Nothing comes back. The Shopping List is derived on the server, so what is left of it - nothing -
+ * arrives with the next state request rather than from this reply.
  */
-export async function clearGotItMarks() {
-  const response = await fetch('/api/shopping-list/got-it', { method: 'DELETE' });
+export async function doneShopping() {
+  const response = await fetch('/api/shopping-list', { method: 'DELETE' });
   if (!response.ok) {
-    throw new Error(`DELETE /api/shopping-list/got-it returned ${response.status}`);
+    throw new Error(`DELETE /api/shopping-list returned ${response.status}`);
   }
 }
 

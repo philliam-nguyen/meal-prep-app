@@ -21,6 +21,7 @@ import {
   RECIPE_INGREDIENTS_MAX,
   createRecipeBody,
 } from '@meal-prep/shared';
+import { clearMarksOffTheList } from './shoppingList.js';
 import { readRecipe, recipeSchema } from './state.js';
 
 const INSERT_RECIPE = `
@@ -475,20 +476,42 @@ export function registerRecipeRoutes(app) {
   // No body comes back. The caller already knows what it set, and the Shopping List this changes is
   // derived rather than stored, so the only honest way to read it is the state request the client
   // makes next. Returning a stale-by-construction rollup from a write would be worse than silence.
+  //
+  // A transaction, because taking a Recipe off the list is two writes that have to be one: the
+  // Recipe stops being Selected, and the Got It marks on whatever left the list with it are
+  // cleared. Committing the first without the second would leave a tick on an Ingredient that is
+  // not on the list to be unticked from, which is the pre-ticked entry this rule exists to remove.
   app.put(
     '/api/recipes/:id/selected',
     { schema: { params: recipeIdParams, body: selectedBody } },
     async (request, reply) => {
-      const { rowCount } = await app.db.query(SET_SELECTED, [
-        request.params.id,
-        request.body.selected,
-        // Null rather than 1 when the request carries no Batch, so the statement can tell "make it
-        // one" from "the request did not say".
-        request.body.batch ?? null,
-      ]);
+      const { id } = request.params;
+      const { selected } = request.body;
+      // Null rather than 1 when the request carries no Batch, so the statement can tell "make it
+      // one" from "the request did not say".
+      const batch = request.body.batch ?? null;
 
-      if (rowCount === 0) {
-        return reply.code(404).send({ message: `There is no Recipe ${request.params.id}.` });
+      const client = await app.db.connect();
+      try {
+        await client.query('begin');
+
+        const { rowCount } = await client.query(SET_SELECTED, [id, selected, batch]);
+        if (rowCount === 0) {
+          await client.query('rollback');
+          return reply.code(404).send({ message: `There is no Recipe ${id}.` });
+        }
+
+        // Only on the way off the list. Selecting clears nothing, which is what lets a cook come
+        // back for a forgotten Recipe mid-trip without losing the ticks already earned in the
+        // store; removing only ever clears what the removal took off the list.
+        if (!selected) await clearMarksOffTheList(client);
+
+        await client.query('commit');
+      } catch (cause) {
+        await client.query('rollback');
+        throw cause;
+      } finally {
+        client.release();
       }
 
       return reply.code(204).send();

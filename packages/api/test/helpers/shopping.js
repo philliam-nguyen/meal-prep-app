@@ -31,6 +31,15 @@ export async function clearGotItMarks(app) {
   assert.equal(response.statusCode, 204, response.body);
 }
 
+/**
+ * Done Shopping: the end of a trip, which deselects every Recipe and clears every Got It mark in
+ * one request. One call rather than two, so a dropped response cannot leave the trip half over.
+ */
+export async function doneShopping(app) {
+  const response = await app.inject({ method: 'DELETE', url: '/api/shopping-list' });
+  assert.equal(response.statusCode, 204, response.body);
+}
+
 /** Whether each entry is ticked, keyed by Ingredient name, as a cook reads the list. */
 export function gotItByIngredient(shoppingList) {
   return Object.fromEntries(shoppingList.map((entry) => [entry.name, entry.gotIt]));

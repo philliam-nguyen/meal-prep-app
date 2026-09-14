@@ -14,6 +14,7 @@
 // Every statement is parameterized.
 
 import { AISLE_MAX } from '@meal-prep/shared';
+import { clearEveryMark } from './shoppingList.js';
 
 // Matches the length the schema caps an id at, so a request cannot get a long string echoed back in
 // a refusal.
@@ -61,18 +62,6 @@ const SET_AISLE = `
   update ingredients
   set aisle = $2
   where id = $1
-`;
-
-// Every mark, not the marks on whatever the Shopping List happens to derive to right now. The stale
-// tick this exists to answer is exactly the Ingredient that has dropped off the list and will come
-// back pre-ticked on the next trip.
-//
-// The `where got_it` guard means a clear touches only the rows it changes, so a list of two ticks
-// does not rewrite every Ingredient in the database to say the same thing twice.
-const CLEAR_GOT_IT = `
-  update ingredients
-  set got_it = false
-  where got_it
 `;
 
 const FIND_INGREDIENT = 'select name, staple from ingredients where id = $1';
@@ -247,11 +236,13 @@ export function registerIngredientRoutes(app) {
   // DELETE rather than a POST, so the method says what a second one does: clearing marks that are
   // already clear leaves the same state, and a retry after a dropped response cannot overshoot.
   //
-  // Deliberate and nothing else triggers it. Auto-clearing on a change to the Selected Recipes was
-  // rejected in the spec: adding a forgotten Recipe mid-trip would wipe the ticks already earned in
-  // the store, which is worse than the mark that never resets.
+  // No control on any page sends this any more: the cook's end-of-trip button is Done Shopping,
+  // which clears the marks and deselects the Recipes together (see shoppingList.js). This survives
+  // for the Seed recording and for scripts that clear marks without ending a trip, which is why the
+  // clearing itself is a function shared with Done Shopping rather than a second copy of one
+  // statement that would then be free to drift.
   app.delete('/api/shopping-list/got-it', async (request, reply) => {
-    await app.db.query(CLEAR_GOT_IT);
+    await clearEveryMark(app.db);
     return reply.code(204).send();
   });
 }

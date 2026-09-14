@@ -42,6 +42,14 @@ export async function createRecipeWith(request, ingredients) {
   });
 }
 
+/** Marks a Recipe as a Selected Recipe, or unmarks it, which is what puts it on the Shopping List. */
+export async function setSelected(request, recipeId, selected) {
+  const response = await request.put(`${API_ORIGIN}/api/recipes/${recipeId}/selected`, {
+    data: { selected },
+  });
+  expect(response.status(), await response.text()).toBe(204);
+}
+
 /** Every Recipe as the browse list sees it. */
 export async function readRecipes(request) {
   return (await readState(request)).recipes;

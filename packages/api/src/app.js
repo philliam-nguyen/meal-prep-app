@@ -8,6 +8,7 @@ import { defaultWebDist } from './config.js';
 import { registerGuardrails } from './guardrails.js';
 import { registerIngredientRoutes } from './ingredients.js';
 import { registerRecipeRoutes } from './recipes.js';
+import { registerShoppingListRoutes } from './shoppingList.js';
 import { readState, stateResponse } from './state.js';
 import { registerVersionRoute } from './version.js';
 
@@ -118,6 +119,7 @@ export async function buildApp({
   registerRecipeRoutes(app);
   registerIngredientRoutes(app);
   registerAisleRoutes(app);
+  registerShoppingListRoutes(app);
   registerVersionRoute(app);
 
   if (bundleExists(staticRoot)) {
