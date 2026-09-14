@@ -134,3 +134,29 @@ test('the Aisle table arrives on top of the schema that came before it', async (
   assert.equal(rows[0].table, 'aisles');
 });
 
+
+// Applying from empty is only half of what a migration has to do. The other half is the homelab
+// instance on the morning it lands: a database at the previous schema with a cook's Recipes already
+// in it. A column added not null needs a default every existing row can take, and a check
+// constraint added to a populated table has to be one every existing row already satisfies.
+test('the Batch column arrives on a database that already holds Recipes', async (t) => {
+  const client = await emptyDatabase(t);
+  const { dir } = await migrationsBefore(t, '0006_recipe_batch.sql');
+  await runMigrations({ client, dir });
+  const { rows: before } = await client.query(
+    "insert into recipes (name, type) values ('Minestrone', 'Soup') returning id",
+  );
+
+  await runMigrations({ client, dir: migrationsDir });
+
+  const { rows } = await client.query('select batch from recipes where id = $1', [before[0].id]);
+  assert.deepEqual(rows, [{ batch: 1 }], 'a Recipe from before the migration is not made once');
+  // The range is the column's own rule and not only the route's, so a write that never went through
+  // the API cannot make the Shopping List multiply by something nobody could have asked for.
+  await assert.rejects(
+    () => client.query('update recipes set batch = 0'),
+    /recipes_batch_range/,
+    'the column took a Batch of 0',
+  );
+  await assert.rejects(() => client.query('update recipes set batch = 10'), /recipes_batch_range/);
+});

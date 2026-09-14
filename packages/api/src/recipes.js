@@ -14,7 +14,13 @@
 //
 // Every statement is parameterized. Nothing on this path builds SQL from a string.
 
-import { RECIPE_ID_MAX, RECIPE_INGREDIENTS_MAX, createRecipeBody } from '@meal-prep/shared';
+import {
+  BATCH_MAX,
+  BATCH_MIN,
+  RECIPE_ID_MAX,
+  RECIPE_INGREDIENTS_MAX,
+  createRecipeBody,
+} from '@meal-prep/shared';
 import { readRecipe, recipeSchema } from './state.js';
 
 const INSERT_RECIPE = `
@@ -90,8 +96,22 @@ const FIND_RECIPE = 'select name, protected from recipes where id = $1';
 
 // No "returning", because the row count already answers the only question the handler asks: whether
 // a Recipe by that id was there to update.
+//
+// The Batch moves in this same statement rather than in one beside it, and that matters most on the
+// way out: a deselect that reset the Batch afterwards would leave a window where the Recipe is off
+// the Shopping List but still carrying last month's triple, and a failure between the two would
+// leave it there for good. Deselecting therefore ignores whatever Batch was sent, which is also
+// what makes an unselected Recipe always report a Batch of 1.
+//
+// Selecting without a Batch leaves the Batch alone: the request said nothing about it, so it
+// changes nothing about it. Since deselecting resets, the only Recipe that has a Batch to leave
+// alone is one already selected, which is exactly the cook re-tapping Add on a Recipe they had
+// already set to three.
 const SET_SELECTED = `
-  update recipes set selected = $2 where id = $1
+  update recipes
+  set selected = $2::boolean,
+      batch = case when $2::boolean then coalesce($3::integer, batch) else 1 end
+  where id = $1
 `;
 
 // The absolute ceilings on rows (ADR-0001). Counting and then inserting is only an approximate cap:
@@ -127,11 +147,19 @@ const namesOneFoodTwice = (cause) =>
 // Setting the flag rather than flipping it. Both phones on one instance can send a toggle, and a
 // flip would land in whatever order they arrived; a set is idempotent, so last-write-wins is
 // correct here rather than a compromise, and a retry after a dropped response cannot undo itself.
+//
+// The Batch rides along optionally rather than having a write of its own. Setting one is what a
+// cook does while selecting the Recipe, and a Batch on a Recipe nobody selected means nothing, so
+// there is no moment at which it wants its own endpoint. An integer, because half a Batch produces
+// amounts the Shopping List cannot show honestly; bounded by the numbers the stepper stops at.
 const selectedBody = {
   type: 'object',
   required: ['selected'],
   additionalProperties: false,
-  properties: { selected: { type: 'boolean' } },
+  properties: {
+    selected: { type: 'boolean' },
+    batch: { type: 'integer', minimum: BATCH_MIN, maximum: BATCH_MAX },
+  },
 };
 
 const recipeIdParams = {
@@ -454,6 +482,9 @@ export function registerRecipeRoutes(app) {
       const { rowCount } = await app.db.query(SET_SELECTED, [
         request.params.id,
         request.body.selected,
+        // Null rather than 1 when the request carries no Batch, so the statement can tell "make it
+        // one" from "the request did not say".
+        request.body.batch ?? null,
       ]);
 
       if (rowCount === 0) {
