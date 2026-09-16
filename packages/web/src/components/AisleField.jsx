@@ -8,21 +8,31 @@
 // shape - a Shopping List entry or an Ingredient from the bulk view - since both carry a `name` and
 // an `aisleId` and that is all this reads.
 //
-// The selected option is the label: closed, it reads the Aisle's name, or the clear option's text
-// when there is none. Setting one for the first time and correcting one that is wrong are the same
-// act through the same control, the way the free-text box worked before it.
+// The selected option is the label: closed, it reads the Aisle's name, or "Set aisle" where there
+// is none. Setting one for the first time and correcting one that is wrong are the same act through
+// the same control, the way the free-text box worked before it - the clear option is always on
+// offer, not only for an already-unassigned entry.
+//
+// The dashed underline is the mock's "this still needs sorting" mark (mock decision 4): it reads
+// off whether the entry itself has an Aisle, not which group it happens to render in, so it marks
+// an unfiled Ingredient the same way in the Shopping List and the Settings bulk view.
 
 export function AisleField({ entry, aisles, readOnly, onSetAisle }) {
+  const unassigned = entry.aisleId == null;
   return (
     <select
       className="aisle-picker"
-      style={{ display: 'block', marginTop: 4, padding: '2px 20px 2px 0', fontSize: 12, color: '#A39E93', background: 'none', border: 'none', fontFamily: 'inherit', cursor: readOnly ? 'not-allowed' : 'pointer' }}
+      style={{
+        display: 'block', marginTop: 4, padding: '2px 20px 2px 0', fontSize: 12, color: '#A39E93',
+        background: 'none', border: 'none', borderBottom: unassigned ? '1px dashed #C9C2B4' : 'none',
+        fontFamily: 'inherit', cursor: readOnly ? 'not-allowed' : 'pointer',
+      }}
       value={entry.aisleId ?? ''}
       disabled={readOnly}
       aria-label={`Aisle for ${entry.name}`}
       onChange={event => onSetAisle(entry, event.target.value || null)}
     >
-      <option value="">No aisle</option>
+      <option value="">Set aisle</option>
       {aisles.map(aisle => (
         <option key={aisle.id} value={aisle.id}>{aisle.name}</option>
       ))}
