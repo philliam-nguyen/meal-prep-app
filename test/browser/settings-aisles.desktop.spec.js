@@ -78,7 +78,9 @@ test('a cook sets up the walk through their store', async ({ page }) => {
   await page.getByRole('button', { name: `Rename ${bakery}` }).click();
   await page.getByLabel(`New name for ${bakery}`).fill(bread);
   await page.getByLabel(`New name for ${bakery}`).press('Enter');
-  await expect(page.getByText(bread)).toBeVisible();
+  // Scoped to the walk's own rows: the bulk-filing pickers below list every Aisle as an option,
+  // so the bare text is ambiguous the moment a concurrent test leaves an Ingredient behind.
+  await expect(page.locator('[data-aisle-name]', { hasText: bread })).toBeVisible();
   expect(await namesOnScreen(page)).toEqual([produce, bread]);
 
   // Removed, behind the one question the control asks first.
