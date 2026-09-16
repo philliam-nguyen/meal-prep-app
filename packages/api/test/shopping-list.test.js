@@ -329,6 +329,7 @@ describe('the Shopping List', () => {
         name: 'Onion',
         aisleId: null,
         gotIt: false,
+        covered: false,
         amounts: [{ quantity: 2, unit: '' }],
       },
     ]);

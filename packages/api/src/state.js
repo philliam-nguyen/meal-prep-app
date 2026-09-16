@@ -90,6 +90,11 @@ const RECIPE_BY_ID_QUERY = recipesQuery('where r.id = $1');
 //
 // Got It and Aisle are read from the Ingredient itself rather than from anything this derives, which
 // is what lets the list be recomputed on every read without losing what the cook marked.
+//
+// Covered is read the same way, off the Ingredient's own Pantry membership rather than anything
+// stored against the entry: a cook who has an Ingredient on the shelf does not need to buy it again,
+// and the moment it leaves the Pantry the next read says so with no write of its own. It is never
+// true for a Staple, since ingredients.js refuses to ever set in_pantry on one.
 const SHOPPING_LIST_QUERY = `
   with needed as (
     select
@@ -115,6 +120,7 @@ const SHOPPING_LIST_QUERY = `
     i.name,
     i.aisle_id as "aisleId",
     i.got_it as "gotIt",
+    i.in_pantry as "covered",
     coalesce(
       (
         select json_agg(
@@ -185,7 +191,7 @@ const shoppingListAmount = {
 
 const shoppingListEntry = {
   type: 'object',
-  required: ['ingredientId', 'name', 'aisleId', 'gotIt', 'amounts'],
+  required: ['ingredientId', 'name', 'aisleId', 'gotIt', 'covered', 'amounts'],
   additionalProperties: false,
   properties: {
     ingredientId: { type: 'string' },
@@ -196,6 +202,11 @@ const shoppingListEntry = {
     // step with a rename.
     aisleId: { type: ['string', 'null'] },
     gotIt: { type: 'boolean' },
+    // Derived off Pantry membership on every read, never stored: true when this Ingredient is in
+    // the Pantry, so buying more of it is redundant. Distinct from gotIt - the trolley already has
+    // this trip's amount, this says the kitchen already had some before the trip started - and both
+    // can be true at once, since buying more of something on hand is not forbidden.
+    covered: { type: 'boolean' },
     // Empty when every Selected Recipe leaves this Ingredient unquantified. The cook still has to
     // buy it; nobody can say how much.
     amounts: { type: 'array', items: shoppingListAmount },

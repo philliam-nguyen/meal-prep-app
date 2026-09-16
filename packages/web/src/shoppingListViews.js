@@ -13,9 +13,10 @@
  * under contributes no group at all, so the walk on screen is only as long as what is being bought,
  * and the unassigned group is the same: absent when everything has a home.
  *
- * Within a group, entries not yet Got It come first and Got It entries sink to the bottom, each
- * half kept in the order it arrived in - the same rule the ungrouped list already applied over the
- * whole thing, run once per group instead of once over the top.
+ * Within a group, entries neither Got It nor Covered come first, and the rest - Got It, Covered, or
+ * both - sink to the bottom, each half kept in the order it arrived in: the same rule the ungrouped
+ * list already applied over the whole thing, run once per group instead of once over the top, now
+ * over two marks that each sink an entry rather than one.
  */
 export function groupByAisle(shoppingList, aisles) {
   const byAisleId = new Map(aisles.map(aisle => [aisle.id, []]));
@@ -26,7 +27,8 @@ export function groupByAisle(shoppingList, aisles) {
     (bucket ?? unassigned).push(entry);
   }
 
-  const sunk = entries => [...entries.filter(e => !e.gotIt), ...entries.filter(e => e.gotIt)];
+  const settled = e => e.gotIt || e.covered;
+  const sunk = entries => [...entries.filter(e => !settled(e)), ...entries.filter(settled)];
 
   const groups = aisles
     .map(aisle => ({ aisleId: aisle.id, name: aisle.name, entries: sunk(byAisleId.get(aisle.id)) }))
