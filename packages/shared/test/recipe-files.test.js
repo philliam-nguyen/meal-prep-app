@@ -92,7 +92,43 @@ describe('parsing a text recipe file', () => {
   });
 
   it('reports nothing usable for a file it cannot read', () => {
-    assert.deepEqual(parseTextFile('a shopping receipt\n'), { name: '', ingredients: [] });
+    assert.deepEqual(parseTextFile('a shopping receipt\n'), { name: '', ingredients: [], steps: [] });
+  });
+
+  it('reads the lines after Instructions as Steps with their ordinals stripped', () => {
+    const text =
+      'Ingredients:\n- 500 g beef shin\nInstructions:\n1. Brown the beef in batches.\n' +
+      '2. Add carrots and stock, simmer two hours.\n';
+
+    const { steps } = parseTextFile(text);
+
+    assert.deepEqual(steps, [
+      'Brown the beef in batches.',
+      'Add carrots and stock, simmer two hours.',
+    ]);
+  });
+
+  it('strips a `)`, `-` or `*` ordinal from a Step the same way', () => {
+    const text = 'Instructions:\n1) Brown the beef.\n- Add the stock.\n* Simmer two hours.\n';
+
+    const { steps } = parseTextFile(text);
+
+    assert.deepEqual(steps, ['Brown the beef.', 'Add the stock.', 'Simmer two hours.']);
+  });
+
+  it('reports no Steps for a file with no Instructions section', () => {
+    const { steps } = parseTextFile('Ingredients:\n- 2 cups rice\n');
+
+    assert.deepEqual(steps, []);
+  });
+
+  it('still stops the Ingredient section at the Instructions heading with Steps present', () => {
+    const text = 'Ingredients:\n- 2 cups rice\nInstructions:\n- heat the pan\n';
+
+    const { ingredients, steps } = parseTextFile(text);
+
+    assert.deepEqual(ingredients, [{ name: 'rice', quantity: 2, unit: 'cups' }]);
+    assert.deepEqual(steps, ['heat the pan']);
   });
 });
 
@@ -133,6 +169,37 @@ describe('parsing a CSV recipe file', () => {
     const { ingredients } = parseCsvFile(`${header}Pepper,a pinch,\n`, 'Bread.csv');
 
     assert.deepEqual(ingredients, [{ name: 'Pepper', quantity: null, unit: '' }]);
+  });
+
+  it('reports no Steps for a CSV with no Instructions block', () => {
+    const { steps } = parseCsvFile(`${header}Flour,500,g\n`, 'Bread.csv');
+
+    assert.deepEqual(steps, []);
+  });
+
+  it('reads the lines after the Instructions block as Steps taken whole, commas included', () => {
+    const text =
+      `${header}beef shin,500,g\ncarrots,2,\nInstructions:\nBrown the beef in batches.\n` +
+      'Add carrots and stock, simmer two hours.\n';
+
+    const parsed = parseCsvFile(text, 'Beef Stew.csv');
+
+    assert.deepEqual(parsed.ingredients, [
+      { name: 'beef shin', quantity: 500, unit: 'g' },
+      { name: 'carrots', quantity: 2, unit: '' },
+    ]);
+    assert.deepEqual(parsed.steps, [
+      'Brown the beef in batches.',
+      'Add carrots and stock, simmer two hours.',
+    ]);
+  });
+
+  it('matches the Instructions row case-insensitively and strips ordinals from its Steps', () => {
+    const text = `${header}Flour,500,g\ninstructions:\n1. Mix the flour.\n`;
+
+    const { steps } = parseCsvFile(text, 'Bread.csv');
+
+    assert.deepEqual(steps, ['Mix the flour.']);
   });
 });
 
