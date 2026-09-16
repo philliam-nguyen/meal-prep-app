@@ -104,6 +104,12 @@ const RECIPES = [
       { name: 'Butter', quantity: 125, unit: 'g' },
       { name: 'Salt', quantity: null, unit: '' },
     ],
+    steps: [
+      'Melt the butter and soften the leek for five minutes.',
+      'Stir in the flour and cook for a minute, then add the stock and cream.',
+      'Add the chicken and thyme, season with salt, and simmer until the chicken is cooked through.',
+      'Spoon into a pie dish, top with pastry and bake at 200C until golden, about 25 minutes.',
+    ],
   },
   {
     name: 'Mushroom Stroganoff',
@@ -237,6 +243,12 @@ const RECIPES = [
       { name: 'Thyme', quantity: 4, unit: 'sprigs' },
       { name: 'Plain flour', quantity: 2, unit: 'tbsp' },
     ],
+    steps: [
+      'Toss the beef in the flour and brown it in batches, setting each batch aside.',
+      'Soften the onion, carrot and celery in the same pot.',
+      'Return the beef, pour in the ale, add the thyme, and bring to a simmer.',
+      'Cover and cook low for two and a half hours, until the beef is tender.',
+    ],
   },
   {
     name: 'Chickpea and Tomato Stew',
@@ -261,6 +273,12 @@ const RECIPES = [
       { name: 'Eggs', quantity: 4, unit: '' },
       { name: 'Double cream', quantity: 300, unit: 'ml' },
       { name: 'Caster sugar', quantity: 50, unit: 'g' },
+    ],
+    steps: [
+      'Melt the chocolate and leave it to cool slightly.',
+      'Whisk the egg yolks with the sugar until pale, then fold in the chocolate.',
+      'Whip the cream to soft peaks and fold it through.',
+      'Whisk the egg whites to stiff peaks and fold in gently, then chill for at least four hours.',
     ],
   },
   {
@@ -295,6 +313,12 @@ const RECIPES = [
       { name: 'Yeast', quantity: 3, unit: 'g' },
       { name: 'Water', quantity: 350, unit: 'ml' },
       { name: 'Salt', quantity: 10, unit: 'g' },
+    ],
+    steps: [
+      'Mix the flour, yeast, water and salt into a shaggy dough.',
+      'Cover and leave at room temperature overnight, at least twelve hours.',
+      'Turn onto a floured surface, shape into a loaf, and prove for an hour.',
+      'Bake at 230C for 30 to 35 minutes, until the base sounds hollow when tapped.',
     ],
   },
   {
