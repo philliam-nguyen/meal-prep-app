@@ -10,7 +10,8 @@
 // mock's capped, scrolling area is for.
 
 import { expect, test } from '@playwright/test';
-import { createRecipeWith, setSelected, uniqueName } from './helpers/recipes.js';
+import { createRecipe, createRecipeWith, setSelected, uniqueName } from './helpers/recipes.js';
+import { openRecipe } from './helpers/sheet.js';
 
 /** Opens the app on the Shopping List page, the way a cook reaches it: the tab at the bottom. */
 async function openShoppingList(page) {
@@ -54,4 +55,23 @@ test('the Shopping List shows the Selected Recipes; removing one removes its Ing
   // row leaves the area and its Ingredient leaves the grouped list below without a page reload.
   await expect(row).toHaveCount(0);
   await expect(shoppingRow(page, ingredientName)).toHaveCount(0);
+});
+
+test('a Batch set on the sheet shows as a chip on the Selected Recipe row', async ({ page, request }) => {
+  const recipe = await createRecipe(request, {
+    name: uniqueName('Leek and Potato Soup'),
+    type: 'Soup',
+    ingredients: [{ name: uniqueName('Leek'), quantity: 3, unit: 'g' }],
+  });
+  await openRecipe(page, recipe.name);
+  await page.getByRole('button', { name: 'Make one more batch' }).click();
+  await page.getByRole('button', { name: 'Add to Shopping List' }).click();
+
+  await openShoppingList(page);
+
+  const row = selectedRecipeRow(page, recipe.name);
+  await expect(row).toBeVisible();
+  // 2x, not a 1x chip the mock decided to keep off the row: the slot between the Type badge and
+  // the remove control only fills in once the Batch is above 1.
+  await expect(row.getByText('2×', { exact: true })).toBeVisible();
 });
