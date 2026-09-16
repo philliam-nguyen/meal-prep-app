@@ -306,6 +306,13 @@ new entity and lifecycle for a feature nobody asked for. Auto-clearing on any ch
 Recipes was rejected because adding a forgotten Recipe mid-trip would wipe ticks accumulated in the
 store, which is worse than the bug.
 
+This section's rule that nothing but the explicit button clears Got It was overturned on
+2026-09-14 by [Spec 0003](0003-shopping-list-by-aisle-with-the-recipes-that-feed-it.md):
+deselecting a Recipe now also clears Got It on Ingredients that leave the Shopping List, and Done
+Shopping is a second action that clears every mark. The reason the single-action rule existed
+still holds — adding a forgotten Recipe mid-trip must not wipe ticks — because adding a Recipe
+never clears anything and removing one only clears what left the list.
+
 ### Freshness
 
 The API exposes a cheap version endpoint returning the maximum update timestamp across mutable
