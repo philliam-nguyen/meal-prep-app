@@ -21,6 +21,10 @@ const MIXED_NUMBER = /^(\d+)\s+(\d+)\/(\d+)$/;
 const FRACTION = /^(\d+)\/(\d+)$/;
 const DECIMAL = /^\d+(?:\.\d+)?$/;
 
+// The app numbers Steps itself, so whatever numbering or bullet a file already carries is stripped
+// on the way in rather than kept as part of the text.
+const ORDINAL = /^(?:\d+[.)]|[-*])\s*/;
+
 // A mixed number has to be tried before a bare one, or "1 1/2 cups" reads as one cup.
 const QUANTITY_PREFIX = /^(\d+\s+\d+\/\d+|\d+(?:[./]\d+)?)\s+(.+)$/;
 
@@ -89,6 +93,17 @@ function readIngredients(lines) {
     .filter((ingredient) => ingredient.name);
 }
 
+/** Every non-empty line after the `Instructions:` heading, ordinal stripped, becomes one Step. */
+function readSteps(lines) {
+  const start = lines.findIndex((line) => /^instructions:/i.test(line));
+  if (start === -1) return [];
+
+  return lines
+    .slice(start + 1)
+    .filter(Boolean)
+    .map((line) => line.replace(ORDINAL, '').trim());
+}
+
 /** Splits one CSV row, keeping a comma that sits inside a quoted field. */
 function splitCsvRow(row) {
   const columns = [];
@@ -112,14 +127,23 @@ const toLines = (text) => text.split('\n').map((line) => line.trim());
 /** Reads a `Title:` / `Ingredients:` / `Instructions:` text file. */
 export function parseTextFile(text) {
   const lines = toLines(text);
-  return { name: readName(lines), ingredients: readIngredients(lines) };
+  return { name: readName(lines), ingredients: readIngredients(lines), steps: readSteps(lines) };
 }
 
 /** Reads an Ingredient, Quantity, Unit CSV. The Recipe takes its name from the filename. */
 export function parseCsvFile(text, filename) {
-  const ingredients = toLines(text)
-    .filter(Boolean)
-    .slice(1)
+  const rows = toLines(text).filter(Boolean).slice(1);
+
+  // The optional block a shortcut can append after the Ingredient rows: a line whose first column
+  // is the `Instructions:` heading, then one Step per line taken whole rather than split on commas,
+  // since a Step is prose and not a row of fields.
+  const instructionsAt = rows.findIndex(
+    (row) => (splitCsvRow(row)[0] ?? '').trim().toLowerCase() === 'instructions:',
+  );
+  const ingredientRows = instructionsAt === -1 ? rows : rows.slice(0, instructionsAt);
+  const stepLines = instructionsAt === -1 ? [] : rows.slice(instructionsAt + 1);
+
+  const ingredients = ingredientRows
     .map((row) => splitCsvRow(row))
     .map((columns) => ({
       name: (columns[0] ?? '').trim(),
@@ -128,7 +152,9 @@ export function parseCsvFile(text, filename) {
     }))
     .filter((ingredient) => ingredient.name);
 
-  return { name: filename.replace(/\.csv$/i, ''), ingredients };
+  const steps = stepLines.map((line) => line.replace(ORDINAL, '').trim());
+
+  return { name: filename.replace(/\.csv$/i, ''), ingredients, steps };
 }
 
 /** Reads whichever of the two formats the filename indicates. */
