@@ -11,13 +11,20 @@ import { describeDiff, diffTab, exportTabs, runExport } from '../src/spreadsheet
 
 // The shape `readState` answers with, narrowed to the fields the export renders. Written out here
 // rather than read from a database, because every question below is about rows rather than SQL.
-const state = ({ recipes = [], shoppingList = [], pantryChecklist = [], staples = [] } = {}) => ({
+const state = ({
+  recipes = [],
+  shoppingList = [],
+  pantryChecklist = [],
+  staples = [],
+  aisles = [],
+} = {}) => ({
   version: 'irrelevant',
   recipes,
   shoppingList,
   pantryChecklist,
   staples,
   bestMatches: [],
+  aisles,
 });
 
 const tab = (tabs, title) => tabs.find((candidate) => candidate.title === title);
@@ -57,18 +64,19 @@ describe('the Shopping List tab', () => {
   it('keeps an amount per unit and carries the Got It mark and the Aisle', () => {
     const tabs = exportTabs(
       state({
+        aisles: [{ id: 'A1', name: 'Baking' }],
         shoppingList: [
           {
             ingredientId: 'I1',
             name: 'flour',
-            aisle: 'Baking',
+            aisleId: 'A1',
             gotIt: true,
             amounts: [
               { quantity: 2, unit: 'cup' },
               { quantity: 300, unit: 'g' },
             ],
           },
-          { ingredientId: 'I2', name: 'thyme', aisle: null, gotIt: false, amounts: [] },
+          { ingredientId: 'I2', name: 'thyme', aisleId: null, gotIt: false, amounts: [] },
         ],
       }),
     );

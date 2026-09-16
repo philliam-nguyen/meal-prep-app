@@ -111,7 +111,7 @@ const SHOPPING_LIST_QUERY = `
   select
     i.id as "ingredientId",
     i.name,
-    i.aisle,
+    i.aisle_id as "aisleId",
     i.got_it as "gotIt",
     coalesce(
       (
@@ -183,12 +183,16 @@ const shoppingListAmount = {
 
 const shoppingListEntry = {
   type: 'object',
-  required: ['ingredientId', 'name', 'aisle', 'gotIt', 'amounts'],
+  required: ['ingredientId', 'name', 'aisleId', 'gotIt', 'amounts'],
   additionalProperties: false,
   properties: {
     ingredientId: { type: 'string' },
     name: { type: 'string' },
-    aisle: { type: ['string', 'null'] },
+    // A reference now, not text: one of the ids `aisles` above carries, or null. Resolving it to a
+    // name is the client's job, from the `aisles` array this same payload carries - the API keeps
+    // answering with one flat derived list rather than nesting a name it would then have to keep in
+    // step with a rename.
+    aisleId: { type: ['string', 'null'] },
     gotIt: { type: 'boolean' },
     // Empty when every Selected Recipe leaves this Ingredient unquantified. The cook still has to
     // buy it; nobody can say how much.

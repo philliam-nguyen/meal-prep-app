@@ -79,6 +79,22 @@ const AISLES = {
   Yeast: 'Baking',
 };
 
+// The store's sections, in the order a visitor walks them - Produce first, Drinks last. This is
+// what the restore creates as Aisle rows before it files a single Ingredient: the vocabulary above
+// only names each Ingredient's section, and says nothing about which comes first, which is exactly
+// the thing free text could never say and a managed, ordered list exists to fix.
+const AISLE_WALK = [
+  'Produce',
+  'Meat & poultry',
+  'Dairy & eggs',
+  'Dry goods',
+  'Baking',
+  'Tins & jars',
+  'Oils & vinegars',
+  'Herbs & spices',
+  'Drinks',
+];
+
 // Two Recipes already on the Shopping List, so a visitor arrives at a list with something in it
 // rather than at an empty page that needs explaining. These two share leek, double cream, butter and
 // chicken stock, which is what makes the list show consolidation rather than a flat concatenation.
@@ -362,6 +378,7 @@ export const SEED = {
   recipes: RECIPES,
   staples: STAPLES,
   aisles: AISLES,
+  aisleWalk: AISLE_WALK,
   selected: SELECTED,
   pantry: PANTRY,
 };

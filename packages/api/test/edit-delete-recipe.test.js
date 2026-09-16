@@ -9,6 +9,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { RECIPE_ID_MAX, RECIPE_INGREDIENTS_MAX } from '@meal-prep/shared';
+import { addAisle } from './helpers/aisles.js';
 import { startApp } from './helpers/app.js';
 import { connect } from './helpers/database.js';
 import { setPantry } from './helpers/pantry.js';
@@ -662,8 +663,9 @@ describe('an Ingredient outliving the Recipe Ingredient that named it', () => {
     const app = await startApp(t);
     const created = await createRecipe(app, soup);
     const potato = created.ingredients.find(({ name }) => name === 'Potato');
+    const produce = await addAisle(app, 'Produce');
     await setGotIt(app, potato.ingredientId, true);
-    await setAisle(app, potato.ingredientId, 'Produce');
+    await setAisle(app, potato.ingredientId, produce.id);
 
     await updateRecipe(app, created.id, {
       ...soup,
@@ -677,7 +679,7 @@ describe('an Ingredient outliving the Recipe Ingredient that named it', () => {
     await setSelected(app, created.id, true);
     const entry = (await readShoppingList(app)).find(({ name }) => name === 'Potato');
     assert.equal(entry.gotIt, true);
-    assert.equal(entry.aisle, 'Produce');
+    assert.equal(entry.aisleId, produce.id);
   });
 
   it('keeps its Pantry membership across a removal', async (t) => {

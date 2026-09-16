@@ -139,9 +139,9 @@ export async function setIngredientGotIt(ingredientId, gotIt) {
   return putIngredientField(ingredientId, 'got-it', { gotIt });
 }
 
-/** Sets the Aisle an Ingredient is found in. Null clears it, and so does an emptied box. */
-export async function setIngredientAisle(ingredientId, aisle) {
-  return putIngredientField(ingredientId, 'aisle', { aisle });
+/** Files an Ingredient into an Aisle by id. Null clears it, and so does the picker's blank option. */
+export async function setIngredientAisle(ingredientId, aisleId) {
+  return putIngredientField(ingredientId, 'aisle', { aisleId });
 }
 
 /**

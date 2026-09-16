@@ -15,12 +15,12 @@ export async function setGotIt(app, ingredientId, gotIt) {
   assert.equal(response.statusCode, 204, response.body);
 }
 
-/** Sets the Aisle an Ingredient is found in, or clears it by passing null. */
-export async function setAisle(app, ingredientId, aisle) {
+/** Files an Ingredient into an Aisle by id, or clears it by passing null. */
+export async function setAisle(app, ingredientId, aisleId) {
   const response = await app.inject({
     method: 'PUT',
     url: `/api/ingredients/${ingredientId}/aisle`,
-    payload: { aisle },
+    payload: { aisleId },
   });
   assert.equal(response.statusCode, 204, response.body);
 }

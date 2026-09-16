@@ -8,6 +8,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { addAisle } from './helpers/aisles.js';
 import { startApp } from './helpers/app.js';
 import { createRecipe, readShoppingList, setSelected } from './helpers/recipes.js';
 import { setAisle, setGotIt } from './helpers/shopping.js';
@@ -242,6 +243,7 @@ describe('the Shopping List', () => {
 
   it('carries the Got It mark and Aisle the Ingredient itself holds onto the entry', async (t) => {
     const app = await startApp(t);
+    const produce = await addAisle(app, 'Produce');
     await selectRecipe(app, {
       name: 'Minestrone',
       type: 'Soup',
@@ -249,12 +251,12 @@ describe('the Shopping List', () => {
     });
     const [{ ingredientId }] = await readShoppingList(app);
     await setGotIt(app, ingredientId, true);
-    await setAisle(app, ingredientId, 'Produce');
+    await setAisle(app, ingredientId, produce.id);
 
     const [entry] = await readShoppingList(app);
 
     assert.equal(entry.gotIt, true);
-    assert.equal(entry.aisle, 'Produce');
+    assert.equal(entry.aisleId, produce.id);
   });
 
   it('reports an Ingredient with no Aisle set as having none', async (t) => {
@@ -267,7 +269,7 @@ describe('the Shopping List', () => {
 
     const [entry] = await readShoppingList(app);
 
-    assert.equal(entry.aisle, null);
+    assert.equal(entry.aisleId, null);
     assert.equal(entry.gotIt, false);
   });
 
@@ -325,7 +327,7 @@ describe('the Shopping List', () => {
       {
         ingredientId: 'I001',
         name: 'Onion',
-        aisle: null,
+        aisleId: null,
         gotIt: false,
         amounts: [{ quantity: 2, unit: '' }],
       },

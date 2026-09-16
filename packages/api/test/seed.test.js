@@ -13,6 +13,14 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { RECIPE_TYPES } from '@meal-prep/shared';
 import { SEED } from '../src/seedFixture.js';
+import {
+  addAisle,
+  deleteAisle,
+  putAisleName,
+  readAisles,
+  removeAisle,
+  renameAisle,
+} from './helpers/aisles.js';
 import { startApp } from './helpers/app.js';
 import { ownerDatabaseUrl } from './helpers/database.js';
 import { setPantry } from './helpers/pantry.js';
@@ -152,10 +160,29 @@ describe('the Seed', () => {
     const shoppingList = await readShoppingList(app);
     assert.ok(shoppingList.length > 0, 'the Seed put nothing on the Shopping List');
     for (const entry of shoppingList) {
-      assert.ok(entry.aisle, `${entry.name} is on the list with no Aisle`);
+      assert.ok(entry.aisleId, `${entry.name} is on the list with no Aisle`);
     }
     const leek = shoppingList.find((entry) => entry.name === 'Leek');
     assert.deepEqual(leek?.amounts, [{ quantity: 700, unit: 'g' }]);
+  });
+
+  // The vocabulary names each Ingredient's section but says nothing about which comes first - that
+  // is the whole reason Aisle stopped being free text. This is the other half: the walk itself, and
+  // that every Ingredient reaches the Shopping List filed under the row the fixture names for it.
+  it('shelves its Aisle vocabulary in store-walk order and files every Ingredient by reference', async (t) => {
+    const app = await startApp(t);
+
+    await loadSeed(t);
+
+    const aisles = await readAisles(app);
+    assert.deepEqual(aisles.map((aisle) => aisle.name), SEED.aisleWalk);
+
+    const aisleNameById = new Map(aisles.map((aisle) => [aisle.id, aisle.name]));
+    const shoppingList = await readShoppingList(app);
+    assert.ok(shoppingList.length > 0, 'the Seed put nothing on the Shopping List');
+    for (const entry of shoppingList) {
+      assert.equal(aisleNameById.get(entry.aisleId), SEED.aisles[entry.name]);
+    }
   });
 
   // The other thing loading through the API buys: every Recipe above got here by meeting the rules
@@ -361,6 +388,48 @@ describe('a seeded Recipe', () => {
   });
 });
 
+// Only ever set in the Demo Variant, so everything here describes behaviour the Homelab Variant
+// never reaches: it seeds nothing, so it has no Protected Aisle to refuse (ADR-0002). The same flag,
+// set by the same loader and refused by the same guard as a seeded Recipe's above.
+describe('a seeded Aisle', () => {
+  const seededAisle = async (t) => {
+    const app = await startApp(t);
+    await loadSeed(t);
+    const [aisle] = await readAisles(app);
+    return { app, aisle };
+  };
+
+  it('refuses a rename, and says which Aisle refused it', async (t) => {
+    const { app, aisle } = await seededAisle(t);
+
+    const response = await putAisleName(app, aisle.id, 'Anything');
+
+    assert.equal(response.statusCode, 403);
+    assert.match(response.json().message, new RegExp(aisle.name));
+    assert.deepEqual((await readAisles(app))[0], aisle);
+  });
+
+  it('refuses a delete, and says which Aisle refused it', async (t) => {
+    const { app, aisle } = await seededAisle(t);
+
+    const response = await deleteAisle(app, aisle.id);
+
+    assert.equal(response.statusCode, 403);
+    assert.match(response.json().message, new RegExp(aisle.name));
+    assert.deepEqual((await readAisles(app))[0], aisle);
+  });
+
+  // The other half of the flag meaning anything: a visitor's own Aisle sits beside the Seed's and
+  // takes a rename and a delete, so the refusals above are the flag rather than the endpoint.
+  it('does not stop a Demo Visitor renaming or removing an Aisle they added', async (t) => {
+    const { app } = await seededAisle(t);
+    const mine = await addAisle(app, 'A Visitor Aisle');
+
+    await renameAisle(app, mine.id, 'Renamed');
+    await removeAisle(app, mine.id);
+  });
+});
+
 // What the scheduled task is for: whatever a visitor left behind is gone by the next restore, and
 // what is there afterwards is the fixture and nothing else. Ids included, because `restart identity`
 // is what keeps a demo restored a hundred times from drifting away from the one restored once.
@@ -379,7 +448,8 @@ describe('the restore', () => {
     await tickPantry(app, ['Onion', 'Leek']);
     const [entry] = await readShoppingList(app);
     await setGotIt(app, entry.ingredientId, true);
-    await setAisle(app, entry.ingredientId, 'Wherever');
+    const wherever = await addAisle(app, 'Wherever');
+    await setAisle(app, entry.ingredientId, wherever.id);
     assert.notDeepEqual(await stateWithoutVersion(app), fresh);
 
     await loadSeed(t);

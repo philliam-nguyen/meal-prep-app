@@ -1,7 +1,8 @@
 // Aisles as a managed, ordered list: the sections of the store in the order the cook walks them.
 //
-// Distinct from aisle.test.js, which is the free-text Aisle written on an Ingredient. That column is
-// untouched here; filing Ingredients against these rows comes later.
+// Distinct from aisle.test.js, which is filing one Ingredient into one of these rows by reference.
+// What that file assumes and this one proves is the delete case it depends on: removing an Aisle
+// unassigns rather than refuses (spec story 16).
 //
 // Every assertion reads the state response rather than the table, because position is the API's to
 // maintain and a client never sends one: the only honest question to ask is what order the next
@@ -10,7 +11,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { AISLE_MAX } from '@meal-prep/shared';
-import { startApp } from './helpers/app.js';
 import {
   addAisle,
   deleteAisle,
@@ -24,6 +24,9 @@ import {
   renameAisle,
   reorderAisles,
 } from './helpers/aisles.js';
+import { startApp } from './helpers/app.js';
+import { createRecipe, readShoppingList, setSelected } from './helpers/recipes.js';
+import { setAisle } from './helpers/shopping.js';
 
 describe('adding an Aisle', () => {
   it('puts it on the list the state response carries', async (t) => {
@@ -324,6 +327,26 @@ describe('removing an Aisle', () => {
 
     assert.equal(response.statusCode, 404);
     assert.equal(response.json().message, 'There is no Aisle A999.');
+  });
+
+  // The initial sort is being done with an agent, so a mistaken removal has to be cheap to recover
+  // from: unassigning rather than refusing is what makes tidying the list never a blocked action.
+  it('unassigns the Ingredients filed under it rather than being refused', async (t) => {
+    const app = await startApp(t);
+    const produce = await addAisle(app, 'Produce');
+    const recipe = await createRecipe(app, {
+      name: 'Minestrone',
+      type: 'Soup',
+      ingredients: [{ name: 'Onion', quantity: 2, unit: '' }],
+    });
+    await setSelected(app, recipe.id, true);
+    const [{ ingredientId }] = await readShoppingList(app);
+    await setAisle(app, ingredientId, produce.id);
+
+    await removeAisle(app, produce.id);
+
+    const [entry] = await readShoppingList(app);
+    assert.equal(entry.aisleId, null);
   });
 });
 

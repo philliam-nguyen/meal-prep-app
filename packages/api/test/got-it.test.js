@@ -13,6 +13,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { addAisle } from './helpers/aisles.js';
 import { startApp } from './helpers/app.js';
 import { readPantryChecklist, setPantry, setStaple } from './helpers/pantry.js';
 import {
@@ -232,8 +233,9 @@ describe('what leaves a Got It mark alone', () => {
     });
     const { ingredientId } = await entryFor(app, 'Onion');
     await setGotIt(app, ingredientId, true);
+    const produce = await addAisle(app, 'Produce');
 
-    await setAisle(app, ingredientId, 'Produce');
+    await setAisle(app, ingredientId, produce.id);
 
     assert.equal((await entryFor(app, 'Onion')).gotIt, true);
   });
@@ -404,8 +406,9 @@ describe('clearing every Got It mark', () => {
     });
     const onion = await entryFor(app, 'Onion');
     const salt = await entryFor(app, 'Salt');
+    const produce = await addAisle(app, 'Produce');
     await setGotIt(app, onion.ingredientId, true);
-    await setAisle(app, onion.ingredientId, 'Produce');
+    await setAisle(app, onion.ingredientId, produce.id);
     await setPantry(app, onion.ingredientId, true);
     await setStaple(app, salt.ingredientId, true);
 
@@ -413,7 +416,7 @@ describe('clearing every Got It mark', () => {
 
     const cleared = await entryFor(app, 'Onion');
     assert.equal(cleared.gotIt, false);
-    assert.equal(cleared.aisle, 'Produce');
+    assert.equal(cleared.aisleId, produce.id);
     assert.deepEqual(cleared.amounts, [{ quantity: 2, unit: '' }]);
     assert.deepEqual(
       (await readPantryChecklist(app)).map((entry) => [entry.name, entry.inPantry]),
