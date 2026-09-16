@@ -910,6 +910,7 @@
       "name": "Black pepper",
       "aisleId": "A008",
       "gotIt": false,
+      "covered": false,
       "amounts": []
     },
     {
@@ -917,6 +918,7 @@
       "name": "Butter",
       "aisleId": "A003",
       "gotIt": false,
+      "covered": false,
       "amounts": [
         {
           "quantity": 165,
@@ -929,6 +931,7 @@
       "name": "Chicken stock",
       "aisleId": "A006",
       "gotIt": false,
+      "covered": true,
       "amounts": [
         {
           "quantity": 1100,
@@ -941,6 +944,7 @@
       "name": "Chicken thighs",
       "aisleId": "A002",
       "gotIt": false,
+      "covered": false,
       "amounts": [
         {
           "quantity": 600,
@@ -953,6 +957,7 @@
       "name": "Double cream",
       "aisleId": "A003",
       "gotIt": false,
+      "covered": false,
       "amounts": [
         {
           "quantity": 250,
@@ -965,6 +970,7 @@
       "name": "Leek",
       "aisleId": "A001",
       "gotIt": false,
+      "covered": false,
       "amounts": [
         {
           "quantity": 700,
@@ -977,6 +983,7 @@
       "name": "Onion",
       "aisleId": "A001",
       "gotIt": false,
+      "covered": true,
       "amounts": [
         {
           "quantity": 1,
@@ -989,6 +996,7 @@
       "name": "Plain flour",
       "aisleId": "A005",
       "gotIt": false,
+      "covered": false,
       "amounts": [
         {
           "quantity": 250,
@@ -1001,6 +1009,7 @@
       "name": "Potato",
       "aisleId": "A001",
       "gotIt": false,
+      "covered": true,
       "amounts": [
         {
           "quantity": 500,
@@ -1013,6 +1022,7 @@
       "name": "Salt",
       "aisleId": "A008",
       "gotIt": false,
+      "covered": false,
       "amounts": []
     },
     {
@@ -1020,6 +1030,7 @@
       "name": "Thyme",
       "aisleId": "A001",
       "gotIt": false,
+      "covered": false,
       "amounts": [
         {
           "quantity": 3,
