@@ -12,6 +12,7 @@ import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { RECIPE_TYPES } from '@meal-prep/shared';
+import { SEED } from '../src/seedFixture.js';
 import { startApp } from './helpers/app.js';
 import { ownerDatabaseUrl } from './helpers/database.js';
 import { setPantry } from './helpers/pantry.js';
@@ -33,6 +34,7 @@ const asPayload = (recipe) => ({
   type: recipe.type,
   cardUrl: recipe.cardUrl,
   ingredients: recipe.ingredients.map(({ name, quantity, unit }) => ({ name, quantity, unit })),
+  steps: recipe.steps,
 });
 
 const refuseEdit = async (app, recipe, payload) => {
@@ -78,6 +80,33 @@ describe('the Seed', () => {
 
     const seeded = new Set((await readRecipes(app)).map((recipe) => recipe.type));
     assert.deepEqual([...seeded].sort(), [...RECIPE_TYPES].sort());
+  });
+
+  // A visitor opening a seeded Recipe has to see the Instructions section without adding anything
+  // first, and has to see it fall back to the Recipe Card too, so three or four Recipes carry Steps
+  // and the rest carry none. Read back off the fixture rather than a literal, so this follows
+  // seedFixture.js instead of racing it, and asserted in order because a demo showing Step three
+  // before Step one would be worse than showing none.
+  it('gives three or four Recipes Steps in order, and leaves the rest with none', async (t) => {
+    const app = await startApp(t);
+
+    await loadSeed(t);
+
+    const recipes = await readRecipes(app);
+    const withSteps = recipes.filter((recipe) => recipe.steps.length > 0);
+    assert.ok(
+      withSteps.length >= 3 && withSteps.length <= 4,
+      `expected three or four seeded Recipes with Steps, got ${withSteps.length}`,
+    );
+    assert.ok(
+      recipes.some((recipe) => recipe.steps.length === 0),
+      'every seeded Recipe carries Steps, so the demo never shows the no-Steps state',
+    );
+
+    for (const recipe of withSteps) {
+      const fixture = SEED.recipes.find((entry) => entry.name === recipe.name);
+      assert.deepEqual(recipe.steps, fixture.steps, `${recipe.name}'s Steps came back out of order`);
+    }
   });
 
   // The visitor's first gesture, and the whole reason the fixture is written by hand: five ticks
