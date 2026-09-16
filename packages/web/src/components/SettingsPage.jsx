@@ -1,4 +1,5 @@
 import { AislesSection } from './AislesSection.jsx';
+import { IngredientsByAisleSection } from './IngredientsByAisleSection.jsx';
 import { I } from '../icons.jsx';
 
 // Nothing to connect and nothing to paste. The API answers on this page's own origin, and the
@@ -7,6 +8,7 @@ import { I } from '../icons.jsx';
 
 export function SettingsPage({
   aisles,
+  ingredients,
   readOnly,
   onRefresh,
   refreshing,
@@ -14,6 +16,7 @@ export function SettingsPage({
   onRenameAisle,
   onMoveAisle,
   onRemoveAisle,
+  onSetIngredientAisle,
 }) {
   return (
     <div className="fade-in">
@@ -33,6 +36,12 @@ export function SettingsPage({
         onRenameAisle={onRenameAisle}
         onMoveAisle={onMoveAisle}
         onRemoveAisle={onRemoveAisle}
+      />
+      <IngredientsByAisleSection
+        ingredients={ingredients}
+        aisles={aisles}
+        readOnly={readOnly}
+        onSetIngredientAisle={onSetIngredientAisle}
       />
       <div style={{ background: 'white', borderRadius: 16, padding: 20, border: '1px solid #F0EBE3' }}>
         <h3 style={{ fontSize: 14, fontWeight: 700, color: '#7A7568', letterSpacing: 0.5, marginBottom: 14 }}>ADD TO HOME SCREEN</h3>

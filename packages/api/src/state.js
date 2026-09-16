@@ -15,7 +15,9 @@
 import { aisleSchema, readAisles } from './aisles.js';
 import { bestMatchSchema, readBestMatches } from './bestMatches.js';
 import {
+  ingredientSchema,
   pantryEntrySchema,
+  readIngredients,
   readPantryChecklist,
   readStaples,
   stapleSchema,
@@ -211,6 +213,7 @@ export const stateResponse = {
     'staples',
     'bestMatches',
     'aisles',
+    'ingredients',
     'notice',
   ],
   additionalProperties: false,
@@ -230,6 +233,10 @@ export const stateResponse = {
     // In walk order, which is the whole of what position means to a client: the array says where
     // each section comes, so nothing here has to carry the number the API maintains.
     aisles: { type: 'array', items: aisleSchema },
+    // Every Ingredient the app knows, Staples included, feeding the bulk Aisle-filing view on
+    // Settings so the initial sort of a whole kitchen happens in one sitting. Pantry membership is
+    // not duplicated here - that question already has an answer in `pantryChecklist`.
+    ingredients: { type: 'array', items: ingredientSchema },
     // The one field here that is configuration rather than data: a line the deployment wants read,
     // or null where nobody configured one. Declared and required rather than left off when unset,
     // because this schema is what Fastify serializes through and what the recorded Seed is checked
@@ -257,14 +264,16 @@ export const stateResponse = {
  */
 export async function readState(db) {
   const version = await readVersion(db);
-  const [recipes, shoppingList, pantryChecklist, staples, bestMatches, aisles] = await Promise.all([
-    db.query(RECIPES_QUERY),
-    db.query(SHOPPING_LIST_QUERY),
-    readPantryChecklist(db),
-    readStaples(db),
-    readBestMatches(db),
-    readAisles(db),
-  ]);
+  const [recipes, shoppingList, pantryChecklist, staples, bestMatches, aisles, ingredients] =
+    await Promise.all([
+      db.query(RECIPES_QUERY),
+      db.query(SHOPPING_LIST_QUERY),
+      readPantryChecklist(db),
+      readStaples(db),
+      readBestMatches(db),
+      readAisles(db),
+      readIngredients(db),
+    ]);
   return {
     version,
     recipes: recipes.rows,
@@ -273,6 +282,7 @@ export async function readState(db) {
     staples,
     bestMatches,
     aisles,
+    ingredients,
   };
 }
 

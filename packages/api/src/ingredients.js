@@ -36,6 +36,17 @@ const STAPLES_QUERY = `
   order by name, id
 `;
 
+// Every Ingredient the app knows, Staples included, for the bulk Aisle-filing view on Settings: the
+// initial sort of a whole kitchen happens in one sitting rather than one shopping trip at a time.
+// Pantry membership is not read here - it is already the Pantry checklist's to carry, and repeating
+// it would be two answers to "is this in the Pantry" that a write to one could leave disagreeing
+// with the other.
+const INGREDIENTS_QUERY = `
+  select id, name, aisle_id as "aisleId", staple
+  from ingredients
+  order by name, id
+`;
+
 // The `not staple` guard is the rule rather than a nicety: a Staple that carried Pantry membership
 // would be a tick nobody could see or clear.
 const SET_PANTRY = `
@@ -98,6 +109,23 @@ export const stapleSchema = {
   },
 };
 
+// Every Ingredient, for the bulk Aisle-filing view. `aisleId` matches the Shopping List entry's own
+// field - a reference or null, never text - so the same picker component reads either shape. Pantry
+// membership is deliberately absent: additionalProperties false is what keeps a column added to this
+// query later from reaching the wire unannounced, and there is nothing here for it to duplicate
+// anyway, since that state already has a home in `pantryEntrySchema`.
+export const ingredientSchema = {
+  type: 'object',
+  required: ['id', 'name', 'aisleId', 'staple'],
+  additionalProperties: false,
+  properties: {
+    id: { type: 'string' },
+    name: { type: 'string' },
+    aisleId: { type: ['string', 'null'] },
+    staple: { type: 'boolean' },
+  },
+};
+
 const ingredientParams = {
   type: 'object',
   required: ['id'],
@@ -146,6 +174,12 @@ export async function readPantryChecklist(db) {
 /** The Ingredients assumed always on hand, which the checklist leaves out. */
 export async function readStaples(db) {
   const { rows } = await db.query(STAPLES_QUERY);
+  return rows;
+}
+
+/** Every Ingredient the app knows, Staples included, for the bulk Aisle-filing view on Settings. */
+export async function readIngredients(db) {
+  const { rows } = await db.query(INGREDIENTS_QUERY);
   return rows;
 }
 

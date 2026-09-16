@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 import { API_ORIGIN } from '../../playwright.config.js';
 import { OFFLINE_NOTICE } from '../../packages/web/src/degraded.js';
-import { uniqueName } from './helpers/recipes.js';
+import { createRecipeWith, uniqueName } from './helpers/recipes.js';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -101,6 +101,42 @@ test('the ends of the walk have nowhere further to go', async ({ page }) => {
 
   await expect(page.getByRole('button', { name: `Move ${only} up` })).toBeDisabled();
   await expect(page.getByRole('button', { name: `Move ${only} down` })).toBeDisabled();
+});
+
+// The bulk view below the walk: every Ingredient the app knows, with the same picker the Shopping
+// List uses. Sharing this file rather than a spec of its own, and its serial mode and clearTheWalk
+// hooks along with it, is what keeps an Aisle this test relies on from being deleted mid-test by a
+// concurrent run of this file's own hooks - a risk a separate spec file would carry, since the walk
+// is instance-wide and this suite's database is never truncated between files. Search narrows to
+// this test's own uniquely named Ingredient, so what the unassigned filter shows is never in doubt
+// however many other Ingredients other browser tests have left unfiled.
+test('a cook narrows the bulk view to unassigned and files one Ingredient', async ({ page, request }) => {
+  const ingredientName = uniqueName('Fennel');
+  await createRecipeWith(request, [{ name: ingredientName, quantity: 1, unit: '' }]);
+  const produce = uniqueName('Produce');
+  await openSettings(page);
+
+  await page.getByLabel('Add an aisle').fill(produce);
+  await page.getByRole('button', { name: 'Add aisle' }).click();
+  await expect(page.getByText(`Added ${produce}`)).toBeVisible();
+
+  await expect(page.getByRole('heading', { name: 'INGREDIENTS BY AISLE' })).toBeVisible();
+  await page.getByPlaceholder('Search ingredients...').fill(ingredientName);
+  await page.getByLabel('Unassigned only').check();
+
+  const picker = page.getByLabel(`Aisle for ${ingredientName}`);
+  await expect(picker).toBeVisible();
+
+  // Filed through the picker, which is the one write this view makes and the same one the Shopping
+  // List's own picker makes. The optimistic update lands before any request returns, so the row
+  // leaves the unassigned filter it no longer matches without waiting on the network.
+  await picker.selectOption({ label: produce });
+
+  await expect(picker).toHaveCount(0);
+
+  // Clearing the unassigned filter brings it back, now showing the Aisle that was just set.
+  await page.getByLabel('Unassigned only').uncheck();
+  await expect(page.getByLabel(`Aisle for ${ingredientName}`)).toHaveValue(/.+/);
 });
 
 // Degraded mode is reached the only way a visitor reaches it: the API cannot answer the first paint

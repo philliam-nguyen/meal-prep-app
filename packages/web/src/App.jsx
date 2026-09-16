@@ -62,6 +62,9 @@ export function MealPrepApp() {
   // The store's sections in the order they are walked. Position never reaches here: the array is
   // the order, and a move sends the whole list of ids back.
   const [aisles, setAisles] = useState([]);
+  // Every Ingredient the app knows, Staples included, for the bulk Aisle-filing view on Settings.
+  // Pantry membership travels separately in pantryChecklist, which is not duplicated here.
+  const [ingredients, setIngredients] = useState([]);
   // A line the deployment configured, or null. It arrives in the payload like everything else here
   // and nothing in this app asks why it is set: the public instance says its data is a fixture
   // because something set the text, and the homelab says nothing because nothing did (ADR-0002).
@@ -109,6 +112,9 @@ export function MealPrepApp() {
       // cache. Empty rather than left alone, so the section reads as "no aisles yet" instead of
       // showing a walk the backend no longer has.
       setAisles(state.aisles ?? []);
+      // A payload from before this bulk view existed has none, which is the recording and an old
+      // cache. Empty rather than left alone, for the reason the Aisle walk above is.
+      setIngredients(state.ingredients ?? []);
       // Whatever this payload says, including the recording's null: the notice describes the
       // deployment that answered, and during an outage nothing answered. That is also why the
       // offline banner never has to share the screen with this one.
@@ -147,6 +153,7 @@ export function MealPrepApp() {
       if (cache.staples) setStaples(cache.staples);
       if (cache.bestMatches) setBestMatches(cache.bestMatches);
       if (cache.aisles) setAisles(cache.aisles);
+      if (cache.ingredients) setIngredients(cache.ingredients);
       // Null rather than left alone when a cache predates the field, so a banner is never restored
       // from a cache written before the deployment configured one - or after it stopped.
       setNotice(cache.notice ?? null);
@@ -299,6 +306,26 @@ export function MealPrepApp() {
     } catch {
       show(previous);
       toast(`Could not set the aisle for ${entry.name}. Nothing was saved.`);
+      return;
+    }
+    loadData(true);
+  }, [loadData, toast]);
+
+  // The same write handleSetAisle makes, aimed at the bulk view's own list rather than the Shopping
+  // List's: the initial sort of a kitchen touches Ingredients that are not on the Shopping List at
+  // all, so this reads and writes back `ingredients` instead of `shoppingList`. Same optimistic
+  // update, same revert and toast on failure.
+  const handleSetIngredientAisle = useCallback(async (ingredient, aisleId) => {
+    const previous = ingredient.aisleId;
+    if (aisleId === previous) return;
+    const show = value => setIngredients(prev => prev.map(i => (i.id === ingredient.id ? { ...i, aisleId: value } : i)));
+
+    show(aisleId);
+    try {
+      await setIngredientAisle(ingredient.id, aisleId);
+    } catch {
+      show(previous);
+      toast(`Could not set the aisle for ${ingredient.name}. Nothing was saved.`);
       return;
     }
     loadData(true);
@@ -474,6 +501,7 @@ export function MealPrepApp() {
             {tab === 'settings' && (
               <SettingsPage
                 aisles={aisles}
+                ingredients={ingredients}
                 readOnly={degraded}
                 onRefresh={handleRefresh}
                 refreshing={refreshing}
@@ -481,6 +509,7 @@ export function MealPrepApp() {
                 onRenameAisle={handleRenameAisle}
                 onMoveAisle={handleMoveAisle}
                 onRemoveAisle={handleRemoveAisle}
+                onSetIngredientAisle={handleSetIngredientAisle}
               />
             )}
           </>
