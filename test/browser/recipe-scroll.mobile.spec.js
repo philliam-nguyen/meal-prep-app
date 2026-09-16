@@ -9,7 +9,7 @@
 // the gesture and native scrolling, and the only way a synthetic finger can observe it.
 
 import { expect, test } from '@playwright/test';
-import { createRecipeWith, manyIngredients } from './helpers/recipes.js';
+import { createRecipe, createRecipeWith, fewIngredients, manyIngredients, manySteps, uniqueName } from './helpers/recipes.js';
 import { dragDown, expectSheetClosed, openRecipe, sheet, sheetTitle, sheetTop } from './helpers/sheet.js';
 
 /** Records, on the page, whether each touchmove reached the document still cancelable. */
@@ -57,6 +57,67 @@ test('once the list is back at the top, a further pull closes the sheet', async 
   const box = await sheet(page, recipe.name).boundingBox();
   const firstIngredient = page.getByText('Ingredient 01');
   await page.getByText('Ingredient 40').scrollIntoViewIfNeeded();
+  await expect(firstIngredient).not.toBeInViewport();
+
+  // Back to the top, then the pull.
+  await firstIngredient.scrollIntoViewIfNeeded();
+  await expect(firstIngredient).toBeInViewport();
+  await dragDown(sheet(page, recipe.name), box.height * 0.8);
+
+  await expectSheetClosed(page, recipe.name);
+});
+
+// The Instructions section ticket 05 added is more content in the same one scroll region, and the
+// case the ticket named to watch: a Recipe long enough that the bottom of the sheet is well past
+// where the Ingredients used to be the last thing in it.
+test('a pull while Instructions are scrolled down scrolls the sheet content and leaves the sheet where it is', async ({
+  page,
+  request,
+}) => {
+  const recipe = await createRecipe(request, {
+    name: uniqueName('Leek and Potato Soup'),
+    type: 'Soup',
+    ingredients: fewIngredients,
+    steps: manySteps,
+  });
+  await openRecipe(page, recipe.name);
+  const box = await sheet(page, recipe.name).boundingBox();
+  const lastStep = page.getByText(manySteps[manySteps.length - 1]);
+  await expect(lastStep).not.toBeInViewport();
+
+  // Scroll Instructions down inside the sheet.
+  await lastStep.scrollIntoViewIfNeeded();
+  await expect(lastStep).toBeInViewport();
+  const moves = await watchTouchMoves(page);
+
+  await dragDown(sheet(page, recipe.name), box.height * 0.8, {
+    whileHeld: async () => {
+      expect(await sheetTop(page, recipe.name)).toBeCloseTo(box.y, 0);
+    },
+  });
+
+  await expect(sheetTitle(page, recipe.name)).toBeVisible();
+  expect(await sheetTop(page, recipe.name)).toBeCloseTo(box.y, 0);
+  expect(await moves.count()).toBeGreaterThan(0);
+  expect(await moves.allLeftToBrowser()).toBe(true);
+});
+
+test('once the sheet is scrolled back to the top past Instructions, a further pull closes it', async ({
+  page,
+  request,
+}) => {
+  const recipe = await createRecipe(request, {
+    name: uniqueName('Leek and Potato Soup'),
+    type: 'Soup',
+    ingredients: fewIngredients,
+    steps: manySteps,
+  });
+  await openRecipe(page, recipe.name);
+  const box = await sheet(page, recipe.name).boundingBox();
+  // The top of the whole sheet, above both sections - the anchor a pull-up all the way lands on,
+  // Instructions included.
+  const firstIngredient = page.getByText(fewIngredients[0].name, { exact: true });
+  await page.getByText(manySteps[manySteps.length - 1]).scrollIntoViewIfNeeded();
   await expect(firstIngredient).not.toBeInViewport();
 
   // Back to the top, then the pull.

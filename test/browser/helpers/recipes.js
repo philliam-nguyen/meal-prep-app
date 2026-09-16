@@ -75,3 +75,9 @@ export const manyIngredients = Array.from({ length: 40 }, (_, i) => ({
   quantity: i + 1,
   unit: 'g',
 }));
+
+/** More Steps than a phone's sheet can show at once, so Instructions makes the list scroll too. */
+export const manySteps = Array.from(
+  { length: 30 },
+  (_, i) => `Step ${String(i + 1).padStart(2, '0')}: do the next thing on the stove.`,
+);
