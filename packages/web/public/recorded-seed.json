@@ -1354,5 +1354,265 @@
       "name": "Drinks"
     }
   ],
+  "ingredients": [
+    {
+      "id": "I065",
+      "name": "Ale",
+      "aisleId": "A009",
+      "staple": false
+    },
+    {
+      "id": "I083",
+      "name": "Apple",
+      "aisleId": "A001",
+      "staple": false
+    },
+    {
+      "id": "I040",
+      "name": "Bacon",
+      "aisleId": "A002",
+      "staple": false
+    },
+    {
+      "id": "I046",
+      "name": "Banana",
+      "aisleId": "A001",
+      "staple": false
+    },
+    {
+      "id": "I023",
+      "name": "Basil",
+      "aisleId": "A001",
+      "staple": false
+    },
+    {
+      "id": "I066",
+      "name": "Beef shin",
+      "aisleId": "A002",
+      "staple": false
+    },
+    {
+      "id": "I016",
+      "name": "Black pepper",
+      "aisleId": "A008",
+      "staple": true
+    },
+    {
+      "id": "I001",
+      "name": "Butter",
+      "aisleId": "A003",
+      "staple": true
+    },
+    {
+      "id": "I017",
+      "name": "Carrot",
+      "aisleId": "A001",
+      "staple": false
+    },
+    {
+      "id": "I079",
+      "name": "Caster sugar",
+      "aisleId": "A005",
+      "staple": true
+    },
+    {
+      "id": "I068",
+      "name": "Celery",
+      "aisleId": "A001",
+      "staple": false
+    },
+    {
+      "id": "I030",
+      "name": "Cheddar",
+      "aisleId": "A003",
+      "staple": false
+    },
+    {
+      "id": "I002",
+      "name": "Chicken stock",
+      "aisleId": "A006",
+      "staple": false
+    },
+    {
+      "id": "I003",
+      "name": "Chicken thighs",
+      "aisleId": "A002",
+      "staple": false
+    },
+    {
+      "id": "I035",
+      "name": "Chickpeas",
+      "aisleId": "A006",
+      "staple": false
+    },
+    {
+      "id": "I080",
+      "name": "Dark chocolate",
+      "aisleId": "A005",
+      "staple": false
+    },
+    {
+      "id": "I004",
+      "name": "Double cream",
+      "aisleId": "A003",
+      "staple": false
+    },
+    {
+      "id": "I032",
+      "name": "Eggs",
+      "aisleId": "A003",
+      "staple": false
+    },
+    {
+      "id": "I011",
+      "name": "Garlic",
+      "aisleId": "A001",
+      "staple": false
+    },
+    {
+      "id": "I062",
+      "name": "Ground cumin",
+      "aisleId": "A008",
+      "staple": false
+    },
+    {
+      "id": "I103",
+      "name": "Honey",
+      "aisleId": "A006",
+      "staple": false
+    },
+    {
+      "id": "I005",
+      "name": "Leek",
+      "aisleId": "A001",
+      "staple": false
+    },
+    {
+      "id": "I019",
+      "name": "Lemon",
+      "aisleId": "A001",
+      "staple": false
+    },
+    {
+      "id": "I049",
+      "name": "Milk",
+      "aisleId": "A003",
+      "staple": false
+    },
+    {
+      "id": "I012",
+      "name": "Mushrooms",
+      "aisleId": "A001",
+      "staple": false
+    },
+    {
+      "id": "I050",
+      "name": "Oats",
+      "aisleId": "A004",
+      "staple": false
+    },
+    {
+      "id": "I020",
+      "name": "Olive oil",
+      "aisleId": "A007",
+      "staple": true
+    },
+    {
+      "id": "I013",
+      "name": "Onion",
+      "aisleId": "A001",
+      "staple": false
+    },
+    {
+      "id": "I014",
+      "name": "Paprika",
+      "aisleId": "A008",
+      "staple": false
+    },
+    {
+      "id": "I038",
+      "name": "Parsley",
+      "aisleId": "A001",
+      "staple": false
+    },
+    {
+      "id": "I026",
+      "name": "Pasta",
+      "aisleId": "A004",
+      "staple": false
+    },
+    {
+      "id": "I006",
+      "name": "Plain flour",
+      "aisleId": "A005",
+      "staple": true
+    },
+    {
+      "id": "I021",
+      "name": "Potato",
+      "aisleId": "A001",
+      "staple": false
+    },
+    {
+      "id": "I064",
+      "name": "Red lentils",
+      "aisleId": "A004",
+      "staple": false
+    },
+    {
+      "id": "I015",
+      "name": "Rice",
+      "aisleId": "A004",
+      "staple": false
+    },
+    {
+      "id": "I007",
+      "name": "Salt",
+      "aisleId": "A008",
+      "staple": true
+    },
+    {
+      "id": "I039",
+      "name": "Spinach",
+      "aisleId": "A001",
+      "staple": false
+    },
+    {
+      "id": "I093",
+      "name": "Strong white flour",
+      "aisleId": "A005",
+      "staple": false
+    },
+    {
+      "id": "I008",
+      "name": "Thyme",
+      "aisleId": "A001",
+      "staple": false
+    },
+    {
+      "id": "I028",
+      "name": "Tinned tomatoes",
+      "aisleId": "A006",
+      "staple": false
+    },
+    {
+      "id": "I088",
+      "name": "Walnuts",
+      "aisleId": "A005",
+      "staple": false
+    },
+    {
+      "id": "I094",
+      "name": "Water",
+      "aisleId": "A009",
+      "staple": true
+    },
+    {
+      "id": "I095",
+      "name": "Yeast",
+      "aisleId": "A005",
+      "staple": false
+    }
+  ],
   "notice": null
 }
