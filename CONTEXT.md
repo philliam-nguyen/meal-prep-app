@@ -44,8 +44,9 @@ you either have an Ingredient or you don't.
 _Avoid_: inventory, stock, have-list, on-hand list
 
 **Aisle**:
-The store section an Ingredient is found in. A property of the Ingredient itself, not of any
-one shopping trip.
+A store section, identified by a stable id, with a name and a position that sets the walking
+order through the store. Ingredients reference an Aisle rather than storing one as free text; an
+Ingredient with none set is unassigned.
 
 ### Shopping
 
@@ -61,9 +62,14 @@ mark and the Aisle persist.
 _Avoid_: grocery list, cart, basket
 
 **Got It**:
-A mark on a Shopping List entry meaning it's already in the trolley. Survives between sessions
-and is shared by everyone using the instance.
+A mark on a Shopping List entry meaning it's already in the trolley. Survives between sessions,
+is shared by everyone using the instance, and is cleared when its Ingredient leaves the Shopping
+List.
 _Avoid_: checked, purchased, done, acquired
+
+**Done Shopping**:
+The action that ends a shopping trip: it deselects every Recipe and clears every Got It mark in
+one step.
 
 ### Matching
 
