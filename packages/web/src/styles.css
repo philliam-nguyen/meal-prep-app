@@ -90,16 +90,18 @@ input:focus, textarea:focus, select:focus { outline: 2px solid #5B7C5A; outline-
 .checkbox-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .checkbox-btn:disabled:hover { border-color: #E5DED3; }
 
-/* The Batch stepper beside Add to Shopping List: minus, count, plus, as one control rather than
-   three, so it reads as a single number a cook is adjusting. The count is a fixed width so that
-   stepping from 1 to 2 does not shuffle the buttons under the finger that is tapping them. */
-.batch-stepper { display: inline-flex; align-items: center; background: #F5EDE3; border: 1px solid #E5DED3; border-radius: 12px; overflow: hidden; flex-shrink: 0; }
-.batch-step { width: 36px; align-self: stretch; background: none; border: none; color: #3D5A3C; font-family: 'Nunito', sans-serif; font-size: 20px; font-weight: 700; line-height: 1; cursor: pointer; transition: background 0.2s; }
-.batch-step:hover:not(:disabled) { background: #EDE5D8; }
+/* The Batch stepper, centred under Instructions and above Add to Shopping List: minus, count,
+   plus, and nothing else. The approved mock (ticket 04 of the Recipe Steps and Batch feature)
+   dropped the "Batch" label and the filled row behind it once the sheet had a place, the Selected
+   Recipes area, that names the number instead - a bare stepper here would otherwise be the only
+   place in the app using the word, and the group now floats on the sheet's own background. */
+.batch-stepper { display: inline-flex; align-items: center; gap: 12px; }
+.batch-step { width: 44px; height: 44px; background: white; border: 1.5px solid #E5DED3; border-radius: 12px; color: #3D5A3C; font-family: 'Nunito', sans-serif; font-size: 20px; font-weight: 700; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: border-color 0.2s; }
+.batch-step:hover:not(:disabled) { border-color: #5B7C5A; }
 /* Two reasons a step is disabled and one appearance for both: the bound has been reached, or the
    backend is offline and every write is greyed out with it (ADR-0009). */
 .batch-step:disabled { opacity: 0.35; cursor: not-allowed; }
-.batch-count { min-width: 34px; text-align: center; font-weight: 700; font-size: 15px; color: #2C2C2C; font-variant-numeric: tabular-nums; }
+.batch-count { min-width: 34px; text-align: center; font-weight: 700; font-size: 20px; color: #2C2C2C; font-variant-numeric: tabular-nums; }
 
 .recipe-card { background: white; border-radius: 16px; padding: 18px 20px; border: 1px solid #F0EBE3; cursor: pointer; transition: all 0.2s; }
 .recipe-card:hover { border-color: #5B7C5A; box-shadow: 0 4px 20px rgba(91,124,90,0.08); transform: translateY(-1px); }

@@ -209,6 +209,9 @@ const dangerButtonStyle = {
 
 export function RecipeDetail({ recipe, readOnly, onClose, onToggleSelected, onSetBatch, onEdit, onDelete }) {
   const { ingredients } = recipe;
+  // Absent only for a Recipe read from a cache written before Steps existed, the same case
+  // `storedBatch` guards against below.
+  const steps = recipe.steps ?? [];
   // Deleting is the one thing here nothing undoes, so it asks. In place rather than through the
   // browser's confirm dialog, which a phone renders as a modal on top of a modal.
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -248,16 +251,9 @@ export function RecipeDetail({ recipe, readOnly, onClose, onToggleSelected, onSe
         onClick={e => e.stopPropagation()}
       >
         <div className="modal-handle" aria-hidden="true" />
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
-          <div>
-            <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 24, marginBottom: 6 }}>{recipe.name}</h2>
-            <span className="badge" style={{ background: getTypeBadge(recipe.type).bg, color: getTypeBadge(recipe.type).text }}>{recipe.type}</span>
-          </div>
-          {recipe.cardUrl && (
-            <a href={recipe.cardUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#5B7C5A', fontWeight: 600, fontSize: 14, textDecoration: 'none', padding: '8px 14px', background: '#E8F0E7', borderRadius: 10 }}>
-              Recipe {I.external}
-            </a>
-          )}
+        <div style={{ marginBottom: 20 }}>
+          <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 24, marginBottom: 6 }}>{recipe.name}</h2>
+          <span className="badge" style={{ background: getTypeBadge(recipe.type).bg, color: getTypeBadge(recipe.type).text }}>{recipe.type}</span>
         </div>
         <h3 style={{ fontSize: 14, fontWeight: 700, color: '#7A7568', letterSpacing: 0.5, marginBottom: 12 }}>INGREDIENTS</h3>
         {ingredients.length === 0 ? (
@@ -272,17 +268,45 @@ export function RecipeDetail({ recipe, readOnly, onClose, onToggleSelected, onSe
             ))}
           </div>
         )}
-        <div style={{ display: 'flex', alignItems: 'stretch', gap: 10 }}>
-          <BatchStepper batch={batch} readOnly={readOnly} onChange={changeBatch} />
-          <button
-            className="btn-primary"
-            style={{ flex: 1, justifyContent: 'center' }}
-            disabled={readOnly}
-            onClick={toggleSelected}
-          >
-            {I.cart} <span>{recipe.selected ? 'Remove from Shopping List' : 'Add to Shopping List'}</span>
-          </button>
+        {/* The Card sits on this heading rather than the title block: this is where it is the
+            fallback anyway, and one place for it beats it appearing twice. */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: '#7A7568', letterSpacing: 0.5 }}>INSTRUCTIONS</h3>
+          {recipe.cardUrl && (
+            <a href={recipe.cardUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#5B7C5A', fontWeight: 600, fontSize: 14, textDecoration: 'none', padding: '8px 14px', background: '#E8F0E7', borderRadius: 10 }}>
+              Recipe {I.external}
+            </a>
+          )}
         </div>
+        {steps.length > 0 ? (
+          <ol role="list" style={{ background: '#F5EDE3', borderRadius: 14, padding: 16, marginBottom: 20, listStyle: 'none' }}>
+            {steps.map((step, i) => (
+              <li
+                key={i}
+                role="listitem"
+                style={{ display: 'flex', gap: 12, padding: '10px 0', borderBottom: i < steps.length - 1 ? '1px solid #E5DED3' : 'none' }}
+              >
+                <span style={{ fontWeight: 700, color: '#5B7C5A', flexShrink: 0 }}>{i + 1}</span>
+                <span style={{ fontSize: 15 }}>{step}</span>
+              </li>
+            ))}
+          </ol>
+        ) : recipe.cardUrl ? (
+          <p style={{ color: '#7A7568', fontSize: 14, marginBottom: 20 }}>No Steps yet. Cook from the Recipe Card above.</p>
+        ) : (
+          <p style={{ color: '#7A7568', fontSize: 14, marginBottom: 20 }}>No instructions yet.</p>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+          <BatchStepper batch={batch} readOnly={readOnly} onChange={changeBatch} />
+        </div>
+        <button
+          className="btn-primary"
+          style={{ width: '100%', justifyContent: 'center' }}
+          disabled={readOnly}
+          onClick={toggleSelected}
+        >
+          {I.cart} <span>{recipe.selected ? 'Remove from Shopping List' : 'Add to Shopping List'}</span>
+        </button>
 
         {!recipe.protected && (
           confirmingDelete ? (
