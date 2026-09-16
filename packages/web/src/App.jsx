@@ -449,11 +449,16 @@ export function MealPrepApp() {
             {tab === 'shopping' && (
               <ShoppingListPage
                 shoppingList={shoppingList}
+                recipes={recipes}
                 aisles={aisles}
                 readOnly={degraded}
                 onToggleGotIt={handleToggleGotIt}
                 onSetAisle={handleSetAisle}
                 onDoneShopping={handleDoneShopping}
+                // The remove control in the Selected Recipes area is the same write the Recipes
+                // page's Add/Remove button makes: it toggles `selected` off through the existing
+                // optimistic update and failure toast, rather than a second copy of that rule.
+                onRemoveRecipe={handleToggleSelected}
               />
             )}
             {tab === 'pantry' && (
