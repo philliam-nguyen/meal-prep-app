@@ -10,8 +10,8 @@ function aisle(id, name) {
   return { id, name };
 }
 
-function entry(ingredientId, aisleId, gotIt = false) {
-  return { ingredientId, name: ingredientId, aisleId, gotIt, amounts: [] };
+function entry(ingredientId, aisleId, gotIt = false, covered = false) {
+  return { ingredientId, name: ingredientId, aisleId, gotIt, covered, amounts: [] };
 }
 
 const WALK = [aisle('A001', 'Produce'), aisle('A002', 'Bakery'), aisle('A003', 'Frozen')];
@@ -83,6 +83,32 @@ describe('groupByAisle', () => {
     const groups = groupByAisle(list, WALK);
 
     assert.deepEqual(groups[0].entries.map(e => e.ingredientId), ['other', 'mystery']);
+  });
+
+  it('sinks Covered entries to the bottom of their group, keeping the API order within each half', () => {
+    const list = [
+      entry('onion', 'A001', false, true),
+      entry('leek', 'A001'),
+      entry('potato', 'A001'),
+      entry('thyme', 'A001', false, true),
+    ];
+
+    const groups = groupByAisle(list, WALK);
+
+    assert.deepEqual(groups[0].entries.map(e => e.ingredientId), ['leek', 'potato', 'onion', 'thyme']);
+  });
+
+  it('sinks an entry that is both Got It and Covered once, alongside either mark on its own', () => {
+    const list = [
+      entry('onion', 'A001', true, false),
+      entry('leek', 'A001', false, false),
+      entry('potato', 'A001', false, true),
+      entry('thyme', 'A001', true, true),
+    ];
+
+    const groups = groupByAisle(list, WALK);
+
+    assert.deepEqual(groups[0].entries.map(e => e.ingredientId), ['leek', 'onion', 'potato', 'thyme']);
   });
 
   it('leaves the list and the walk it was given alone', () => {

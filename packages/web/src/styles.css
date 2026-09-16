@@ -132,6 +132,11 @@ input:focus, textarea:focus, select:focus { outline: 2px solid #5B7C5A; outline-
 .shopping-item:last-child { border-bottom: none; }
 .shopping-item.got-it { opacity: 0.5; }
 .shopping-item.got-it .item-name { text-decoration: line-through; }
+/* Covered: muted like Got It (the entry needs no more attention this trip) but never struck
+   through - the Ingredient itself is untouched, only already on the shelf at home. */
+.shopping-item.covered { opacity: 0.6; }
+.checkbox-btn.covered { background: #F5EDE3; border-color: #C9C2B4; color: #8A7F5C; }
+.covered-label { display: inline-flex; align-items: center; gap: 3px; margin-left: 8px; color: #8A7F5C; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
 
 .nav-bar { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,0.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 1px solid #F0EBE3; padding: 6px 0 env(safe-area-inset-bottom, 8px); z-index: 100; display: flex; justify-content: space-around; }
 .nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 12px; border-radius: 12px; cursor: pointer; transition: all 0.2s; border: none; background: none; color: #A39E93; font-size: 11px; font-weight: 600; font-family: 'Nunito', sans-serif; }

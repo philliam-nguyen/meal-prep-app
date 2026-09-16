@@ -75,23 +75,32 @@ function SelectedRecipesArea({ recipes, readOnly, onRemove }) {
 }
 
 
-/** One Shopping List entry: the tick, the name and its Aisle picker, and the summed amount. */
+/**
+ * One Shopping List entry: the tick, the name and its Aisle picker, and the summed amount.
+ *
+ * Covered replaces the empty box with a house glyph and the word "Covered" - the Ingredient is
+ * already on the shelf at home, so there is nothing to tick yet - but the button underneath is
+ * still the Got It control: buying more of something already in the Pantry is not forbidden, and a
+ * tick there switches the marker to the ordinary check the moment it lands.
+ */
 function ShoppingItemRow({ entry, aisles, readOnly, onToggleGotIt, onSetAisle }) {
+  const covered = entry.covered && !entry.gotIt;
   return (
-    <div className={`shopping-item ${entry.gotIt ? 'got-it' : ''}`}>
+    <div className={`shopping-item ${entry.gotIt ? 'got-it' : ''} ${covered ? 'covered' : ''}`}>
       {/* The tick lands before the write does. A cook works down an aisle a dozen entries at a
           time, and a failed write puts the entry back rather than leaving a tick that never
           saved. */}
       <button
-        className={`checkbox-btn ${entry.gotIt ? 'checked' : ''}`}
+        className={`checkbox-btn ${entry.gotIt ? 'checked' : ''} ${covered ? 'covered' : ''}`}
         disabled={readOnly}
         onClick={() => onToggleGotIt(entry)}
         aria-label={entry.gotIt ? `Unmark ${entry.name}` : `Mark ${entry.name} as got it`}
       >
-        {entry.gotIt && I.check}
+        {entry.gotIt ? I.check : covered ? I.home : null}
       </button>
       <div style={{ flex: 1, minWidth: 0 }}>
         <span className="item-name" style={{ fontWeight: 600, fontSize: 15 }}>{entry.name}</span>
+        {covered && <span className="covered-label">Covered</span>}
         <AisleField entry={entry} aisles={aisles} readOnly={readOnly} onSetAisle={onSetAisle} />
       </div>
       <span style={{ color: '#7A7568', fontSize: 14, fontWeight: 500, whiteSpace: 'nowrap' }}>{formatAmounts(entry.amounts)}</span>
@@ -169,7 +178,9 @@ export function ShoppingListPage({ shoppingList, recipes, aisles, readOnly, onTo
   // not "what is on it" - the list is the other half of that question.
   const selectedRecipes = recipes.filter(recipe => recipe.selected);
   const groups = groupByAisle(shoppingList, aisles);
-  const remaining = shoppingList.filter(entry => !entry.gotIt).length;
+  // What is left to find in the store: an entry that is Got It or Covered needs no more attention
+  // this trip, whichever of the two - or both - is why.
+  const remaining = shoppingList.filter(entry => !entry.gotIt && !entry.covered).length;
 
   return (
     <div className="fade-in">
