@@ -9,6 +9,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { addAisle } from './helpers/aisles.js';
 import { startApp } from './helpers/app.js';
 import { readPantryChecklist, setPantry, setStaple } from './helpers/pantry.js';
 import { createRecipe, readRecipes, readShoppingList, setSelected } from './helpers/recipes.js';
@@ -147,8 +148,9 @@ describe('Done Shopping', () => {
     const list = await readShoppingList(app);
     const onion = list.find((entry) => entry.name === 'Onion');
     const salt = list.find((entry) => entry.name === 'Salt');
+    const produce = await addAisle(app, 'Produce');
     await setGotIt(app, onion.ingredientId, true);
-    await setAisle(app, onion.ingredientId, 'Produce');
+    await setAisle(app, onion.ingredientId, produce.id);
     await setPantry(app, onion.ingredientId, true);
     await setStaple(app, salt.ingredientId, true);
 
@@ -156,7 +158,7 @@ describe('Done Shopping', () => {
 
     await setSelected(app, recipe.id, true);
     const entry = (await readShoppingList(app)).find((candidate) => candidate.name === 'Onion');
-    assert.equal(entry.aisle, 'Produce');
+    assert.equal(entry.aisleId, produce.id);
     assert.deepEqual(entry.amounts, [{ quantity: 2, unit: '' }]);
     assert.deepEqual(
       (await readPantryChecklist(app)).map((checked) => [checked.name, checked.inPantry]),

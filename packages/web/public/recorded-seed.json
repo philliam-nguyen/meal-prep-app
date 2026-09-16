@@ -888,14 +888,14 @@
     {
       "ingredientId": "I016",
       "name": "Black pepper",
-      "aisle": "Herbs & spices",
+      "aisleId": "A008",
       "gotIt": false,
       "amounts": []
     },
     {
       "ingredientId": "I001",
       "name": "Butter",
-      "aisle": "Dairy & eggs",
+      "aisleId": "A003",
       "gotIt": false,
       "amounts": [
         {
@@ -907,7 +907,7 @@
     {
       "ingredientId": "I002",
       "name": "Chicken stock",
-      "aisle": "Tins & jars",
+      "aisleId": "A006",
       "gotIt": false,
       "amounts": [
         {
@@ -919,7 +919,7 @@
     {
       "ingredientId": "I003",
       "name": "Chicken thighs",
-      "aisle": "Meat & poultry",
+      "aisleId": "A002",
       "gotIt": false,
       "amounts": [
         {
@@ -931,7 +931,7 @@
     {
       "ingredientId": "I004",
       "name": "Double cream",
-      "aisle": "Dairy & eggs",
+      "aisleId": "A003",
       "gotIt": false,
       "amounts": [
         {
@@ -943,7 +943,7 @@
     {
       "ingredientId": "I005",
       "name": "Leek",
-      "aisle": "Produce",
+      "aisleId": "A001",
       "gotIt": false,
       "amounts": [
         {
@@ -955,7 +955,7 @@
     {
       "ingredientId": "I013",
       "name": "Onion",
-      "aisle": "Produce",
+      "aisleId": "A001",
       "gotIt": false,
       "amounts": [
         {
@@ -967,7 +967,7 @@
     {
       "ingredientId": "I006",
       "name": "Plain flour",
-      "aisle": "Baking",
+      "aisleId": "A005",
       "gotIt": false,
       "amounts": [
         {
@@ -979,7 +979,7 @@
     {
       "ingredientId": "I021",
       "name": "Potato",
-      "aisle": "Produce",
+      "aisleId": "A001",
       "gotIt": false,
       "amounts": [
         {
@@ -991,14 +991,14 @@
     {
       "ingredientId": "I007",
       "name": "Salt",
-      "aisle": "Herbs & spices",
+      "aisleId": "A008",
       "gotIt": false,
       "amounts": []
     },
     {
       "ingredientId": "I008",
       "name": "Thyme",
-      "aisle": "Produce",
+      "aisleId": "A001",
       "gotIt": false,
       "amounts": [
         {
@@ -1296,6 +1296,43 @@
       ]
     }
   ],
-  "aisles": [],
+  "aisles": [
+    {
+      "id": "A001",
+      "name": "Produce"
+    },
+    {
+      "id": "A002",
+      "name": "Meat & poultry"
+    },
+    {
+      "id": "A003",
+      "name": "Dairy & eggs"
+    },
+    {
+      "id": "A004",
+      "name": "Dry goods"
+    },
+    {
+      "id": "A005",
+      "name": "Baking"
+    },
+    {
+      "id": "A006",
+      "name": "Tins & jars"
+    },
+    {
+      "id": "A007",
+      "name": "Oils & vinegars"
+    },
+    {
+      "id": "A008",
+      "name": "Herbs & spices"
+    },
+    {
+      "id": "A009",
+      "name": "Drinks"
+    }
+  ],
   "notice": null
 }

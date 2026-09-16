@@ -18,6 +18,11 @@ import { ownerDatabaseUrl } from './helpers/database.js';
 // on top of the schema the previous migration left.
 const AISLES_MIGRATION = '0004_aisles.sql';
 
+// The other half of "from empty" for the migration that points the Ingredient at an Aisle row
+// instead of typing one: a deployment already holding Ingredients with free-text Aisles has to
+// take this migration too, and what it leaves behind is what matters.
+const AISLE_REFERENCE_MIGRATION = '0007_ingredient_aisle_reference.sql';
+
 /** An empty database owned by the migration role, dropped when the test ends. */
 async function emptyDatabase(t) {
   const name = `migration_probe_${randomBytes(6).toString('hex')}`;
@@ -159,4 +164,71 @@ test('the Batch column arrives on a database that already holds Recipes', async 
     'the column took a Batch of 0',
   );
   await assert.rejects(() => client.query('update recipes set batch = 10'), /recipes_batch_range/);
+});
+
+// The homelab morning this one has to survive: a database already holding Ingredients with a
+// free-text Aisle typed into them. The migration drops that text rather than converting it, so what
+// this proves is that the drop leaves the new reference column behind rather than failing outright.
+test('an Ingredient with a free-text Aisle takes the reference migration onto an empty Aisle', async (t) => {
+  const client = await emptyDatabase(t);
+  const { dir } = await migrationsBefore(t, AISLE_REFERENCE_MIGRATION);
+  await runMigrations({ client, dir });
+  const { rows: before } = await client.query(
+    "insert into ingredients (name, aisle) values ('Salt', 'Herbs & spices') returning id",
+  );
+
+  const { applied } = await runMigrations({ client, dir: migrationsDir });
+
+  assert.ok(
+    applied.includes(AISLE_REFERENCE_MIGRATION),
+    `expected ${AISLE_REFERENCE_MIGRATION} to apply onto the prior schema, applied ${applied.join(', ')}`,
+  );
+  const { rows: columns } = await client.query(
+    `select column_name from information_schema.columns
+     where table_name = 'ingredients' and column_name in ('aisle', 'aisle_id')`,
+  );
+  assert.deepEqual(
+    columns.map((row) => row.column_name).sort(),
+    ['aisle_id'],
+    'the free-text column survived, or the reference column never arrived',
+  );
+  const { rows } = await client.query('select aisle_id from ingredients where id = $1', [
+    before[0].id,
+  ]);
+  assert.deepEqual(rows, [{ aisle_id: null }], 'a free-text Aisle came across as a reference');
+});
+
+test('an Ingredient loses its Aisle when the Aisle it was filed under is removed', async (t) => {
+  const client = await emptyDatabase(t);
+  await runMigrations({ client, dir: migrationsDir });
+  const { rows: aisle } = await client.query(
+    "insert into aisles (name, position) values ('Produce', 1) returning id",
+  );
+  const { rows: ingredient } = await client.query(
+    'insert into ingredients (name, aisle_id) values ($1, $2) returning id',
+    ['Onion', aisle[0].id],
+  );
+
+  await client.query('delete from aisles where id = $1', [aisle[0].id]);
+
+  const { rows } = await client.query('select aisle_id from ingredients where id = $1', [
+    ingredient[0].id,
+  ]);
+  assert.deepEqual(rows, [{ aisle_id: null }], 'the Ingredient still names the deleted Aisle');
+});
+
+test('Aisles gain a Protected mark on top of the schema that came before it', async (t) => {
+  const client = await emptyDatabase(t);
+  const { dir } = await migrationsBefore(t, AISLE_REFERENCE_MIGRATION);
+  await runMigrations({ client, dir });
+  const { rows: before } = await client.query(
+    "insert into aisles (name, position) values ('Produce', 1) returning id",
+  );
+
+  await runMigrations({ client, dir: migrationsDir });
+
+  const { rows } = await client.query('select protected from aisles where id = $1', [
+    before[0].id,
+  ]);
+  assert.deepEqual(rows, [{ protected: false }], 'an Aisle from before the migration is Protected');
 });

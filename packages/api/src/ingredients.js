@@ -13,12 +13,14 @@
 //
 // Every statement is parameterized.
 
-import { AISLE_MAX } from '@meal-prep/shared';
 import { clearEveryMark } from './shoppingList.js';
 
 // Matches the length the schema caps an id at, so a request cannot get a long string echoed back in
 // a refusal.
 const INGREDIENT_ID_MAX = 32;
+
+// Matches the length aisles.js caps an Aisle id at, for the same reason INGREDIENT_ID_MAX does.
+const AISLE_ID_MAX = 32;
 
 const PANTRY_CHECKLIST_QUERY = `
   select id, name, in_pantry as "inPantry"
@@ -60,11 +62,20 @@ const SET_GOT_IT = `
 
 const SET_AISLE = `
   update ingredients
-  set aisle = $2
+  set aisle_id = $2
   where id = $1
 `;
 
 const FIND_INGREDIENT = 'select name, staple from ingredients where id = $1';
+
+// Raised when the id sent names no row in aisles: the foreign key is what refuses it, and matching
+// it by name rather than by code alone is the lesson aisles.js and recipes.js both record, so a
+// 23503 raised by anything else is never turned into a message about an Aisle that was never named.
+const FOREIGN_KEY_VIOLATION = '23503';
+const UNKNOWN_AISLE = 'ingredients_aisle_id_fkey';
+
+const namesNoAisle = (cause) =>
+  cause.code === FOREIGN_KEY_VIOLATION && cause.constraint === UNKNOWN_AISLE;
 
 export const pantryEntrySchema = {
   type: 'object',
@@ -115,18 +126,15 @@ const gotItBody = {
   properties: { gotIt: { type: 'boolean' } },
 };
 
-// Free text with a length cap and no character allowlist. Store sections are written every way a
-// store can think of - "Aisle 12 - Dairy & eggs" - and a set tight enough to be worth enforcing
-// would refuse the real ones. The stored-XSS rule that governs the Recipe Card URL does not reach
-// here: an Aisle is rendered as text, which React escapes, and never as an href.
-//
-// Null clears the Aisle. An emptied box is normalized to null below rather than refused, because a
-// cook deleting what they typed means the same thing by it.
+// A reference now, not text: the Aisle an Ingredient is filed under is one of the managed rows
+// aisles.js maintains or nothing, never a spelling a cook typed. Null clears it. The id itself is
+// never trimmed or normalized here - it either names a row or it does not, and the foreign key is
+// what decides which.
 const aisleBody = {
   type: 'object',
-  required: ['aisle'],
+  required: ['aisleId'],
   additionalProperties: false,
-  properties: { aisle: { type: ['string', 'null'], maxLength: AISLE_MAX } },
+  properties: { aisleId: { type: ['string', 'null'], maxLength: AISLE_ID_MAX } },
 };
 
 /** The Ingredients a cook is asked to tick. */
@@ -154,15 +162,6 @@ async function explainPantryRefusal(db, id) {
     code: 400,
     message: `${rows[0].name} is a Staple, which is assumed on hand rather than ticked into the Pantry.`,
   };
-}
-
-/**
- * What an Aisle a cook typed is worth storing as. Trimmed, so one section does not arrive as two
- * spellings, and an emptied box becomes null rather than a heading with no name in it.
- */
-function normalizeAisle(aisle) {
-  const trimmed = aisle?.trim();
-  return trimmed ? trimmed : null;
 }
 
 /**
@@ -221,11 +220,18 @@ export function registerIngredientRoutes(app) {
   app.put(
     '/api/ingredients/:id/aisle',
     { schema: { params: ingredientParams, body: aisleBody } },
-    async (request, reply) =>
-      setIngredientField(app, reply, SET_AISLE, [
-        request.params.id,
-        normalizeAisle(request.body.aisle),
-      ]),
+    async (request, reply) => {
+      const { id } = request.params;
+      const { aisleId } = request.body;
+      try {
+        return await setIngredientField(app, reply, SET_AISLE, [id, aisleId]);
+      } catch (cause) {
+        if (namesNoAisle(cause)) {
+          return reply.code(400).send({ message: `There is no Aisle ${aisleId}.` });
+        }
+        throw cause;
+      }
+    },
   );
 
   // Named for the cook's action rather than for the column it writes, because "clear the marks off

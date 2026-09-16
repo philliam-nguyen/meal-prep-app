@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { AISLE_MAX } from '@meal-prep/shared';
 import { formatAmounts } from '../format.js';
 import { I } from '../icons.jsx';
 
@@ -8,52 +7,33 @@ import { I } from '../icons.jsx';
 // disagree about what to buy, and it is one query in SQL now.
 //
 // What this page does own is the two marks that survive that derivation, because they belong to the
-// Ingredient rather than to the row: Got It, and the Aisle it is found in.
+// Ingredient rather than to the row: Got It, and the Aisle it is filed under.
 
 /**
- * The Aisle line under an Ingredient's name: a label until it is tapped, a box after. The same
- * control sets an Aisle for the first time and corrects one that is wrong, because to a cook
- * standing in the wrong aisle those are the same act.
+ * The Aisle line under an Ingredient's name: a picker listing every managed Aisle plus a clear
+ * option, standing in for the free-text box this replaced now that an Ingredient's Aisle is a
+ * reference rather than a spelling a cook typed. A native select rather than anything fancier,
+ * because a cook standing in the aisle wants one tap and a list, not a box to type into.
+ *
+ * The selected option is the label: closed, it reads the Aisle's name, or the clear option's text
+ * when there is none. Setting one for the first time and correcting one that is wrong are the same
+ * act through the same control, the way the free-text box worked before it.
  */
-function AisleField({ entry, readOnly, onSetAisle }) {
-  // The draft doubles as the mode: null is the label, a string is the open box. One piece of state
-  // rather than two, so there is no arrangement where the box is open holding nothing.
-  const [draft, setDraft] = useState(null);
-
-  // Read-only shows the label and nothing else, so there is no box to type an Aisle into that could
-  // not be saved. It reads as a box that never opens rather than one closing under a cook: degraded
-  // mode is entered by the first paint, so nothing here is ever open when it arrives.
-  if (draft === null || readOnly) {
-    return (
-      <button
-        disabled={readOnly}
-        onClick={() => setDraft(entry.aisle ?? '')}
-        style={{ display: 'block', background: 'none', border: 'none', padding: '2px 0 0', fontSize: 12, color: '#A39E93', cursor: readOnly ? 'not-allowed' : 'pointer', opacity: readOnly ? 0.5 : 1, fontFamily: 'inherit' }}
-      >
-        {entry.aisle ? `Aisle: ${entry.aisle}` : 'Set aisle'}
-      </button>
-    );
-  }
-
-  // Closing the box before handing the value over is what keeps Escape from committing the edit it
-  // is abandoning: the input is gone, so the blur that would have saved it has nothing to fire on.
-  const commit = () => { setDraft(null); onSetAisle(entry, draft); };
-
+function AisleField({ entry, aisles, readOnly, onSetAisle }) {
   return (
-    <input
-      className="input-field"
-      style={{ padding: '4px 8px', fontSize: 12, marginTop: 4, maxWidth: 200 }}
-      value={draft}
-      placeholder="Which aisle?"
-      maxLength={AISLE_MAX}
-      autoFocus
-      onChange={event => setDraft(event.target.value)}
-      onBlur={commit}
-      onKeyDown={event => {
-        if (event.key === 'Enter') commit();
-        if (event.key === 'Escape') setDraft(null);
-      }}
-    />
+    <select
+      className="aisle-picker"
+      style={{ display: 'block', marginTop: 4, padding: '2px 20px 2px 0', fontSize: 12, color: '#A39E93', background: 'none', border: 'none', fontFamily: 'inherit', cursor: readOnly ? 'not-allowed' : 'pointer' }}
+      value={entry.aisleId ?? ''}
+      disabled={readOnly}
+      aria-label={`Aisle for ${entry.name}`}
+      onChange={event => onSetAisle(entry, event.target.value || null)}
+    >
+      <option value="">No aisle</option>
+      {aisles.map(aisle => (
+        <option key={aisle.id} value={aisle.id}>{aisle.name}</option>
+      ))}
+    </select>
   );
 }
 
@@ -88,7 +68,7 @@ function DoneShoppingButton({ readOnly, onDoneShopping }) {
   );
 }
 
-export function ShoppingListPage({ shoppingList, readOnly, onToggleGotIt, onSetAisle, onDoneShopping }) {
+export function ShoppingListPage({ shoppingList, aisles, readOnly, onToggleGotIt, onSetAisle, onDoneShopping }) {
   if (shoppingList.length === 0) {
     return (
       <div className="empty-state fade-in">
@@ -121,7 +101,7 @@ export function ShoppingListPage({ shoppingList, readOnly, onToggleGotIt, onSetA
             </button>
             <div style={{ flex: 1, minWidth: 0 }}>
               <span className="item-name" style={{ fontWeight: 600, fontSize: 15 }}>{entry.name}</span>
-              <AisleField entry={entry} readOnly={readOnly} onSetAisle={onSetAisle} />
+              <AisleField entry={entry} aisles={aisles} readOnly={readOnly} onSetAisle={onSetAisle} />
             </div>
             <span style={{ color: '#7A7568', fontSize: 14, fontWeight: 500, whiteSpace: 'nowrap' }}>{formatAmounts(entry.amounts)}</span>
           </div>

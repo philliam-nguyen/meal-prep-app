@@ -27,7 +27,11 @@ const recipesTab = (recipes) => ({
   ],
 });
 
-const shoppingListTab = (shoppingList) => ({
+// The Aisle travels on the entry as an id now, not text (ticket "Ingredients are filed into an
+// Aisle by reference"), so the name this tab still writes (ADR-0011: the spreadsheet is a copy a
+// person reads on a phone, and a join key in column A is not for them) is looked up from the
+// payload's own `aisles` list rather than carried on the entry.
+const shoppingListTab = (shoppingList, aisleNameById) => ({
   title: 'Shopping List',
   rows: [
     ['Ingredient', 'Amount', 'Aisle', 'Got It'],
@@ -37,7 +41,7 @@ const shoppingListTab = (shoppingList) => ({
       // across them, and a cell that picked one unit would be the arithmetic state.js records having
       // fixed, written back into the spreadsheet it came from.
       entry.amounts.map(readable).join(' + '),
-      entry.aisle ?? '',
+      (entry.aisleId && aisleNameById.get(entry.aisleId)) || '',
       entry.gotIt ? 'Yes' : '',
     ]),
   ],
@@ -73,9 +77,10 @@ const pantryTab = (pantryChecklist, staples) => ({
  * target is a copy a person reads on a phone rather than a source anything loads back.
  */
 export function exportTabs(state) {
+  const aisleNameById = new Map((state.aisles ?? []).map((aisle) => [aisle.id, aisle.name]));
   return [
     recipesTab(state.recipes),
-    shoppingListTab(state.shoppingList),
+    shoppingListTab(state.shoppingList, aisleNameById),
     pantryTab(state.pantryChecklist, state.staples),
   ];
 }

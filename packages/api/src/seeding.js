@@ -28,6 +28,11 @@ const DOMAIN_TABLES = `
 // on the rows it has just created.
 const PROTECT_SEEDED_RECIPES = 'update recipes set protected = true';
 
+// The same write, for the same reason, on the Aisles the loader has just shelved: a visitor renaming
+// or removing one would leave every later restore's assignments filed under a walk that no longer
+// matches the fixture's own.
+const PROTECT_SEEDED_AISLES = 'update aisles set protected = true';
+
 /**
  * Empties every domain table, leaving the migration record alone. Exported because the test fixture
  * clears the database between tests and there is one right answer to "what counts as a domain
@@ -142,11 +147,34 @@ export async function restoreSeed({ pool, guardrails, fixture = SEED, log = () =
     }
     log(`ticked ${fixture.pantry.length} Pantry Ingredients`);
 
-    for (const [name, aisle] of Object.entries(fixture.aisles)) {
+    // The store's sections, created in the fixed walk order the fixture gives them - Produce first,
+    // Drinks last, or similar - so a Demo restore always shelves them the same way. Aisle became a
+    // managed list precisely so this order could be said at all; free text never could.
+    const walkIds = new Map();
+    for (const name of fixture.aisleWalk) {
+      const created = await send(app, {
+        method: 'POST',
+        url: '/api/aisles',
+        payload: { name },
+        expected: 201,
+        entry: `Aisle ${name}`,
+      });
+      walkIds.set(name, created.json().id);
+    }
+    log(`shelved ${fixture.aisleWalk.length} Aisles`);
+
+    // Every Ingredient filed by reference to the Aisle it belongs in, rather than by a spelling of
+    // its name. A section the vocabulary names but the walk left out is a fixture inconsistency, and
+    // it fails loudly here rather than as a 400 the id lookup could not explain.
+    for (const [name, aisleName] of Object.entries(fixture.aisles)) {
+      const aisleId = walkIds.get(aisleName);
+      if (!aisleId) {
+        throw new Error(`the Seed shelves ${name} into ${aisleName}, which is not in the walk`);
+      }
       await send(app, {
         method: 'PUT',
         url: `/api/ingredients/${idFor(ids, name, 'an Aisle')}/aisle`,
-        payload: { aisle },
+        payload: { aisleId },
         expected: 204,
         entry: `Aisle for ${name}`,
       });
@@ -170,11 +198,14 @@ export async function restoreSeed({ pool, guardrails, fixture = SEED, log = () =
     // relying on which routes happen not to check it.
     await pool.query(PROTECT_SEEDED_RECIPES);
     log('marked every seeded Recipe Protected');
+    await pool.query(PROTECT_SEEDED_AISLES);
+    log('marked every seeded Aisle Protected');
 
     return {
       recipes: fixture.recipes.length,
       ingredients: ids.size,
       staples: fixture.staples.length,
+      aisles: fixture.aisleWalk.length,
     };
   } finally {
     await app.close();

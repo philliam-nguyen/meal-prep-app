@@ -18,12 +18,12 @@ const config = readSeedConfig();
 const pool = createPool(config.databaseUrl, 'meal-prep-seed');
 
 try {
-  const { recipes, ingredients, staples } = await restoreSeed({
+  const { recipes, ingredients, staples, aisles } = await restoreSeed({
     pool,
     guardrails: config.guardrails,
     log,
   });
-  log(`${recipes} Recipes, ${ingredients} Ingredients, ${staples} of them Staples`);
+  log(`${recipes} Recipes, ${ingredients} Ingredients, ${staples} of them Staples, ${aisles} Aisles`);
 } catch (error) {
   // The whole error, not just its message: this runs unattended and its log is the only account.
   console.error('seed failed');

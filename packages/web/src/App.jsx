@@ -281,20 +281,21 @@ export function MealPrepApp() {
     loadData(true);
   }, [loadData, toast]);
 
-  // Sends what the cook typed, untouched. Trimming here and emptying to null would be the server's
-  // rule written a second time in the browser, which is the drift ADR-0005 keeps out; the box shows
-  // what was typed until the reload replaces it with what the server actually stored.
+  // A reference now, not text: the select hands back an Aisle id or null, and the same optimistic
+  // update Got It uses applies. The entry shows the new Aisle before the write lands, and a failure
+  // puts it back and says so with the existing toast, so nothing on screen names an Aisle that never
+  // saved.
   //
-  // The Aisle is the Ingredient's rather than this list's, so that reload is also what carries a
-  // correction to wherever else that Ingredient shows up.
-  const handleSetAisle = useCallback(async (entry, aisle) => {
-    const previous = entry.aisle;
-    if (aisle === (previous ?? '')) return;
-    const show = value => setShoppingList(prev => prev.map(e => (e.ingredientId === entry.ingredientId ? { ...e, aisle: value } : e)));
+  // The Aisle is the Ingredient's rather than this list's, so the reload that follows is also what
+  // carries a correction to wherever else that Ingredient shows up.
+  const handleSetAisle = useCallback(async (entry, aisleId) => {
+    const previous = entry.aisleId;
+    if (aisleId === previous) return;
+    const show = value => setShoppingList(prev => prev.map(e => (e.ingredientId === entry.ingredientId ? { ...e, aisleId: value } : e)));
 
-    show(aisle);
+    show(aisleId);
     try {
-      await setIngredientAisle(entry.ingredientId, aisle);
+      await setIngredientAisle(entry.ingredientId, aisleId);
     } catch {
       show(previous);
       toast(`Could not set the aisle for ${entry.name}. Nothing was saved.`);
@@ -448,6 +449,7 @@ export function MealPrepApp() {
             {tab === 'shopping' && (
               <ShoppingListPage
                 shoppingList={shoppingList}
+                aisles={aisles}
                 readOnly={degraded}
                 onToggleGotIt={handleToggleGotIt}
                 onSetAisle={handleSetAisle}

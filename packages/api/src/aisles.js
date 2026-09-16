@@ -79,9 +79,12 @@ const REWRITE_POSITIONS = `
 // Deleting returns the place the section held, because the walk has to close up behind it: the
 // statement below shifts everything after that place down by one, which is what keeps position
 // dense and the next added section at the end of the walk rather than in the gap.
+//
+// `and not protected` for the reason RENAME_AISLE carries it: a seeded Aisle refuses a delete under
+// the demo guardrails, the same way a seeded Recipe does.
 const DELETE_AISLE = `
   delete from aisles
-  where id = $1
+  where id = $1 and not protected
   returning position
 `;
 
@@ -107,16 +110,26 @@ const namesAnAisleTwice = (cause) =>
 // The name goes and the place in the walk stays: renaming is fixing a spelling, not re-walking the
 // store. No "returning" beyond the row itself, which the response is assembled from so a renamed
 // Aisle and a listed one cannot describe the same row differently.
+//
+// `and not protected` is the same guard recipes.js puts on its own update: a seeded Aisle refuses a
+// rename under the demo guardrails (ADR-0001), and the Homelab Variant never sets the flag, so it is
+// inert there rather than conditional (ADR-0002).
 const RENAME_AISLE = `
   update aisles
   set name = $2
-  where id = $1
+  where id = $1 and not protected
   returning id, name
 `;
 
 // The name the duplicate collided with, so the refusal names the Aisle that is already there rather
 // than the spelling the cook just tried. Only read on the path that is already refusing.
 const FIND_AISLE_BY_NAME = 'select name from aisles where lower(btrim(name)) = lower(btrim($1))';
+
+// Only read once a write has already matched no row, so the ordinary rename or delete stays on one
+// statement and only a refusal pays for the explanation - the same shape recipes.js's FIND_RECIPE
+// and explainRefusal take, for the same reason: telling "there is no such Aisle" apart from "there is
+// one, and it is Protected" needs a second read that names it.
+const FIND_AISLE = 'select name, protected from aisles where id = $1';
 
 export const aisleSchema = {
   type: 'object',
@@ -180,6 +193,21 @@ async function duplicateRefusal(db, name) {
 export async function readAisles(db) {
   const { rows } = await db.query(AISLES_QUERY);
   return rows;
+}
+
+/**
+ * Why a write naming an Aisle matched no row: either there is no such Aisle, or there is one that is
+ * Protected. Mirrors recipes.js's explainRefusal, for the same reason: Protected is the one refusal
+ * on these two routes that is not about the request itself, and the guarded statement's row count
+ * alone cannot say which of the two happened.
+ */
+async function explainAisleRefusal(db, id) {
+  const { rows } = await db.query(FIND_AISLE, [id]);
+  if (rows.length === 0) return { code: 404, message: `There is no Aisle ${id}.` };
+  return {
+    code: 403,
+    message: `${rows[0].name} is Protected, so it cannot be renamed or removed.`,
+  };
 }
 
 /**
@@ -281,10 +309,11 @@ export function registerAisleRoutes(app) {
         const { id } = request.params;
         const { rows } = await app.db.query(RENAME_AISLE, [id, name]);
 
-        // The row count is the whole test: this matches on the primary key, so matching nothing
-        // means the id names nothing.
+        // No row means either of two things the guard above folds together: there is no such Aisle,
+        // or there is one that is Protected. explainAisleRefusal is what tells them apart.
         if (rows.length === 0) {
-          return reply.code(404).send({ message: `There is no Aisle ${id}.` });
+          const refusal = await explainAisleRefusal(app.db, id);
+          return reply.code(refusal.code).send({ message: refusal.message });
         }
 
         return reply.code(200).send(rows[0]);
@@ -322,10 +351,10 @@ export function registerAisleRoutes(app) {
   // Nothing comes back, and none is wanted: what a caller would do with a copy of an Aisle that no
   // longer exists is nothing.
   //
-  // A removal is never refused for what is filed under the section. Ingredients carry their Aisle as
-  // free text and nothing references these rows yet; once they do, story 16 asks for them to be
-  // unassigned rather than for the removal to be blocked, because tidying the list must not be the
-  // thing that cannot be done.
+  // A removal is never refused for what is filed under the section: `ingredients.aisle_id` references
+  // this table `on delete set null`, so an Ingredient filed here becomes unassigned rather than the
+  // removal being blocked. Tidying the list must not be the thing that cannot be done, and the
+  // initial sort is being done with an agent, so a mistaken removal is cheap to recover from.
   app.delete('/api/aisles/:id', { schema: { params: aisleParams } }, async (request, reply) => {
     const { id } = request.params;
 
@@ -339,7 +368,8 @@ export function registerAisleRoutes(app) {
     });
 
     if (!removed) {
-      return reply.code(404).send({ message: `There is no Aisle ${id}.` });
+      const refusal = await explainAisleRefusal(app.db, id);
+      return reply.code(refusal.code).send({ message: refusal.message });
     }
 
     return reply.code(204).send();
