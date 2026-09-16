@@ -9,8 +9,8 @@ kitchen.
 ### Recipes
 
 **Recipe**:
-A dish, identified by a stable id, with a name, a Recipe Type, and a set of Recipe Ingredients.
-The app stores no instructions — it links out to a Recipe Card.
+A dish, identified by a stable id, with a name, a Recipe Type, a set of Recipe Ingredients,
+optional Steps, and an optional Recipe Card link.
 
 **Recipe Type**:
 The single category a Recipe belongs to, drawn from a fixed set (dinner, soup, stew, dessert,
@@ -18,13 +18,18 @@ bread, lunch, breakfast, snack).
 _Avoid_: category, tag, meal, cuisine
 
 **Recipe Card**:
-The external page holding the actual cooking instructions. The app only ever holds its URL.
+An optional external source for a Recipe's cooking instructions, such as a video or a blog post.
+The app only ever holds its URL.
 _Avoid_: link, recipe url, instructions
 
 **Recipe Ingredient**:
 The quantity and unit of one Ingredient within one Recipe. Meaningless on its own — it exists
 only as part of a Recipe.
 _Avoid_: line item, recipe row, ingredient row
+
+**Step**:
+One ordered plain-text instruction in a Recipe, optional.
+_Avoid_: instruction line, direction, method
 
 ### Ingredients and the kitchen
 
@@ -54,6 +59,11 @@ Ingredient with none set is unassigned.
 A Recipe the cook has committed to making, which is what pulls its Ingredients into the
 Shopping List.
 _Avoid_: active recipe, in cart, added recipe
+
+**Batch**:
+The whole number of times a Selected Recipe is being made, 1 to 9. Scales its quantified
+amounts on the Shopping List and resets to 1 on deselect.
+_Avoid_: multiplier, servings, portions, scale
 
 **Shopping List**:
 The consolidated Ingredients needed for every Selected Recipe, each with its summed quantity.
