@@ -45,7 +45,8 @@ _Avoid_: basic, common ingredient, always-have
 
 **Pantry**:
 The set of Ingredients currently on hand. A simple membership question with no quantities —
-you either have an Ingredient or you don't.
+you either have an Ingredient or you don't. Presented as two views, in and not in, over that
+same set.
 _Avoid_: inventory, stock, have-list, on-hand list
 
 **Aisle**:
@@ -76,6 +77,11 @@ A mark on a Shopping List entry meaning it's already in the trolley. Survives be
 is shared by everyone using the instance, and is cleared when its Ingredient leaves the Shopping
 List.
 _Avoid_: checked, purchased, done, acquired
+
+**Covered**:
+A Shopping List entry whose Ingredient is in the Pantry. Derived from Pantry membership on every
+read, never stored, and shown distinctly from Got It.
+_Avoid_: in stock, have it, skip
 
 **Done Shopping**:
 The action that ends a shopping trip: it deselects every Recipe and clears every Got It mark in
