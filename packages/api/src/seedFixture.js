@@ -79,6 +79,22 @@ const AISLES = {
   Yeast: 'Baking',
 };
 
+// The store's sections, in the order a visitor walks them - Produce first, Drinks last. This is
+// what the restore creates as Aisle rows before it files a single Ingredient: the vocabulary above
+// only names each Ingredient's section, and says nothing about which comes first, which is exactly
+// the thing free text could never say and a managed, ordered list exists to fix.
+const AISLE_WALK = [
+  'Produce',
+  'Meat & poultry',
+  'Dairy & eggs',
+  'Dry goods',
+  'Baking',
+  'Tins & jars',
+  'Oils & vinegars',
+  'Herbs & spices',
+  'Drinks',
+];
+
 // Two Recipes already on the Shopping List, so a visitor arrives at a list with something in it
 // rather than at an empty page that needs explaining. These two share leek, double cream, butter and
 // chicken stock, which is what makes the list show consolidation rather than a flat concatenation.
@@ -103,6 +119,12 @@ const RECIPES = [
       { name: 'Plain flour', quantity: 250, unit: 'g' },
       { name: 'Butter', quantity: 125, unit: 'g' },
       { name: 'Salt', quantity: null, unit: '' },
+    ],
+    steps: [
+      'Melt the butter and soften the leek for five minutes.',
+      'Stir in the flour and cook for a minute, then add the stock and cream.',
+      'Add the chicken and thyme, season with salt, and simmer until the chicken is cooked through.',
+      'Spoon into a pie dish, top with pastry and bake at 200C until golden, about 25 minutes.',
     ],
   },
   {
@@ -237,6 +259,12 @@ const RECIPES = [
       { name: 'Thyme', quantity: 4, unit: 'sprigs' },
       { name: 'Plain flour', quantity: 2, unit: 'tbsp' },
     ],
+    steps: [
+      'Toss the beef in the flour and brown it in batches, setting each batch aside.',
+      'Soften the onion, carrot and celery in the same pot.',
+      'Return the beef, pour in the ale, add the thyme, and bring to a simmer.',
+      'Cover and cook low for two and a half hours, until the beef is tender.',
+    ],
   },
   {
     name: 'Chickpea and Tomato Stew',
@@ -261,6 +289,12 @@ const RECIPES = [
       { name: 'Eggs', quantity: 4, unit: '' },
       { name: 'Double cream', quantity: 300, unit: 'ml' },
       { name: 'Caster sugar', quantity: 50, unit: 'g' },
+    ],
+    steps: [
+      'Melt the chocolate and leave it to cool slightly.',
+      'Whisk the egg yolks with the sugar until pale, then fold in the chocolate.',
+      'Whip the cream to soft peaks and fold it through.',
+      'Whisk the egg whites to stiff peaks and fold in gently, then chill for at least four hours.',
     ],
   },
   {
@@ -295,6 +329,12 @@ const RECIPES = [
       { name: 'Yeast', quantity: 3, unit: 'g' },
       { name: 'Water', quantity: 350, unit: 'ml' },
       { name: 'Salt', quantity: 10, unit: 'g' },
+    ],
+    steps: [
+      'Mix the flour, yeast, water and salt into a shaggy dough.',
+      'Cover and leave at room temperature overnight, at least twelve hours.',
+      'Turn onto a floured surface, shape into a loaf, and prove for an hour.',
+      'Bake at 230C for 30 to 35 minutes, until the base sounds hollow when tapped.',
     ],
   },
   {
@@ -338,6 +378,7 @@ export const SEED = {
   recipes: RECIPES,
   staples: STAPLES,
   aisles: AISLES,
+  aisleWalk: AISLE_WALK,
   selected: SELECTED,
   pantry: PANTRY,
 };

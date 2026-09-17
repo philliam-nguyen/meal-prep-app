@@ -12,9 +12,12 @@
 // Best Matches is derived the same way and for the same reason, and lives in bestMatches.js because
 // the match rule is a thing in its own right rather than a shape this payload happens to need.
 
+import { aisleSchema, readAisles } from './aisles.js';
 import { bestMatchSchema, readBestMatches } from './bestMatches.js';
 import {
+  ingredientSchema,
   pantryEntrySchema,
+  readIngredients,
   readPantryChecklist,
   readStaples,
   stapleSchema,
@@ -28,6 +31,9 @@ const recipesQuery = (where = '') => `
     r.type,
     r.card_url as "cardUrl",
     r.selected,
+    -- How many times this Recipe is being made, which is what the Shopping List multiplies by.
+    -- Always 1 unless the Recipe is a Selected Recipe: deselecting resets it.
+    r.batch,
     r.protected,
     coalesce(
       (
@@ -48,7 +54,18 @@ const recipesQuery = (where = '') => `
         where ri.recipe_id = r.id
       ),
       '[]'::json
-    ) as ingredients
+    ) as ingredients,
+    -- Steps nest for the reason Recipe Ingredients do: a Step is meaningless without its Recipe. An
+    -- array of strings rather than of objects, because the position is the array's own order and a
+    -- Step carries nothing else.
+    coalesce(
+      (
+        select json_agg(s.text order by s.position)
+        from recipe_steps s
+        where s.recipe_id = r.id
+      ),
+      '[]'::json
+    ) as steps
   from recipes r
   ${where}
   -- By name, because this is a browse list and the cook is looking for one they half-remember.
@@ -73,6 +90,11 @@ const RECIPE_BY_ID_QUERY = recipesQuery('where r.id = $1');
 //
 // Got It and Aisle are read from the Ingredient itself rather than from anything this derives, which
 // is what lets the list be recomputed on every read without losing what the cook marked.
+//
+// Covered is read the same way, off the Ingredient's own Pantry membership rather than anything
+// stored against the entry: a cook who has an Ingredient on the shelf does not need to buy it again,
+// and the moment it leaves the Pantry the next read says so with no write of its own. It is never
+// true for a Staple, since ingredients.js refuses to ever set in_pantry on one.
 const SHOPPING_LIST_QUERY = `
   with needed as (
     select
@@ -81,7 +103,13 @@ const SHOPPING_LIST_QUERY = `
       -- sum() skips nulls, so an unquantified Recipe Ingredient contributes nothing rather than the
       -- zero the Sheets-era parseFloat(...) || 0 turned it into. A unit every Selected Recipe leaves
       -- unquantified sums to null and is dropped below, so "to taste" never becomes an amount.
-      sum(ri.quantity) as quantity
+      --
+      -- Each Recipe's amount is scaled by its own Batch before the sum, not after: two Selected
+      -- Recipes sharing an Ingredient are each being made their own number of times, so one factor
+      -- outside the sum would be arithmetic about neither of them. Null times anything is null, so
+      -- "to taste" survives the multiplication unquantified, which is the point of doing it here
+      -- rather than in a client that would have to remember not to.
+      sum(ri.quantity * r.batch) as quantity
     from recipe_ingredients ri
     join recipes r on r.id = ri.recipe_id
     where r.selected
@@ -90,8 +118,9 @@ const SHOPPING_LIST_QUERY = `
   select
     i.id as "ingredientId",
     i.name,
-    i.aisle,
+    i.aisle_id as "aisleId",
     i.got_it as "gotIt",
+    i.in_pantry as "covered",
     coalesce(
       (
         select json_agg(
@@ -128,7 +157,7 @@ const recipeIngredient = {
 
 export const recipeSchema = {
   type: 'object',
-  required: ['id', 'name', 'type', 'cardUrl', 'selected', 'protected', 'ingredients'],
+  required: ['id', 'name', 'type', 'cardUrl', 'selected', 'batch', 'protected', 'ingredients', 'steps'],
   additionalProperties: false,
   properties: {
     id: { type: 'string' },
@@ -136,8 +165,15 @@ export const recipeSchema = {
     type: { type: 'string' },
     cardUrl: { type: ['string', 'null'] },
     selected: { type: 'boolean' },
+    // A whole number of times, 1 to 9, and 1 for anything not selected. Declared as an integer
+    // rather than a number because half a Batch produces amounts this app cannot show honestly.
+    batch: { type: 'integer' },
     protected: { type: 'boolean' },
     ingredients: { type: 'array', items: recipeIngredient },
+    // Empty for a Recipe whose instructions are only its Recipe Card, which is most of them. Always
+    // present, never absent: a field that came and went with the data would leave every reader
+    // asking whether a Recipe has no Steps or this response forgot to say.
+    steps: { type: 'array', items: { type: 'string' } },
   },
 };
 
@@ -155,13 +191,22 @@ const shoppingListAmount = {
 
 const shoppingListEntry = {
   type: 'object',
-  required: ['ingredientId', 'name', 'aisle', 'gotIt', 'amounts'],
+  required: ['ingredientId', 'name', 'aisleId', 'gotIt', 'covered', 'amounts'],
   additionalProperties: false,
   properties: {
     ingredientId: { type: 'string' },
     name: { type: 'string' },
-    aisle: { type: ['string', 'null'] },
+    // A reference now, not text: one of the ids `aisles` above carries, or null. Resolving it to a
+    // name is the client's job, from the `aisles` array this same payload carries - the API keeps
+    // answering with one flat derived list rather than nesting a name it would then have to keep in
+    // step with a rename.
+    aisleId: { type: ['string', 'null'] },
     gotIt: { type: 'boolean' },
+    // Derived off Pantry membership on every read, never stored: true when this Ingredient is in
+    // the Pantry, so buying more of it is redundant. Distinct from gotIt - the trolley already has
+    // this trip's amount, this says the kitchen already had some before the trip started - and both
+    // can be true at once, since buying more of something on hand is not forbidden.
+    covered: { type: 'boolean' },
     // Empty when every Selected Recipe leaves this Ingredient unquantified. The cook still has to
     // buy it; nobody can say how much.
     amounts: { type: 'array', items: shoppingListAmount },
@@ -178,6 +223,8 @@ export const stateResponse = {
     'pantryChecklist',
     'staples',
     'bestMatches',
+    'aisles',
+    'ingredients',
     'notice',
   ],
   additionalProperties: false,
@@ -194,6 +241,13 @@ export const stateResponse = {
     pantryChecklist: { type: 'array', items: pantryEntrySchema },
     staples: { type: 'array', items: stapleSchema },
     bestMatches: { type: 'array', items: bestMatchSchema },
+    // In walk order, which is the whole of what position means to a client: the array says where
+    // each section comes, so nothing here has to carry the number the API maintains.
+    aisles: { type: 'array', items: aisleSchema },
+    // Every Ingredient the app knows, Staples included, feeding the bulk Aisle-filing view on
+    // Settings so the initial sort of a whole kitchen happens in one sitting. Pantry membership is
+    // not duplicated here - that question already has an answer in `pantryChecklist`.
+    ingredients: { type: 'array', items: ingredientSchema },
     // The one field here that is configuration rather than data: a line the deployment wants read,
     // or null where nobody configured one. Declared and required rather than left off when unset,
     // because this schema is what Fastify serializes through and what the recorded Seed is checked
@@ -221,13 +275,16 @@ export const stateResponse = {
  */
 export async function readState(db) {
   const version = await readVersion(db);
-  const [recipes, shoppingList, pantryChecklist, staples, bestMatches] = await Promise.all([
-    db.query(RECIPES_QUERY),
-    db.query(SHOPPING_LIST_QUERY),
-    readPantryChecklist(db),
-    readStaples(db),
-    readBestMatches(db),
-  ]);
+  const [recipes, shoppingList, pantryChecklist, staples, bestMatches, aisles, ingredients] =
+    await Promise.all([
+      db.query(RECIPES_QUERY),
+      db.query(SHOPPING_LIST_QUERY),
+      readPantryChecklist(db),
+      readStaples(db),
+      readBestMatches(db),
+      readAisles(db),
+      readIngredients(db),
+    ]);
   return {
     version,
     recipes: recipes.rows,
@@ -235,6 +292,8 @@ export async function readState(db) {
     pantryChecklist,
     staples,
     bestMatches,
+    aisles,
+    ingredients,
   };
 }
 

@@ -29,6 +29,14 @@ export const ingredientRow = ({ name = '', quantity = null, unit = '' } = {}) =>
 /** The rows that will reach the API. A row naming nothing is scaffolding, not an Ingredient. */
 export const rowsNamingIngredient = (rows) => rows.filter((row) => row.name.trim());
 
+// A Step row carries an id for the reason an Ingredient row does: React keys survive a row being
+// removed or moved, and a problem reported against the second Step in the payload is shown against
+// the row that produced it, which is not the second row on screen whenever a blank sits above.
+export const stepRow = ({ text = '' } = {}) => ({ id: (lastRowId += 1), text });
+
+/** The rows that will reach the API. A row with nothing typed in it is scaffolding, not a Step. */
+export const rowsHoldingStep = (rows) => rows.filter((row) => row.text.trim());
+
 /**
  * An empty box is unquantified, "to taste". Text that is not a number stays text so the schema
  * refuses it and the cook is told; turning it into null here would silently discard what they
@@ -42,7 +50,7 @@ function toQuantity(text) {
 }
 
 /** The form's state as the API's request body. */
-export function toRecipePayload({ name, type, cardUrl, rows }) {
+export function toRecipePayload({ name, type, cardUrl, rows, stepRows }) {
   return {
     name: name.trim(),
     type,
@@ -52,6 +60,7 @@ export function toRecipePayload({ name, type, cardUrl, rows }) {
       quantity: toQuantity(row.quantity),
       unit: row.unit.trim(),
     })),
+    steps: rowsHoldingStep(stepRows).map((row) => row.text.trim()),
   };
 }
 

@@ -35,10 +35,32 @@ export const QUANTITY_MAX = 100000;
 // the column, so accepting it would store exactly the value the range refuses.
 export const QUANTITY_MIN = 0.001;
 
+// How many times a Selected Recipe can be said to be being made. Whole numbers only: half a Batch
+// produces amounts the Shopping List cannot show honestly. Nine is a party, and a stepper a cook
+// taps their way up is no way to reach a hundred anyway.
+//
+// Two constants rather than a schema, which is the one thing in this file that is not one. The
+// Selected Recipe route declares its own body schema, because a checkbox has nothing to validate
+// before it sends and a shared schema would have a single importer; but the stepper on the Recipe
+// sheet has to stop at the same numbers the route refuses, and one pair of numbers here is what
+// keeps the stepper's ceiling and the route's from drifting apart.
+export const BATCH_MIN = 1;
+export const BATCH_MAX = 9;
+
 // A per-Recipe ceiling, which is also the first half of the row caps ADR-0001 asks for. The cap on
 // total Recipes belongs to the ticket that adds it, because it counts rows rather than reading one
 // request.
 export const RECIPE_INGREDIENTS_MAX = 100;
+
+// One instruction, not a method. Long enough for the longest sentence a Recipe writes ("Brown the
+// beef in batches over a high heat, then set it aside while the vegetables soften") and short enough
+// that a pasted essay is refused as one Step rather than stored as one. The form shows the refusal
+// before it sends, because it compiles this same object.
+export const STEP_MAX = 300;
+
+// The per-Recipe ceiling on Steps, for the reason RECIPE_INGREDIENTS_MAX has one (ADR-0001): an
+// array with no maxItems is a row cap with a hole in it. Well past any Recipe anyone cooks from.
+export const RECIPE_STEPS_MAX = 100;
 
 // Scheme allowlist for the Recipe Card, and the whole of the stored-XSS fix: this URL is the one
 // user-supplied value that reaches an href, which React's text escaping does not cover. Matching
@@ -84,6 +106,15 @@ export const createRecipeBody = {
       type: 'array',
       maxItems: RECIPE_INGREDIENTS_MAX,
       items: recipeIngredient,
+    },
+    // Optional, and absent means none: a Recipe that only has a Recipe Card still saves. A blank
+    // Step is refused rather than dropped here, because the form drops its blank rows before it
+    // sends and a blank arriving from anything else is a caller sending nothing and calling it an
+    // instruction.
+    steps: {
+      type: 'array',
+      maxItems: RECIPE_STEPS_MAX,
+      items: { type: 'string', minLength: 1, maxLength: STEP_MAX, pattern: HAS_CONTENT },
     },
   },
 };

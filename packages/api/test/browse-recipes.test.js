@@ -155,8 +155,14 @@ describe('browsing Recipes', () => {
       type: 'Soup',
       cardUrl: 'https://example.com/leek-and-potato',
       selected: true,
+      // Made once, because nothing asked for more. Every Recipe carries a Batch, and the Shopping
+      // List multiplies by it.
+      batch: 1,
       protected: false,
       ingredients: [{ ingredientId: 'I001', name: 'Leek', quantity: 3, unit: '' }],
+      // Empty rather than absent: a Recipe whose instructions are only its Recipe Card still says
+      // so, and this is the shape every reader of the payload is written against.
+      steps: [],
     });
   });
 });

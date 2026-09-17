@@ -31,7 +31,12 @@ export function AddRecipePage({ readOnly, onRecipeAdded, toast }) {
   };
 
   const handleParsed = (parsed) => {
-    showRecipe({ ...BLANK_RECIPE, name: parsed.name, ingredients: parsed.ingredients });
+    showRecipe({
+      ...BLANK_RECIPE,
+      name: parsed.name,
+      ingredients: parsed.ingredients,
+      steps: parsed.steps,
+    });
     setFileReady(true);
   };
 

@@ -14,7 +14,14 @@
 //
 // Every statement is parameterized. Nothing on this path builds SQL from a string.
 
-import { RECIPE_ID_MAX, RECIPE_INGREDIENTS_MAX, createRecipeBody } from '@meal-prep/shared';
+import {
+  BATCH_MAX,
+  BATCH_MIN,
+  RECIPE_ID_MAX,
+  RECIPE_INGREDIENTS_MAX,
+  createRecipeBody,
+} from '@meal-prep/shared';
+import { clearMarksOffTheList } from './shoppingList.js';
 import { readRecipe, recipeSchema } from './state.js';
 
 const INSERT_RECIPE = `
@@ -36,6 +43,15 @@ const UPSERT_INGREDIENT = `
 const INSERT_RECIPE_INGREDIENT = `
   insert into recipe_ingredients (recipe_id, ingredient_id, quantity, unit)
   values ($1, $2, $3, $4)
+`;
+
+// One statement for the whole list, because the position is the array's own ordinality rather than
+// anything the handler has to count. A Recipe's Steps are small and always written together, so
+// there is nothing to be gained by sending them one at a time.
+const INSERT_RECIPE_STEPS = `
+  insert into recipe_steps (recipe_id, position, text)
+  select $1, ordinality, step
+  from unnest($2::text[]) with ordinality as given (step, ordinality)
 `;
 
 // The Protected guard is in the statement rather than in a read the handler does first, so there is
@@ -60,6 +76,11 @@ const UPDATE_RECIPE = `
 // which rows to keep, to answer a question the request has already answered.
 const DELETE_RECIPE_INGREDIENTS = 'delete from recipe_ingredients where recipe_id = $1';
 
+// Its Steps are replaced the same way and in the same transaction, for the same reason: the request
+// carries the whole list in the order the cook is looking at, so reconciling would be work done to
+// answer a question already answered. An empty list clears them.
+const DELETE_RECIPE_STEPS = 'delete from recipe_steps where recipe_id = $1';
+
 // recipe_ingredients cascades and the Shopping List is derived, so this is the whole of removing a
 // Recipe from the app. The Ingredients it named stay: each has an identity of its own carrying
 // Pantry membership, an Aisle and a Got It mark that no Recipe owns.
@@ -76,8 +97,22 @@ const FIND_RECIPE = 'select name, protected from recipes where id = $1';
 
 // No "returning", because the row count already answers the only question the handler asks: whether
 // a Recipe by that id was there to update.
+//
+// The Batch moves in this same statement rather than in one beside it, and that matters most on the
+// way out: a deselect that reset the Batch afterwards would leave a window where the Recipe is off
+// the Shopping List but still carrying last month's triple, and a failure between the two would
+// leave it there for good. Deselecting therefore ignores whatever Batch was sent, which is also
+// what makes an unselected Recipe always report a Batch of 1.
+//
+// Selecting without a Batch leaves the Batch alone: the request said nothing about it, so it
+// changes nothing about it. Since deselecting resets, the only Recipe that has a Batch to leave
+// alone is one already selected, which is exactly the cook re-tapping Add on a Recipe they had
+// already set to three.
 const SET_SELECTED = `
-  update recipes set selected = $2 where id = $1
+  update recipes
+  set selected = $2::boolean,
+      batch = case when $2::boolean then coalesce($3::integer, batch) else 1 end
+  where id = $1
 `;
 
 // The absolute ceilings on rows (ADR-0001). Counting and then inserting is only an approximate cap:
@@ -113,11 +148,19 @@ const namesOneFoodTwice = (cause) =>
 // Setting the flag rather than flipping it. Both phones on one instance can send a toggle, and a
 // flip would land in whatever order they arrived; a set is idempotent, so last-write-wins is
 // correct here rather than a compromise, and a retry after a dropped response cannot undo itself.
+//
+// The Batch rides along optionally rather than having a write of its own. Setting one is what a
+// cook does while selecting the Recipe, and a Batch on a Recipe nobody selected means nothing, so
+// there is no moment at which it wants its own endpoint. An integer, because half a Batch produces
+// amounts the Shopping List cannot show honestly; bounded by the numbers the stepper stops at.
 const selectedBody = {
   type: 'object',
   required: ['selected'],
   additionalProperties: false,
-  properties: { selected: { type: 'boolean' } },
+  properties: {
+    selected: { type: 'boolean' },
+    batch: { type: 'integer', minimum: BATCH_MIN, maximum: BATCH_MAX },
+  },
 };
 
 const recipeIdParams = {
@@ -141,6 +184,10 @@ function normalize(body) {
       quantity: ingredient.quantity ?? null,
       unit: (ingredient.unit ?? '').trim(),
     })),
+    // Trimmed for the reason the name is: a Step is read as a line, and leading whitespace a paste
+    // brought along is not part of the instruction. The schema has already refused a Step that is
+    // nothing but whitespace, so trimming cannot empty one here.
+    steps: (body.steps ?? []).map((step) => step.trim()),
   };
 }
 
@@ -223,11 +270,18 @@ async function insertRecipeIngredients(client, recipeId, ingredients) {
   }
 }
 
+/** Writes the Steps of a Recipe in the order they were sent. No rows when there are none. */
+async function insertRecipeSteps(client, recipeId, steps) {
+  if (steps.length === 0) return;
+  await client.query(INSERT_RECIPE_STEPS, [recipeId, steps]);
+}
+
 async function insertRecipe(client, recipe) {
   const { rows } = await client.query(INSERT_RECIPE, [recipe.name, recipe.type, recipe.cardUrl]);
   const recipeId = rows[0].id;
 
   await insertRecipeIngredients(client, recipeId, recipe.ingredients);
+  await insertRecipeSteps(client, recipeId, recipe.steps);
 
   return recipeId;
 }
@@ -369,6 +423,9 @@ export function registerRecipeRoutes(app) {
         await client.query(DELETE_RECIPE_INGREDIENTS, [id]);
         await insertRecipeIngredients(client, id, recipe.ingredients);
 
+        await client.query(DELETE_RECIPE_STEPS, [id]);
+        await insertRecipeSteps(client, id, recipe.steps);
+
         // The write an edit makes that a create cannot: the foods it stops naming leave their
         // Ingredients behind, so rewriting one Recipe with fresh names over and over grows the
         // table without bound. Asked after the upserts, because only they know how many of these
@@ -419,17 +476,42 @@ export function registerRecipeRoutes(app) {
   // No body comes back. The caller already knows what it set, and the Shopping List this changes is
   // derived rather than stored, so the only honest way to read it is the state request the client
   // makes next. Returning a stale-by-construction rollup from a write would be worse than silence.
+  //
+  // A transaction, because taking a Recipe off the list is two writes that have to be one: the
+  // Recipe stops being Selected, and the Got It marks on whatever left the list with it are
+  // cleared. Committing the first without the second would leave a tick on an Ingredient that is
+  // not on the list to be unticked from, which is the pre-ticked entry this rule exists to remove.
   app.put(
     '/api/recipes/:id/selected',
     { schema: { params: recipeIdParams, body: selectedBody } },
     async (request, reply) => {
-      const { rowCount } = await app.db.query(SET_SELECTED, [
-        request.params.id,
-        request.body.selected,
-      ]);
+      const { id } = request.params;
+      const { selected } = request.body;
+      // Null rather than 1 when the request carries no Batch, so the statement can tell "make it
+      // one" from "the request did not say".
+      const batch = request.body.batch ?? null;
 
-      if (rowCount === 0) {
-        return reply.code(404).send({ message: `There is no Recipe ${request.params.id}.` });
+      const client = await app.db.connect();
+      try {
+        await client.query('begin');
+
+        const { rowCount } = await client.query(SET_SELECTED, [id, selected, batch]);
+        if (rowCount === 0) {
+          await client.query('rollback');
+          return reply.code(404).send({ message: `There is no Recipe ${id}.` });
+        }
+
+        // Only on the way off the list. Selecting clears nothing, which is what lets a cook come
+        // back for a forgotten Recipe mid-trip without losing the ticks already earned in the
+        // store; removing only ever clears what the removal took off the list.
+        if (!selected) await clearMarksOffTheList(client);
+
+        await client.query('commit');
+      } catch (cause) {
+        await client.query('rollback');
+        throw cause;
+      } finally {
+        client.release();
       }
 
       return reply.code(204).send();

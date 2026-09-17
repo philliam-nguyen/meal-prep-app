@@ -15,12 +15,12 @@ export async function setGotIt(app, ingredientId, gotIt) {
   assert.equal(response.statusCode, 204, response.body);
 }
 
-/** Sets the Aisle an Ingredient is found in, or clears it by passing null. */
-export async function setAisle(app, ingredientId, aisle) {
+/** Files an Ingredient into an Aisle by id, or clears it by passing null. */
+export async function setAisle(app, ingredientId, aisleId) {
   const response = await app.inject({
     method: 'PUT',
     url: `/api/ingredients/${ingredientId}/aisle`,
-    payload: { aisle },
+    payload: { aisleId },
   });
   assert.equal(response.statusCode, 204, response.body);
 }
@@ -28,6 +28,15 @@ export async function setAisle(app, ingredientId, aisle) {
 /** The one action that clears every Got It mark. */
 export async function clearGotItMarks(app) {
   const response = await app.inject({ method: 'DELETE', url: '/api/shopping-list/got-it' });
+  assert.equal(response.statusCode, 204, response.body);
+}
+
+/**
+ * Done Shopping: the end of a trip, which deselects every Recipe and clears every Got It mark in
+ * one request. One call rather than two, so a dropped response cannot leave the trip half over.
+ */
+export async function doneShopping(app) {
+  const response = await app.inject({ method: 'DELETE', url: '/api/shopping-list' });
   assert.equal(response.statusCode, 204, response.body);
 }
 

@@ -42,6 +42,14 @@ export async function createRecipeWith(request, ingredients) {
   });
 }
 
+/** Marks a Recipe as a Selected Recipe, or unmarks it, which is what puts it on the Shopping List. */
+export async function setSelected(request, recipeId, selected) {
+  const response = await request.put(`${API_ORIGIN}/api/recipes/${recipeId}/selected`, {
+    data: { selected },
+  });
+  expect(response.status(), await response.text()).toBe(204);
+}
+
 /** Every Recipe as the browse list sees it. */
 export async function readRecipes(request) {
   return (await readState(request)).recipes;
@@ -67,3 +75,9 @@ export const manyIngredients = Array.from({ length: 40 }, (_, i) => ({
   quantity: i + 1,
   unit: 'g',
 }));
+
+/** More Steps than a phone's sheet can show at once, so Instructions makes the list scroll too. */
+export const manySteps = Array.from(
+  { length: 30 },
+  (_, i) => `Step ${String(i + 1).padStart(2, '0')}: do the next thing on the stove.`,
+);

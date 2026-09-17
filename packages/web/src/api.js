@@ -74,17 +74,23 @@ export async function deleteRecipe(recipeId) {
 }
 
 /**
- * Marks a Recipe as a Selected Recipe, or unmarks it. Sends the value it wants rather than asking
- * for a flip, so a retry after a dropped response cannot undo the write it is retrying.
+ * Marks a Recipe as a Selected Recipe, or unmarks it, and says how many times it is being made.
+ * Sends the values it wants rather than asking for a flip, so a retry after a dropped response
+ * cannot undo the write it is retrying.
+ *
+ * The Batch travels on this write rather than on one of its own, because setting one is what a cook
+ * does while adding the Recipe to the list, and changing the Batch of a Recipe already on the list
+ * is this same write with the new number. A deselect sends none: the server resets it to 1, so
+ * sending a Batch there would be describing a state that cannot exist.
  *
  * Nothing comes back. The Shopping List this changes is derived on the server, so the caller reads
  * it with the next state request rather than from this reply.
  */
-export async function setRecipeSelected(recipeId, selected) {
+export async function setRecipeSelected(recipeId, selected, batch) {
   const response = await fetch(`/api/recipes/${encodeURIComponent(recipeId)}/selected`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ selected }),
+    body: JSON.stringify(selected ? { selected, batch } : { selected }),
   });
 
   if (!response.ok) {
@@ -133,18 +139,73 @@ export async function setIngredientGotIt(ingredientId, gotIt) {
   return putIngredientField(ingredientId, 'got-it', { gotIt });
 }
 
-/** Sets the Aisle an Ingredient is found in. Null clears it, and so does an emptied box. */
-export async function setIngredientAisle(ingredientId, aisle) {
-  return putIngredientField(ingredientId, 'aisle', { aisle });
+/** Files an Ingredient into an Aisle by id. Null clears it, and so does the picker's blank option. */
+export async function setIngredientAisle(ingredientId, aisleId) {
+  return putIngredientField(ingredientId, 'aisle', { aisleId });
 }
 
 /**
- * The one action that clears every Got It mark, for a cook starting a new list. Nothing else clears
- * them: adding a forgotten Recipe mid-trip has to leave the ticks already earned in the store.
+ * Done Shopping: the trip is over, so every Recipe is deselected and every Got It mark cleared.
+ *
+ * One request rather than two, and the server does both in one transaction, because a phone that
+ * loses its connection in the car park would otherwise leave a list half cleared. It lands the same
+ * way however many times it arrives, so the retry after a dropped response is safe to send.
+ *
+ * Nothing comes back. The Shopping List is derived on the server, so what is left of it - nothing -
+ * arrives with the next state request rather than from this reply.
  */
-export async function clearGotItMarks() {
-  const response = await fetch('/api/shopping-list/got-it', { method: 'DELETE' });
+export async function doneShopping() {
+  const response = await fetch('/api/shopping-list', { method: 'DELETE' });
   if (!response.ok) {
-    throw new Error(`DELETE /api/shopping-list/got-it returned ${response.status}`);
+    throw new Error(`DELETE /api/shopping-list returned ${response.status}`);
   }
+}
+
+/**
+ * One request against the Aisle routes. Two of them answer with the Aisle they wrote and two
+ * answer with nothing, so a 204 is a null rather than a body nobody sent.
+ *
+ * A refusal is shown verbatim for the reason a refused Recipe write is: the server knows things the
+ * page cannot check - that a name is already taken, that the walk on screen has gone stale - and
+ * flattening those into "could not save" throws away the only sentence that helps.
+ */
+async function sendAisle(method, path, body) {
+  const response = await fetch(path, {
+    method,
+    ...(body ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}),
+  });
+
+  if (response.status === 204) return null;
+  if (response.ok) return response.json();
+
+  const refusal = await response.json().catch(() => null);
+  throw new Error(refusal?.message ?? `${method} ${path} returned ${response.status}`);
+}
+
+/**
+ * Adds an Aisle to the end of the walk. The API refuses a name another Aisle already has, whatever
+ * its case, and the refusal names the Aisle that is there, which is the half the cook cannot see:
+ * they typed the other spelling. Worth showing verbatim rather than flattening into a status code.
+ */
+export async function createAisle(name) {
+  return sendAisle('POST', '/api/aisles', { name });
+}
+
+/** Fixes an Aisle's name without moving it in the walk or touching what is filed under it. */
+export async function renameAisle(aisleId, name) {
+  return sendAisle('PUT', `/api/aisles/${encodeURIComponent(aisleId)}`, { name });
+}
+
+/** Removes an Aisle. Nothing comes back; the walk closes up behind it on the server. */
+export async function deleteAisle(aisleId) {
+  return sendAisle('DELETE', `/api/aisles/${encodeURIComponent(aisleId)}`);
+}
+
+/**
+ * Rewrites the walk from the full ordered list of Aisle ids. Ids and never positions: the order is
+ * the array, and the API is the only thing that knows what number each place carries. A partial
+ * list is refused, so this always sends every Aisle on screen.
+ */
+export async function reorderAisles(ids) {
+  return sendAisle('PUT', '/api/aisles/order', { ids });
 }

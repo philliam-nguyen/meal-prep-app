@@ -9,6 +9,8 @@
 export { RECIPE_TYPES } from './recipeTypes.js';
 export {
   AISLE_MAX,
+  BATCH_MAX,
+  BATCH_MIN,
   CARD_URL_MAX,
   INGREDIENT_NAME_MAX,
   QUANTITY_MAX,
@@ -16,6 +18,8 @@ export {
   RECIPE_ID_MAX,
   RECIPE_INGREDIENTS_MAX,
   RECIPE_NAME_MAX,
+  RECIPE_STEPS_MAX,
+  STEP_MAX,
   UNIT_MAX,
   ajvOptions,
   createRecipeBody,

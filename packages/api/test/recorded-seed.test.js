@@ -110,7 +110,10 @@ describe('the recording check', () => {
     await startApp(t);
     const recorded = await recordTheSeed(t);
 
-    assert.throws(() => assertRecorded({ ...recorded, aisles: [] }), /aisles/);
+    // A field the payload has never had, rather than one it has not got yet: `aisles` was this
+    // literal until the state response grew it, and a field the schema later adds turns this test
+    // from a check on the guard into a check on the schema's spelling.
+    assert.throws(() => assertRecorded({ ...recorded, trolley: [] }), /trolley/);
   });
 });
 

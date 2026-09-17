@@ -7,6 +7,7 @@
       "type": "Dessert",
       "cardUrl": "https://recipes.example.com/apple-and-walnut-crumble",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -45,7 +46,8 @@
           "quantity": 75,
           "unit": "g"
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R008",
@@ -53,6 +55,7 @@
       "type": "Breakfast",
       "cardUrl": "https://recipes.example.com/banana-oat-pancakes",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -91,7 +94,8 @@
           "quantity": 100,
           "unit": "g"
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R011",
@@ -99,6 +103,7 @@
       "type": "Stew",
       "cardUrl": "https://recipes.example.com/beef-and-ale-stew",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -143,6 +148,12 @@
           "quantity": 4,
           "unit": "sprigs"
         }
+      ],
+      "steps": [
+        "Toss the beef in the flour and brown it in batches, setting each batch aside.",
+        "Soften the onion, carrot and celery in the same pot.",
+        "Return the beef, pour in the ale, add the thyme, and bring to a simmer.",
+        "Cover and cook low for two and a half hours, until the beef is tender."
       ]
     },
     {
@@ -151,6 +162,7 @@
       "type": "Bread",
       "cardUrl": "https://recipes.example.com/cheddar-and-thyme-soda-bread",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -183,7 +195,8 @@
           "quantity": 2,
           "unit": "sprigs"
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R001",
@@ -191,6 +204,7 @@
       "type": "Dinner",
       "cardUrl": "https://recipes.example.com/chicken-and-leek-pie",
       "selected": true,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -241,6 +255,12 @@
           "quantity": 3,
           "unit": "sprigs"
         }
+      ],
+      "steps": [
+        "Melt the butter and soften the leek for five minutes.",
+        "Stir in the flour and cook for a minute, then add the stock and cream.",
+        "Add the chicken and thyme, season with salt, and simmer until the chicken is cooked through.",
+        "Spoon into a pie dish, top with pastry and bake at 200C until golden, about 25 minutes."
       ]
     },
     {
@@ -249,6 +269,7 @@
       "type": "Lunch",
       "cardUrl": null,
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -281,7 +302,8 @@
           "quantity": 200,
           "unit": "g"
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R012",
@@ -289,6 +311,7 @@
       "type": "Stew",
       "cardUrl": "https://recipes.example.com/chickpea-and-tomato-stew",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -333,7 +356,8 @@
           "quantity": 400,
           "unit": "g"
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R013",
@@ -341,6 +365,7 @@
       "type": "Dessert",
       "cardUrl": "https://recipes.example.com/dark-chocolate-mousse",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -367,6 +392,12 @@
           "quantity": 4,
           "unit": ""
         }
+      ],
+      "steps": [
+        "Melt the chocolate and leave it to cool slightly.",
+        "Whisk the egg yolks with the sugar until pale, then fold in the chocolate.",
+        "Whip the cream to soft peaks and fold it through.",
+        "Whisk the egg whites to stiff peaks and fold in gently, then chill for at least four hours."
       ]
     },
     {
@@ -375,6 +406,7 @@
       "type": "Snack",
       "cardUrl": "https://recipes.example.com/honey-and-oat-flapjacks",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -401,7 +433,8 @@
           "quantity": 300,
           "unit": "g"
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R005",
@@ -409,6 +442,7 @@
       "type": "Lunch",
       "cardUrl": "https://recipes.example.com/leek-and-cheddar-tart",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -447,7 +481,8 @@
           "quantity": 200,
           "unit": "g"
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R009",
@@ -455,6 +490,7 @@
       "type": "Soup",
       "cardUrl": "https://recipes.example.com/leek-and-potato-soup",
       "selected": true,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -499,7 +535,8 @@
           "quantity": 500,
           "unit": "g"
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R015",
@@ -507,6 +544,7 @@
       "type": "Dessert",
       "cardUrl": "https://recipes.example.com/lemon-posset",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -527,7 +565,8 @@
           "quantity": 3,
           "unit": ""
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R002",
@@ -535,6 +574,7 @@
       "type": "Dinner",
       "cardUrl": "https://recipes.example.com/mushroom-stroganoff",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -579,7 +619,8 @@
           "quantity": 300,
           "unit": "g"
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R007",
@@ -587,6 +628,7 @@
       "type": "Breakfast",
       "cardUrl": "https://recipes.example.com/mushroom-and-bacon-hash",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -625,7 +667,8 @@
           "quantity": 600,
           "unit": "g"
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R016",
@@ -633,6 +676,7 @@
       "type": "Bread",
       "cardUrl": "https://recipes.example.com/overnight-white-loaf",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -659,6 +703,12 @@
           "quantity": 3,
           "unit": "g"
         }
+      ],
+      "steps": [
+        "Mix the flour, yeast, water and salt into a shaggy dough.",
+        "Cover and leave at room temperature overnight, at least twelve hours.",
+        "Turn onto a floured surface, shape into a loaf, and prove for an hour.",
+        "Bake at 230C for 30 to 35 minutes, until the base sounds hollow when tapped."
       ]
     },
     {
@@ -667,6 +717,7 @@
       "type": "Soup",
       "cardUrl": "https://recipes.example.com/red-lentil-and-carrot-soup",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -705,7 +756,8 @@
           "quantity": 200,
           "unit": "g"
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R003",
@@ -713,6 +765,7 @@
       "type": "Dinner",
       "cardUrl": "https://recipes.example.com/roast-chicken-traybake",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -757,7 +810,8 @@
           "quantity": 4,
           "unit": "sprigs"
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R004",
@@ -765,6 +819,7 @@
       "type": "Dinner",
       "cardUrl": "https://recipes.example.com/spaghetti-tomato-basil",
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -803,7 +858,8 @@
           "quantity": 800,
           "unit": "g"
         }
-      ]
+      ],
+      "steps": []
     },
     {
       "id": "R019",
@@ -811,6 +867,7 @@
       "type": "Snack",
       "cardUrl": null,
       "selected": false,
+      "batch": 1,
       "protected": true,
       "ingredients": [
         {
@@ -843,22 +900,25 @@
           "quantity": null,
           "unit": ""
         }
-      ]
+      ],
+      "steps": []
     }
   ],
   "shoppingList": [
     {
       "ingredientId": "I016",
       "name": "Black pepper",
-      "aisle": "Herbs & spices",
+      "aisleId": "A008",
       "gotIt": false,
+      "covered": false,
       "amounts": []
     },
     {
       "ingredientId": "I001",
       "name": "Butter",
-      "aisle": "Dairy & eggs",
+      "aisleId": "A003",
       "gotIt": false,
+      "covered": false,
       "amounts": [
         {
           "quantity": 165,
@@ -869,8 +929,9 @@
     {
       "ingredientId": "I002",
       "name": "Chicken stock",
-      "aisle": "Tins & jars",
+      "aisleId": "A006",
       "gotIt": false,
+      "covered": true,
       "amounts": [
         {
           "quantity": 1100,
@@ -881,8 +942,9 @@
     {
       "ingredientId": "I003",
       "name": "Chicken thighs",
-      "aisle": "Meat & poultry",
+      "aisleId": "A002",
       "gotIt": false,
+      "covered": false,
       "amounts": [
         {
           "quantity": 600,
@@ -893,8 +955,9 @@
     {
       "ingredientId": "I004",
       "name": "Double cream",
-      "aisle": "Dairy & eggs",
+      "aisleId": "A003",
       "gotIt": false,
+      "covered": false,
       "amounts": [
         {
           "quantity": 250,
@@ -905,8 +968,9 @@
     {
       "ingredientId": "I005",
       "name": "Leek",
-      "aisle": "Produce",
+      "aisleId": "A001",
       "gotIt": false,
+      "covered": false,
       "amounts": [
         {
           "quantity": 700,
@@ -917,8 +981,9 @@
     {
       "ingredientId": "I013",
       "name": "Onion",
-      "aisle": "Produce",
+      "aisleId": "A001",
       "gotIt": false,
+      "covered": true,
       "amounts": [
         {
           "quantity": 1,
@@ -929,8 +994,9 @@
     {
       "ingredientId": "I006",
       "name": "Plain flour",
-      "aisle": "Baking",
+      "aisleId": "A005",
       "gotIt": false,
+      "covered": false,
       "amounts": [
         {
           "quantity": 250,
@@ -941,8 +1007,9 @@
     {
       "ingredientId": "I021",
       "name": "Potato",
-      "aisle": "Produce",
+      "aisleId": "A001",
       "gotIt": false,
+      "covered": true,
       "amounts": [
         {
           "quantity": 500,
@@ -953,15 +1020,17 @@
     {
       "ingredientId": "I007",
       "name": "Salt",
-      "aisle": "Herbs & spices",
+      "aisleId": "A008",
       "gotIt": false,
+      "covered": false,
       "amounts": []
     },
     {
       "ingredientId": "I008",
       "name": "Thyme",
-      "aisle": "Produce",
+      "aisleId": "A001",
       "gotIt": false,
+      "covered": false,
       "amounts": [
         {
           "quantity": 3,
@@ -1256,6 +1325,304 @@
         "Paprika",
         "Rice"
       ]
+    }
+  ],
+  "aisles": [
+    {
+      "id": "A001",
+      "name": "Produce"
+    },
+    {
+      "id": "A002",
+      "name": "Meat & poultry"
+    },
+    {
+      "id": "A003",
+      "name": "Dairy & eggs"
+    },
+    {
+      "id": "A004",
+      "name": "Dry goods"
+    },
+    {
+      "id": "A005",
+      "name": "Baking"
+    },
+    {
+      "id": "A006",
+      "name": "Tins & jars"
+    },
+    {
+      "id": "A007",
+      "name": "Oils & vinegars"
+    },
+    {
+      "id": "A008",
+      "name": "Herbs & spices"
+    },
+    {
+      "id": "A009",
+      "name": "Drinks"
+    }
+  ],
+  "ingredients": [
+    {
+      "id": "I065",
+      "name": "Ale",
+      "aisleId": "A009",
+      "staple": false
+    },
+    {
+      "id": "I083",
+      "name": "Apple",
+      "aisleId": "A001",
+      "staple": false
+    },
+    {
+      "id": "I040",
+      "name": "Bacon",
+      "aisleId": "A002",
+      "staple": false
+    },
+    {
+      "id": "I046",
+      "name": "Banana",
+      "aisleId": "A001",
+      "staple": false
+    },
+    {
+      "id": "I023",
+      "name": "Basil",
+      "aisleId": "A001",
+      "staple": false
+    },
+    {
+      "id": "I066",
+      "name": "Beef shin",
+      "aisleId": "A002",
+      "staple": false
+    },
+    {
+      "id": "I016",
+      "name": "Black pepper",
+      "aisleId": "A008",
+      "staple": true
+    },
+    {
+      "id": "I001",
+      "name": "Butter",
+      "aisleId": "A003",
+      "staple": true
+    },
+    {
+      "id": "I017",
+      "name": "Carrot",
+      "aisleId": "A001",
+      "staple": false
+    },
+    {
+      "id": "I079",
+      "name": "Caster sugar",
+      "aisleId": "A005",
+      "staple": true
+    },
+    {
+      "id": "I068",
+      "name": "Celery",
+      "aisleId": "A001",
+      "staple": false
+    },
+    {
+      "id": "I030",
+      "name": "Cheddar",
+      "aisleId": "A003",
+      "staple": false
+    },
+    {
+      "id": "I002",
+      "name": "Chicken stock",
+      "aisleId": "A006",
+      "staple": false
+    },
+    {
+      "id": "I003",
+      "name": "Chicken thighs",
+      "aisleId": "A002",
+      "staple": false
+    },
+    {
+      "id": "I035",
+      "name": "Chickpeas",
+      "aisleId": "A006",
+      "staple": false
+    },
+    {
+      "id": "I080",
+      "name": "Dark chocolate",
+      "aisleId": "A005",
+      "staple": false
+    },
+    {
+      "id": "I004",
+      "name": "Double cream",
+      "aisleId": "A003",
+      "staple": false
+    },
+    {
+      "id": "I032",
+      "name": "Eggs",
+      "aisleId": "A003",
+      "staple": false
+    },
+    {
+      "id": "I011",
+      "name": "Garlic",
+      "aisleId": "A001",
+      "staple": false
+    },
+    {
+      "id": "I062",
+      "name": "Ground cumin",
+      "aisleId": "A008",
+      "staple": false
+    },
+    {
+      "id": "I103",
+      "name": "Honey",
+      "aisleId": "A006",
+      "staple": false
+    },
+    {
+      "id": "I005",
+      "name": "Leek",
+      "aisleId": "A001",
+      "staple": false
+    },
+    {
+      "id": "I019",
+      "name": "Lemon",
+      "aisleId": "A001",
+      "staple": false
+    },
+    {
+      "id": "I049",
+      "name": "Milk",
+      "aisleId": "A003",
+      "staple": false
+    },
+    {
+      "id": "I012",
+      "name": "Mushrooms",
+      "aisleId": "A001",
+      "staple": false
+    },
+    {
+      "id": "I050",
+      "name": "Oats",
+      "aisleId": "A004",
+      "staple": false
+    },
+    {
+      "id": "I020",
+      "name": "Olive oil",
+      "aisleId": "A007",
+      "staple": true
+    },
+    {
+      "id": "I013",
+      "name": "Onion",
+      "aisleId": "A001",
+      "staple": false
+    },
+    {
+      "id": "I014",
+      "name": "Paprika",
+      "aisleId": "A008",
+      "staple": false
+    },
+    {
+      "id": "I038",
+      "name": "Parsley",
+      "aisleId": "A001",
+      "staple": false
+    },
+    {
+      "id": "I026",
+      "name": "Pasta",
+      "aisleId": "A004",
+      "staple": false
+    },
+    {
+      "id": "I006",
+      "name": "Plain flour",
+      "aisleId": "A005",
+      "staple": true
+    },
+    {
+      "id": "I021",
+      "name": "Potato",
+      "aisleId": "A001",
+      "staple": false
+    },
+    {
+      "id": "I064",
+      "name": "Red lentils",
+      "aisleId": "A004",
+      "staple": false
+    },
+    {
+      "id": "I015",
+      "name": "Rice",
+      "aisleId": "A004",
+      "staple": false
+    },
+    {
+      "id": "I007",
+      "name": "Salt",
+      "aisleId": "A008",
+      "staple": true
+    },
+    {
+      "id": "I039",
+      "name": "Spinach",
+      "aisleId": "A001",
+      "staple": false
+    },
+    {
+      "id": "I093",
+      "name": "Strong white flour",
+      "aisleId": "A005",
+      "staple": false
+    },
+    {
+      "id": "I008",
+      "name": "Thyme",
+      "aisleId": "A001",
+      "staple": false
+    },
+    {
+      "id": "I028",
+      "name": "Tinned tomatoes",
+      "aisleId": "A006",
+      "staple": false
+    },
+    {
+      "id": "I088",
+      "name": "Walnuts",
+      "aisleId": "A005",
+      "staple": false
+    },
+    {
+      "id": "I094",
+      "name": "Water",
+      "aisleId": "A009",
+      "staple": true
+    },
+    {
+      "id": "I095",
+      "name": "Yeast",
+      "aisleId": "A005",
+      "staple": false
     }
   ],
   "notice": null

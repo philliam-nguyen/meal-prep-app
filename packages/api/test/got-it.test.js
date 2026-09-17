@@ -4,16 +4,25 @@
 // be derived on every read without losing what was ticked in the store. So the assertions here read
 // the Shopping List back after doing something else entirely to it.
 //
-// Today the mark never resets. The Sheets-era client carried the previous one forward for any
-// Ingredient whose name matched and the spreadsheet kept it indefinitely, so an Ingredient two trips
-// shared arrived pre-ticked and got walked past. Clearing is deliberate, and these tests pin down
-// that nothing else clears it.
+// A mark is cleared by two things and by nothing else: the cook saying the trip is over, and the
+// Ingredient leaving the Shopping List because the last Selected Recipe calling for it was removed.
+// The Sheets-era client carried the previous mark forward for any Ingredient whose name matched and
+// the spreadsheet kept it indefinitely, so an Ingredient two trips shared arrived pre-ticked and got
+// walked past. These tests pin down both what clears a mark and what leaves it standing - the
+// second half being the one that matters mid-trip, when a cook comes back for a forgotten Recipe.
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { addAisle } from './helpers/aisles.js';
 import { startApp } from './helpers/app.js';
 import { readPantryChecklist, setPantry, setStaple } from './helpers/pantry.js';
-import { createRecipe, readRecipes, readShoppingList, setSelected } from './helpers/recipes.js';
+import {
+  createRecipe,
+  readRecipes,
+  readShoppingList,
+  setSelected,
+  updateRecipe,
+} from './helpers/recipes.js';
 import { clearGotItMarks, gotItByIngredient, setAisle, setGotIt } from './helpers/shopping.js';
 
 /** Creates a Recipe and marks it a Selected Recipe, which is what puts it on the list. */
@@ -137,14 +146,17 @@ describe('what leaves a Got It mark alone', () => {
     });
   });
 
-  it('deselecting a Recipe that shares the Ingredient', async (t) => {
+  // Selecting is the half of the rule that has to stay quiet. Coming back for a forgotten Recipe
+  // mid-trip must not undo the ticks already earned in the store, so a Recipe arriving on the list
+  // clears nothing, including on the Ingredient it arrives holding.
+  it('selecting a Recipe that shares a ticked Ingredient', async (t) => {
     const app = await startApp(t);
     await selectRecipe(app, {
       name: 'Minestrone',
       type: 'Soup',
       ingredients: [{ name: 'Onion', quantity: 2, unit: '' }],
     });
-    const ragu = await selectRecipe(app, {
+    const ragu = await createRecipe(app, {
       name: 'Ragu',
       type: 'Dinner',
       ingredients: [{ name: 'Onion', quantity: 1, unit: '' }],
@@ -152,26 +164,7 @@ describe('what leaves a Got It mark alone', () => {
     const { ingredientId } = await entryFor(app, 'Onion');
     await setGotIt(app, ingredientId, true);
 
-    await setSelected(app, ragu.id, false);
-
-    assert.equal((await entryFor(app, 'Onion')).gotIt, true);
-  });
-
-  // An Ingredient off the list and back on keeps its mark, because the mark is on the Ingredient and
-  // the list is derived. That is the pre-ticked entry the spec describes, and clearing is what
-  // answers it rather than an automatic reset nobody asked for.
-  it('a Recipe deselected and selected again', async (t) => {
-    const app = await startApp(t);
-    const recipe = await selectRecipe(app, {
-      name: 'Minestrone',
-      type: 'Soup',
-      ingredients: [{ name: 'Onion', quantity: 2, unit: '' }],
-    });
-    const { ingredientId } = await entryFor(app, 'Onion');
-    await setGotIt(app, ingredientId, true);
-
-    await setSelected(app, recipe.id, false);
-    await setSelected(app, recipe.id, true);
+    await setSelected(app, ragu.id, true);
 
     assert.equal((await entryFor(app, 'Onion')).gotIt, true);
   });
@@ -240,10 +233,108 @@ describe('what leaves a Got It mark alone', () => {
     });
     const { ingredientId } = await entryFor(app, 'Onion');
     await setGotIt(app, ingredientId, true);
+    const produce = await addAisle(app, 'Produce');
 
-    await setAisle(app, ingredientId, 'Produce');
+    await setAisle(app, ingredientId, produce.id);
 
     assert.equal((await entryFor(app, 'Onion')).gotIt, true);
+  });
+});
+
+// The other half of the rule, and the one that answers the pre-ticked entry: an Ingredient that
+// leaves the Shopping List loses its mark on the way out, in the same write that removed it. What
+// makes this safe to do on a deselect and not on a select is that removing only ever clears what
+// left, so the ticks earned in the store survive everything except the Recipe that put them there
+// being taken off the list.
+describe('deselecting a Recipe', () => {
+  /** Two Selected Recipes sharing an Onion, with every entry on the list ticked. */
+  async function twoTickedRecipes(app) {
+    const minestrone = await selectRecipe(app, {
+      name: 'Minestrone',
+      type: 'Soup',
+      ingredients: [
+        { name: 'Onion', quantity: 2, unit: '' },
+        { name: 'Tomato', quantity: 400, unit: 'g' },
+      ],
+    });
+    const ragu = await selectRecipe(app, {
+      name: 'Ragu',
+      type: 'Dinner',
+      ingredients: [{ name: 'Onion', quantity: 1, unit: '' }],
+    });
+    for (const entry of await readShoppingList(app)) {
+      await setGotIt(app, entry.ingredientId, true);
+    }
+    return { minestrone, ragu };
+  }
+
+  // Asked by putting the Recipe back, because an Ingredient off the list has no entry to read a
+  // mark from. That is also exactly how a cook meets a stale tick: weeks later, cooking the same
+  // thing again.
+  it('clears the mark on an Ingredient that left the list', async (t) => {
+    const app = await startApp(t);
+    const { minestrone } = await twoTickedRecipes(app);
+
+    await setSelected(app, minestrone.id, false);
+
+    await setSelected(app, minestrone.id, true);
+    assert.equal((await entryFor(app, 'Tomato')).gotIt, false);
+  });
+
+  it('leaves the mark on an Ingredient another Selected Recipe still needs', async (t) => {
+    const app = await startApp(t);
+    const { minestrone } = await twoTickedRecipes(app);
+
+    await setSelected(app, minestrone.id, false);
+
+    const onion = await entryFor(app, 'Onion');
+    assert.equal(onion.gotIt, true);
+    // Still on the list, and now only what the Recipe left behind calls for.
+    assert.deepEqual(onion.amounts, [{ quantity: 1, unit: '' }]);
+  });
+
+  // The rule is about what is on the list rather than about what this one write removed, so a mark
+  // that was already stale when the deselect arrived goes with the ones that just left. There is no
+  // reading of "clears what left the list" under which that tick should survive.
+  it('clears a mark that had already gone stale', async (t) => {
+    const app = await startApp(t);
+    const { minestrone, ragu } = await twoTickedRecipes(app);
+    // Rewriting Minestrone without its Tomato takes it off the list on its own, and an edit clears
+    // nothing: that is the stale tick, arranged the way the app can actually produce one.
+    await updateRecipe(app, minestrone.id, {
+      name: 'Minestrone',
+      type: 'Soup',
+      ingredients: [{ name: 'Onion', quantity: 2, unit: '' }],
+    });
+
+    await setSelected(app, ragu.id, false);
+
+    await updateRecipe(app, minestrone.id, {
+      name: 'Minestrone',
+      type: 'Soup',
+      ingredients: [
+        { name: 'Onion', quantity: 2, unit: '' },
+        { name: 'Tomato', quantity: 400, unit: 'g' },
+      ],
+    });
+    assert.equal((await entryFor(app, 'Tomato')).gotIt, false);
+  });
+
+  it('refuses a Recipe that is not there, and clears nothing on the way', async (t) => {
+    const app = await startApp(t);
+    await twoTickedRecipes(app);
+
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/api/recipes/R404/selected',
+      payload: { selected: false },
+    });
+
+    assert.equal(response.statusCode, 404);
+    assert.deepEqual(gotItByIngredient(await readShoppingList(app)), {
+      Onion: true,
+      Tomato: true,
+    });
   });
 });
 
@@ -275,6 +366,9 @@ describe('clearing every Got It mark', () => {
   // The stale tick the spec describes: an Ingredient marked on one trip, off the list by the next,
   // and pre-ticked when it comes back. Clearing has to reach it, so it clears every mark rather than
   // the marks on whatever happens to be derived right now.
+  //
+  // Arranged with an edit rather than a deselect, because a deselect clears what left the list on
+  // its own now and would leave this asserting on a mark that was already gone.
   it('reaches an Ingredient no Selected Recipe currently calls for', async (t) => {
     const app = await startApp(t);
     const recipe = await selectRecipe(app, {
@@ -284,11 +378,19 @@ describe('clearing every Got It mark', () => {
     });
     const { ingredientId } = await entryFor(app, 'Onion');
     await setGotIt(app, ingredientId, true);
-    await setSelected(app, recipe.id, false);
+    await updateRecipe(app, recipe.id, {
+      name: 'Minestrone',
+      type: 'Soup',
+      ingredients: [{ name: 'Leek', quantity: 2, unit: '' }],
+    });
 
     await clearGotItMarks(app);
 
-    await setSelected(app, recipe.id, true);
+    await updateRecipe(app, recipe.id, {
+      name: 'Minestrone',
+      type: 'Soup',
+      ingredients: [{ name: 'Onion', quantity: 2, unit: '' }],
+    });
     assert.equal((await entryFor(app, 'Onion')).gotIt, false);
   });
 
@@ -304,8 +406,9 @@ describe('clearing every Got It mark', () => {
     });
     const onion = await entryFor(app, 'Onion');
     const salt = await entryFor(app, 'Salt');
+    const produce = await addAisle(app, 'Produce');
     await setGotIt(app, onion.ingredientId, true);
-    await setAisle(app, onion.ingredientId, 'Produce');
+    await setAisle(app, onion.ingredientId, produce.id);
     await setPantry(app, onion.ingredientId, true);
     await setStaple(app, salt.ingredientId, true);
 
@@ -313,7 +416,7 @@ describe('clearing every Got It mark', () => {
 
     const cleared = await entryFor(app, 'Onion');
     assert.equal(cleared.gotIt, false);
-    assert.equal(cleared.aisle, 'Produce');
+    assert.equal(cleared.aisleId, produce.id);
     assert.deepEqual(cleared.amounts, [{ quantity: 2, unit: '' }]);
     assert.deepEqual(
       (await readPantryChecklist(app)).map((entry) => [entry.name, entry.inPantry]),

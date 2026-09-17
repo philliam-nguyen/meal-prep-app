@@ -1,14 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   fetchVersion,
+  createAisle,
+  deleteAisle,
   deleteRecipe,
-  clearGotItMarks,
+  renameAisle,
+  reorderAisles,
+  doneShopping,
   setIngredientAisle,
   setIngredientGotIt, 
   setIngredientPantry, 
   setIngredientStaple, 
   setRecipeSelected 
 } from './api.js';
+import { walkAfterMoving } from './aisleOrder.js';
 import { loadCache, saveCache } from './cache.js';
 import { OFFLINE_NOTICE, readRenderableState } from './degraded.js';
 import { NO_BASELINE, startFreshnessPoll } from './freshness.js';
@@ -54,6 +59,12 @@ export function MealPrepApp() {
   const [pantryChecklist, setPantryChecklist] = useState([]);
   const [staples, setStaples] = useState([]);
   const [bestMatches, setBestMatches] = useState([]);
+  // The store's sections in the order they are walked. Position never reaches here: the array is
+  // the order, and a move sends the whole list of ids back.
+  const [aisles, setAisles] = useState([]);
+  // Every Ingredient the app knows, Staples included, for the bulk Aisle-filing view on Settings.
+  // Pantry membership travels separately in pantryChecklist, which is not duplicated here.
+  const [ingredients, setIngredients] = useState([]);
   // A line the deployment configured, or null. It arrives in the payload like everything else here
   // and nothing in this app asks why it is set: the public instance says its data is a fixture
   // because something set the text, and the homelab says nothing because nothing did (ADR-0002).
@@ -97,6 +108,13 @@ export function MealPrepApp() {
       setPantryChecklist(state.pantryChecklist);
       setStaples(state.staples);
       setBestMatches(state.bestMatches);
+      // A payload from before Aisles became a list has none, which is the recording and an old
+      // cache. Empty rather than left alone, so the section reads as "no aisles yet" instead of
+      // showing a walk the backend no longer has.
+      setAisles(state.aisles ?? []);
+      // A payload from before this bulk view existed has none, which is the recording and an old
+      // cache. Empty rather than left alone, for the reason the Aisle walk above is.
+      setIngredients(state.ingredients ?? []);
       // Whatever this payload says, including the recording's null: the notice describes the
       // deployment that answered, and during an outage nothing answered. That is also why the
       // offline banner never has to share the screen with this one.
@@ -134,6 +152,8 @@ export function MealPrepApp() {
       if (cache.pantryChecklist) setPantryChecklist(cache.pantryChecklist);
       if (cache.staples) setStaples(cache.staples);
       if (cache.bestMatches) setBestMatches(cache.bestMatches);
+      if (cache.aisles) setAisles(cache.aisles);
+      if (cache.ingredients) setIngredients(cache.ingredients);
       // Null rather than left alone when a cache predates the field, so a banner is never restored
       // from a cache written before the deployment configured one - or after it stopped.
       setNotice(cache.notice ?? null);
@@ -175,21 +195,52 @@ export function MealPrepApp() {
   // The toggle lands on screen before the write does, because a cook changing their mind about four
   // Recipes should not wait four times. A write that fails puts the Recipe back the way it was and
   // says so, so nothing stays ticked that never saved.
-  const handleToggleSelected = useCallback(async recipe => {
+  const handleToggleSelected = useCallback(async (recipe, batch = 1) => {
     const selected = !recipe.selected;
-    const show = value => setRecipes(prev => prev.map(r => (r.id === recipe.id ? { ...r, selected: value } : r)));
+    // Deselecting resets the Batch on the server, in the same statement that clears the flag, so it
+    // resets here too rather than waiting for the reload to say so.
+    const show = (value, batchValue) => setRecipes(prev => prev.map(r => (r.id === recipe.id ? { ...r, selected: value, batch: batchValue } : r)));
 
-    show(selected);
+    show(selected, selected ? batch : 1);
     try {
-      await setRecipeSelected(recipe.id, selected);
+      await setRecipeSelected(recipe.id, selected, batch);
     } catch {
-      show(!selected);
+      show(!selected, recipe.batch);
       toast(`Could not ${selected ? 'add' : 'remove'} ${recipe.name}. Nothing was saved.`);
+      // The revert is a guess: a response lost on the way back looks the same as a write the server
+      // never saw, and after one of those the server may hold what this screen just took away.
+      // Asking now, rather than leaving it to the poll, closes the window where a stepper tap on
+      // this Recipe would be treated as a draft and die with the sheet.
+      loadData(true);
       return;
     }
     toast(selected ? `Added ${recipe.name} to your shopping list` : `Removed ${recipe.name} from your shopping list`);
     // The Shopping List is a query now, not a calculation this app can redo, so what changed comes
     // back from the server rather than from here.
+    loadData(true);
+  }, [loadData, toast]);
+
+  // Changing the Batch of a Recipe already on the Shopping List. The same write the toggle makes,
+  // with the flag left where it is: there is no endpoint of its own, because a Batch is only ever
+  // set on a Recipe that is being added or is already there.
+  //
+  // Optimistic like the toggle, and for the same reason: a cook stepping from one to three taps
+  // twice and should see the number move both times. No toast on success, as the Pantry and Got It
+  // toggles have none - a confirmation per tap on a stepper would be noise. The reload is what
+  // brings back the Shopping List this changed, which only the server can say.
+  const handleSetBatch = useCallback(async (recipe, batch) => {
+    const show = value => setRecipes(prev => prev.map(r => (r.id === recipe.id ? { ...r, batch: value } : r)));
+
+    show(batch);
+    try {
+      await setRecipeSelected(recipe.id, true, batch);
+    } catch {
+      show(recipe.batch);
+      toast(`Could not change how many times you are making ${recipe.name}. Nothing was saved.`);
+      // Same resync as the toggle above, for the same phantom-write reason.
+      loadData(true);
+      return;
+    }
     loadData(true);
   }, [loadData, toast]);
 
@@ -221,6 +272,9 @@ export function MealPrepApp() {
     } catch {
       show(!inPantry);
       toast(`Could not update ${ingredient.name}. Nothing was saved.`);
+      // The revert is a guess - the server may have applied a write whose response was lost - so
+      // ask it, as the Selected toggle's catch explains.
+      loadData(true);
       return;
     }
     loadData(true);
@@ -239,53 +293,78 @@ export function MealPrepApp() {
     } catch {
       show(!gotIt);
       toast(`Could not update ${entry.name}. Nothing was saved.`);
+      // Same phantom-write resync as the toggles above.
+      loadData(true);
       return;
     }
     loadData(true);
   }, [loadData, toast]);
 
-  // Sends what the cook typed, untouched. Trimming here and emptying to null would be the server's
-  // rule written a second time in the browser, which is the drift ADR-0005 keeps out; the box shows
-  // what was typed until the reload replaces it with what the server actually stored.
+  // A reference now, not text: the select hands back an Aisle id or null, and the same optimistic
+  // update Got It uses applies. The entry shows the new Aisle before the write lands, and a failure
+  // puts it back and says so with the existing toast, so nothing on screen names an Aisle that never
+  // saved.
   //
-  // The Aisle is the Ingredient's rather than this list's, so that reload is also what carries a
-  // correction to wherever else that Ingredient shows up.
-  const handleSetAisle = useCallback(async (entry, aisle) => {
-    const previous = entry.aisle;
-    if (aisle === (previous ?? '')) return;
-    const show = value => setShoppingList(prev => prev.map(e => (e.ingredientId === entry.ingredientId ? { ...e, aisle: value } : e)));
+  // The Aisle is the Ingredient's rather than this list's, so the reload that follows is also what
+  // carries a correction to wherever else that Ingredient shows up.
+  const handleSetAisle = useCallback(async (entry, aisleId) => {
+    const previous = entry.aisleId;
+    if (aisleId === previous) return;
+    const show = value => setShoppingList(prev => prev.map(e => (e.ingredientId === entry.ingredientId ? { ...e, aisleId: value } : e)));
 
-    show(aisle);
+    show(aisleId);
     try {
-      await setIngredientAisle(entry.ingredientId, aisle);
+      await setIngredientAisle(entry.ingredientId, aisleId);
     } catch {
       show(previous);
       toast(`Could not set the aisle for ${entry.name}. Nothing was saved.`);
+      // Same phantom-write resync as the toggles above.
+      loadData(true);
       return;
     }
     loadData(true);
   }, [loadData, toast]);
 
-  // Deliberate, and the only thing that clears a mark. Nothing else does: adding a forgotten Recipe
-  // mid-trip has to leave the ticks already earned in the store.
-  const handleClearGotIt = useCallback(async () => {
-    // The marks alone, not the list they sit on. Putting a whole captured list back would throw away
-    // a background reload that landed while the write was in flight, which is the stale snapshot
-    // ticket 06's review caught in RecipesPage. An entry that arrived since keeps what it arrived
-    // with.
-    const marks = new Map(shoppingList.map(entry => [entry.ingredientId, entry.gotIt]));
+  // The same write handleSetAisle makes, aimed at the bulk view's own list rather than the Shopping
+  // List's: the initial sort of a kitchen touches Ingredients that are not on the Shopping List at
+  // all, so this reads and writes back `ingredients` instead of `shoppingList`. Same optimistic
+  // update, same revert and toast on failure.
+  const handleSetIngredientAisle = useCallback(async (ingredient, aisleId) => {
+    const previous = ingredient.aisleId;
+    if (aisleId === previous) return;
+    const show = value => setIngredients(prev => prev.map(i => (i.id === ingredient.id ? { ...i, aisleId: value } : i)));
 
-    setShoppingList(prev => prev.map(entry => ({ ...entry, gotIt: false })));
+    show(aisleId);
     try {
-      await clearGotItMarks();
+      await setIngredientAisle(ingredient.id, aisleId);
     } catch {
-      setShoppingList(prev => prev.map(entry => ({ ...entry, gotIt: marks.get(entry.ingredientId) ?? entry.gotIt })));
-      toast('Could not clear your marks. Nothing was saved.');
+      show(previous);
+      toast(`Could not set the aisle for ${ingredient.name}. Nothing was saved.`);
+      // Same phantom-write resync as the toggles above.
+      loadData(true);
       return;
     }
-    toast('Cleared every Got It mark');
     loadData(true);
-  }, [loadData, shoppingList, toast]);
+  }, [loadData, toast]);
+
+  // The end of a trip: every Recipe deselected and every Got It mark cleared, in one request the
+  // server runs as one transaction. The cook has already confirmed on the page before this runs.
+  //
+  // This one waits for the server and shows nothing optimistically, like the delete above and
+  // unlike the ticks. Emptying the page before the write lands would mean putting a whole list back
+  // if it failed, and a Shopping List reappearing after a cook watched it go is worse than a
+  // moment's wait. What replaces it is the server's own answer, which is also the only thing that
+  // knows what a second phone did while this was in flight.
+  const handleDoneShopping = useCallback(async () => {
+    try {
+      await doneShopping();
+    } catch {
+      toast('Could not clear your list. Nothing was saved.');
+      return;
+    }
+    toast('Shopping trip cleared');
+    loadData(true);
+  }, [loadData, toast]);
 
   // This one waits for its write, unlike the two above. It moves an Ingredient between two lists
   // rather than flipping a field, and a cook does it when they notice one rather than twelve times
@@ -298,6 +377,64 @@ export function MealPrepApp() {
       return;
     }
     toast(staple ? `${ingredient.name} is a staple now` : `${ingredient.name} is back on your pantry list`);
+    loadData(true);
+  }, [loadData, toast]);
+
+  // These four wait for the server rather than landing on screen first, unlike the Got It and
+  // Pantry ticks. A cook sets the walk up once and then leaves it alone, so there is no run of taps
+  // to keep ahead of, and the refusals here are ones only the server can make - a name another Aisle
+  // already has, a walk that has gone stale on this screen - which are worth showing as they are
+  // written rather than being flattened into "could not save".
+  const handleAddAisle = useCallback(async name => {
+    let added;
+    try {
+      added = await createAisle(name);
+    } catch (error) {
+      toast(error.message);
+      return;
+    }
+    // The name the server stored rather than the one that was typed, so a trimmed name is confirmed
+    // as what it actually became.
+    toast(`Added ${added.name}`);
+    loadData(true);
+  }, [loadData, toast]);
+
+  // Compared as typed rather than trimmed, for the reason handleSetAisle sends what it was given:
+  // trimming here would be the server's rule written a second time in the browser, which is the
+  // drift ADR-0005 keeps out. What this skips is a box closed without a keystroke in it.
+  const handleRenameAisle = useCallback(async (aisle, name) => {
+    if (name === aisle.name) return;
+    try {
+      await renameAisle(aisle.id, name);
+    } catch (error) {
+      toast(error.message);
+      return;
+    }
+    loadData(true);
+  }, [loadData, toast]);
+
+  // The whole walk goes back, computed from what is on screen. A button at either end of the list
+  // is already disabled, so a null here is a screen that has moved on rather than a mis-tap.
+  const handleMoveAisle = useCallback(async (aisle, step) => {
+    const walk = walkAfterMoving(aisles, aisle.id, step);
+    if (!walk) return;
+    try {
+      await reorderAisles(walk);
+    } catch (error) {
+      toast(error.message);
+      return;
+    }
+    loadData(true);
+  }, [aisles, loadData, toast]);
+
+  const handleRemoveAisle = useCallback(async aisle => {
+    try {
+      await deleteAisle(aisle.id);
+    } catch (error) {
+      toast(error.message);
+      return;
+    }
+    toast(`Removed ${aisle.name}`);
     loadData(true);
   }, [loadData, toast]);
 
@@ -351,14 +488,20 @@ export function MealPrepApp() {
           />
         ) : (
           <>
-            {tab === 'recipes' && <RecipesPage recipes={recipes} readOnly={degraded} onToggleSelected={handleToggleSelected} onEdit={recipe => setEditingId(recipe.id)} onDelete={handleDelete} />}
+            {tab === 'recipes' && <RecipesPage recipes={recipes} readOnly={degraded} onToggleSelected={handleToggleSelected} onSetBatch={handleSetBatch} onEdit={recipe => setEditingId(recipe.id)} onDelete={handleDelete} />}
             {tab === 'shopping' && (
               <ShoppingListPage
                 shoppingList={shoppingList}
+                recipes={recipes}
+                aisles={aisles}
                 readOnly={degraded}
                 onToggleGotIt={handleToggleGotIt}
                 onSetAisle={handleSetAisle}
-                onClearGotIt={handleClearGotIt}
+                onDoneShopping={handleDoneShopping}
+                // The remove control in the Selected Recipes area is the same write the Recipes
+                // page's Add/Remove button makes: it toggles `selected` off through the existing
+                // optimistic update and failure toast, rather than a second copy of that rule.
+                onRemoveRecipe={handleToggleSelected}
               />
             )}
             {tab === 'pantry' && (
@@ -376,7 +519,20 @@ export function MealPrepApp() {
             {tab === 'add' && (
               <AddRecipePage readOnly={degraded} onRecipeAdded={() => loadData(true)} toast={toast} />
             )}
-            {tab === 'settings' && <SettingsPage onRefresh={handleRefresh} refreshing={refreshing} />}
+            {tab === 'settings' && (
+              <SettingsPage
+                aisles={aisles}
+                ingredients={ingredients}
+                readOnly={degraded}
+                onRefresh={handleRefresh}
+                refreshing={refreshing}
+                onAddAisle={handleAddAisle}
+                onRenameAisle={handleRenameAisle}
+                onMoveAisle={handleMoveAisle}
+                onRemoveAisle={handleRemoveAisle}
+                onSetIngredientAisle={handleSetIngredientAisle}
+              />
+            )}
           </>
         )}
       </div>

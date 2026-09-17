@@ -13,11 +13,14 @@
 //
 // Every statement is parameterized.
 
-import { AISLE_MAX } from '@meal-prep/shared';
+import { clearEveryMark } from './shoppingList.js';
 
 // Matches the length the schema caps an id at, so a request cannot get a long string echoed back in
 // a refusal.
 const INGREDIENT_ID_MAX = 32;
+
+// Matches the length aisles.js caps an Aisle id at, for the same reason INGREDIENT_ID_MAX does.
+const AISLE_ID_MAX = 32;
 
 const PANTRY_CHECKLIST_QUERY = `
   select id, name, in_pantry as "inPantry"
@@ -30,6 +33,17 @@ const STAPLES_QUERY = `
   select id, name
   from ingredients
   where staple
+  order by name, id
+`;
+
+// Every Ingredient the app knows, Staples included, for the bulk Aisle-filing view on Settings: the
+// initial sort of a whole kitchen happens in one sitting rather than one shopping trip at a time.
+// Pantry membership is not read here - it is already the Pantry checklist's to carry, and repeating
+// it would be two answers to "is this in the Pantry" that a write to one could leave disagreeing
+// with the other.
+const INGREDIENTS_QUERY = `
+  select id, name, aisle_id as "aisleId", staple
+  from ingredients
   order by name, id
 `;
 
@@ -59,23 +73,20 @@ const SET_GOT_IT = `
 
 const SET_AISLE = `
   update ingredients
-  set aisle = $2
+  set aisle_id = $2
   where id = $1
 `;
 
-// Every mark, not the marks on whatever the Shopping List happens to derive to right now. The stale
-// tick this exists to answer is exactly the Ingredient that has dropped off the list and will come
-// back pre-ticked on the next trip.
-//
-// The `where got_it` guard means a clear touches only the rows it changes, so a list of two ticks
-// does not rewrite every Ingredient in the database to say the same thing twice.
-const CLEAR_GOT_IT = `
-  update ingredients
-  set got_it = false
-  where got_it
-`;
-
 const FIND_INGREDIENT = 'select name, staple from ingredients where id = $1';
+
+// Raised when the id sent names no row in aisles: the foreign key is what refuses it, and matching
+// it by name rather than by code alone is the lesson aisles.js and recipes.js both record, so a
+// 23503 raised by anything else is never turned into a message about an Aisle that was never named.
+const FOREIGN_KEY_VIOLATION = '23503';
+const UNKNOWN_AISLE = 'ingredients_aisle_id_fkey';
+
+const namesNoAisle = (cause) =>
+  cause.code === FOREIGN_KEY_VIOLATION && cause.constraint === UNKNOWN_AISLE;
 
 export const pantryEntrySchema = {
   type: 'object',
@@ -95,6 +106,23 @@ export const stapleSchema = {
   properties: {
     id: { type: 'string' },
     name: { type: 'string' },
+  },
+};
+
+// Every Ingredient, for the bulk Aisle-filing view. `aisleId` matches the Shopping List entry's own
+// field - a reference or null, never text - so the same picker component reads either shape. Pantry
+// membership is deliberately absent: additionalProperties false is what keeps a column added to this
+// query later from reaching the wire unannounced, and there is nothing here for it to duplicate
+// anyway, since that state already has a home in `pantryEntrySchema`.
+export const ingredientSchema = {
+  type: 'object',
+  required: ['id', 'name', 'aisleId', 'staple'],
+  additionalProperties: false,
+  properties: {
+    id: { type: 'string' },
+    name: { type: 'string' },
+    aisleId: { type: ['string', 'null'] },
+    staple: { type: 'boolean' },
   },
 };
 
@@ -126,18 +154,15 @@ const gotItBody = {
   properties: { gotIt: { type: 'boolean' } },
 };
 
-// Free text with a length cap and no character allowlist. Store sections are written every way a
-// store can think of - "Aisle 12 - Dairy & eggs" - and a set tight enough to be worth enforcing
-// would refuse the real ones. The stored-XSS rule that governs the Recipe Card URL does not reach
-// here: an Aisle is rendered as text, which React escapes, and never as an href.
-//
-// Null clears the Aisle. An emptied box is normalized to null below rather than refused, because a
-// cook deleting what they typed means the same thing by it.
+// A reference now, not text: the Aisle an Ingredient is filed under is one of the managed rows
+// aisles.js maintains or nothing, never a spelling a cook typed. Null clears it. The id itself is
+// never trimmed or normalized here - it either names a row or it does not, and the foreign key is
+// what decides which.
 const aisleBody = {
   type: 'object',
-  required: ['aisle'],
+  required: ['aisleId'],
   additionalProperties: false,
-  properties: { aisle: { type: ['string', 'null'], maxLength: AISLE_MAX } },
+  properties: { aisleId: { type: ['string', 'null'], maxLength: AISLE_ID_MAX } },
 };
 
 /** The Ingredients a cook is asked to tick. */
@@ -149,6 +174,12 @@ export async function readPantryChecklist(db) {
 /** The Ingredients assumed always on hand, which the checklist leaves out. */
 export async function readStaples(db) {
   const { rows } = await db.query(STAPLES_QUERY);
+  return rows;
+}
+
+/** Every Ingredient the app knows, Staples included, for the bulk Aisle-filing view on Settings. */
+export async function readIngredients(db) {
+  const { rows } = await db.query(INGREDIENTS_QUERY);
   return rows;
 }
 
@@ -165,15 +196,6 @@ async function explainPantryRefusal(db, id) {
     code: 400,
     message: `${rows[0].name} is a Staple, which is assumed on hand rather than ticked into the Pantry.`,
   };
-}
-
-/**
- * What an Aisle a cook typed is worth storing as. Trimmed, so one section does not arrive as two
- * spellings, and an emptied box becomes null rather than a heading with no name in it.
- */
-function normalizeAisle(aisle) {
-  const trimmed = aisle?.trim();
-  return trimmed ? trimmed : null;
 }
 
 /**
@@ -232,11 +254,18 @@ export function registerIngredientRoutes(app) {
   app.put(
     '/api/ingredients/:id/aisle',
     { schema: { params: ingredientParams, body: aisleBody } },
-    async (request, reply) =>
-      setIngredientField(app, reply, SET_AISLE, [
-        request.params.id,
-        normalizeAisle(request.body.aisle),
-      ]),
+    async (request, reply) => {
+      const { id } = request.params;
+      const { aisleId } = request.body;
+      try {
+        return await setIngredientField(app, reply, SET_AISLE, [id, aisleId]);
+      } catch (cause) {
+        if (namesNoAisle(cause)) {
+          return reply.code(400).send({ message: `There is no Aisle ${aisleId}.` });
+        }
+        throw cause;
+      }
+    },
   );
 
   // Named for the cook's action rather than for the column it writes, because "clear the marks off
@@ -247,11 +276,13 @@ export function registerIngredientRoutes(app) {
   // DELETE rather than a POST, so the method says what a second one does: clearing marks that are
   // already clear leaves the same state, and a retry after a dropped response cannot overshoot.
   //
-  // Deliberate and nothing else triggers it. Auto-clearing on a change to the Selected Recipes was
-  // rejected in the spec: adding a forgotten Recipe mid-trip would wipe the ticks already earned in
-  // the store, which is worse than the mark that never resets.
+  // No control on any page sends this any more: the cook's end-of-trip button is Done Shopping,
+  // which clears the marks and deselects the Recipes together (see shoppingList.js). This survives
+  // for the Seed recording and for scripts that clear marks without ending a trip, which is why the
+  // clearing itself is a function shared with Done Shopping rather than a second copy of one
+  // statement that would then be free to drift.
   app.delete('/api/shopping-list/got-it', async (request, reply) => {
-    await app.db.query(CLEAR_GOT_IT);
+    await clearEveryMark(app.db);
     return reply.code(204).send();
   });
 }

@@ -17,7 +17,7 @@ function typesPresent(recipes) {
   return [ALL, ...known, ...unknown];
 }
 
-export function RecipesPage({ recipes, readOnly, onToggleSelected, onEdit, onDelete }) {
+export function RecipesPage({ recipes, readOnly, onToggleSelected, onSetBatch, onEdit, onDelete }) {
   const [filter, setFilter] = useState(ALL);
   const [searchTerm, setSearchTerm] = useState('');
   // The id of the open card rather than the Recipe itself, so what the card shows is looked up on
@@ -70,10 +70,14 @@ export function RecipesPage({ recipes, readOnly, onToggleSelected, onEdit, onDel
           the same reason: the card is describing a Recipe that is about to be something else. */}
       {open && (
         <RecipeDetail
+          // Keyed by the Recipe, so the sheet's own state - the Batch it is about to send, and the
+          // delete confirmation - belongs to the Recipe on screen rather than to the sheet.
+          key={open.id}
           recipe={open}
           readOnly={readOnly}
           onClose={() => setOpenId(null)}
-          onToggleSelected={recipe => { onToggleSelected(recipe); setOpenId(null); }}
+          onSetBatch={onSetBatch}
+          onToggleSelected={(recipe, batch) => { onToggleSelected(recipe, batch); setOpenId(null); }}
           onEdit={recipe => { onEdit(recipe); setOpenId(null); }}
           onDelete={recipe => { onDelete(recipe); setOpenId(null); }}
         />

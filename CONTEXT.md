@@ -9,8 +9,8 @@ kitchen.
 ### Recipes
 
 **Recipe**:
-A dish, identified by a stable id, with a name, a Recipe Type, and a set of Recipe Ingredients.
-The app stores no instructions — it links out to a Recipe Card.
+A dish, identified by a stable id, with a name, a Recipe Type, a set of Recipe Ingredients,
+optional Steps, and an optional Recipe Card link.
 
 **Recipe Type**:
 The single category a Recipe belongs to, drawn from a fixed set (dinner, soup, stew, dessert,
@@ -18,13 +18,18 @@ bread, lunch, breakfast, snack).
 _Avoid_: category, tag, meal, cuisine
 
 **Recipe Card**:
-The external page holding the actual cooking instructions. The app only ever holds its URL.
+An optional external source for a Recipe's cooking instructions, such as a video or a blog post.
+The app only ever holds its URL.
 _Avoid_: link, recipe url, instructions
 
 **Recipe Ingredient**:
 The quantity and unit of one Ingredient within one Recipe. Meaningless on its own — it exists
 only as part of a Recipe.
 _Avoid_: line item, recipe row, ingredient row
+
+**Step**:
+One ordered plain-text instruction in a Recipe, optional.
+_Avoid_: instruction line, direction, method
 
 ### Ingredients and the kitchen
 
@@ -40,12 +45,14 @@ _Avoid_: basic, common ingredient, always-have
 
 **Pantry**:
 The set of Ingredients currently on hand. A simple membership question with no quantities —
-you either have an Ingredient or you don't.
+you either have an Ingredient or you don't. Presented as two views, in and not in, over that
+same set.
 _Avoid_: inventory, stock, have-list, on-hand list
 
 **Aisle**:
-The store section an Ingredient is found in. A property of the Ingredient itself, not of any
-one shopping trip.
+A store section, identified by a stable id, with a name and a position that sets the walking
+order through the store. Ingredients reference an Aisle rather than storing one as free text; an
+Ingredient with none set is unassigned.
 
 ### Shopping
 
@@ -54,6 +61,11 @@ A Recipe the cook has committed to making, which is what pulls its Ingredients i
 Shopping List.
 _Avoid_: active recipe, in cart, added recipe
 
+**Batch**:
+The whole number of times a Selected Recipe is being made, 1 to 9. Scales its quantified
+amounts on the Shopping List and resets to 1 on deselect.
+_Avoid_: multiplier, servings, portions, scale
+
 **Shopping List**:
 The consolidated Ingredients needed for every Selected Recipe, each with its summed quantity.
 The quantities are always derived from the Selected Recipes and never stored; only the Got It
@@ -61,9 +73,19 @@ mark and the Aisle persist.
 _Avoid_: grocery list, cart, basket
 
 **Got It**:
-A mark on a Shopping List entry meaning it's already in the trolley. Survives between sessions
-and is shared by everyone using the instance.
+A mark on a Shopping List entry meaning it's already in the trolley. Survives between sessions,
+is shared by everyone using the instance, and is cleared when its Ingredient leaves the Shopping
+List.
 _Avoid_: checked, purchased, done, acquired
+
+**Covered**:
+A Shopping List entry whose Ingredient is in the Pantry. Derived from Pantry membership on every
+read, never stored, and shown distinctly from Got It.
+_Avoid_: in stock, have it, skip
+
+**Done Shopping**:
+The action that ends a shopping trip: it deselects every Recipe and clears every Got It mark in
+one step.
 
 ### Matching
 

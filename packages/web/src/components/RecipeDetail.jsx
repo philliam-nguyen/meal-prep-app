@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { BATCH_MAX, BATCH_MIN } from '@meal-prep/shared';
 import { formatAmount } from '../format.js';
 import { getTypeBadge } from '../typeBadge.js';
 import { I } from '../icons.jsx';
@@ -164,6 +165,40 @@ function useDragToClose(sheetRef, onClose) {
   }, [sheetRef]);
 }
 
+/**
+ * The Batch: how many times the Recipe is being made, from 1 to 9. Bounded by the same numbers the
+ * API refuses, imported rather than written here, so the button that stops going up and the request
+ * that would be refused agree.
+ *
+ * A stepper rather than a number box, because this is set on a phone with one thumb while the other
+ * hand holds a pan, and because a box that can hold "12" would have to explain why it cannot.
+ */
+function BatchStepper({ batch, readOnly, onChange }) {
+  const step = (to) => (
+    <button
+      className="batch-step"
+      type="button"
+      disabled={readOnly || to < BATCH_MIN || to > BATCH_MAX}
+      // Named for what it does to the shop rather than for the arithmetic: "increase" says nothing
+      // to a cook who has not seen the number.
+      aria-label={to > batch ? 'Make one more batch' : 'Make one fewer batch'}
+      onClick={() => onChange(to)}
+    >
+      {to > batch ? '+' : '\u2212'}
+    </button>
+  );
+
+  return (
+    <div className="batch-stepper" role="group" aria-label="Batch">
+      {step(batch - 1)}
+      {/* Announced on change rather than silently, because the two buttons around it say what they
+          do and not what happened. */}
+      <span className="batch-count" role="status">{`${batch}\u00d7`}</span>
+      {step(batch + 1)}
+    </div>
+  );
+}
+
 const dangerButtonStyle = {
   flex: 1,
   justifyContent: 'center',
@@ -172,11 +207,36 @@ const dangerButtonStyle = {
   border: 'none',
 };
 
-export function RecipeDetail({ recipe, readOnly, onClose, onToggleSelected, onEdit, onDelete }) {
+export function RecipeDetail({ recipe, readOnly, onClose, onToggleSelected, onSetBatch, onEdit, onDelete }) {
   const { ingredients } = recipe;
+  // Absent only for a Recipe read from a cache written before Steps existed, the same case
+  // `storedBatch` guards against below.
+  const steps = recipe.steps ?? [];
   // Deleting is the one thing here nothing undoes, so it asks. In place rather than through the
   // browser's confirm dialog, which a phone renders as a modal on top of a modal.
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  // Made once unless the Recipe says otherwise. The fallback is for the cache: a first paint
+  // restored from one written before Batch existed hands this component a Recipe with no Batch on
+  // it, and a stepper reading "undefined" for the moment before the reload lands is worse than one
+  // reading the number every such Recipe means.
+  const storedBatch = recipe.batch ?? BATCH_MIN;
+  // The Batch of a Recipe that is not on the Shopping List yet, which nothing has stored anywhere:
+  // it is what Add will send. Once the Recipe is selected the stored Batch is the only truth, so
+  // this stops being read - which is what makes a failed write revert on screen, since the revert
+  // happens in the Recipe rather than here.
+  const [draftBatch, setDraftBatch] = useState(storedBatch);
+  const batch = recipe.selected ? storedBatch : draftBatch;
+  // Selected, and the write goes now: the Shopping List is wrong until it lands, and a cook who
+  // stepped from two to three has already said what they meant. Not selected, and there is nothing
+  // to write to yet, so the number waits for Add.
+  const changeBatch = (next) => (recipe.selected ? onSetBatch(recipe, next) : setDraftBatch(next));
+  // Removing takes the Batch back to 1 here as well as on the server, which resets it in the same
+  // statement that deselects. The sheet usually closes on this, so it is what a cook sees when they
+  // open the Recipe again rather than a moment later.
+  const toggleSelected = () => {
+    if (recipe.selected) setDraftBatch(BATCH_MIN);
+    onToggleSelected(recipe, batch);
+  };
   const sheetRef = useRef(null);
   useDragToClose(sheetRef, onClose);
 
@@ -191,16 +251,9 @@ export function RecipeDetail({ recipe, readOnly, onClose, onToggleSelected, onEd
         onClick={e => e.stopPropagation()}
       >
         <div className="modal-handle" aria-hidden="true" />
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
-          <div>
-            <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 24, marginBottom: 6 }}>{recipe.name}</h2>
-            <span className="badge" style={{ background: getTypeBadge(recipe.type).bg, color: getTypeBadge(recipe.type).text }}>{recipe.type}</span>
-          </div>
-          {recipe.cardUrl && (
-            <a href={recipe.cardUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#5B7C5A', fontWeight: 600, fontSize: 14, textDecoration: 'none', padding: '8px 14px', background: '#E8F0E7', borderRadius: 10 }}>
-              Recipe {I.external}
-            </a>
-          )}
+        <div style={{ marginBottom: 20 }}>
+          <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 24, marginBottom: 6 }}>{recipe.name}</h2>
+          <span className="badge" style={{ background: getTypeBadge(recipe.type).bg, color: getTypeBadge(recipe.type).text }}>{recipe.type}</span>
         </div>
         <h3 style={{ fontSize: 14, fontWeight: 700, color: '#7A7568', letterSpacing: 0.5, marginBottom: 12 }}>INGREDIENTS</h3>
         {ingredients.length === 0 ? (
@@ -215,7 +268,43 @@ export function RecipeDetail({ recipe, readOnly, onClose, onToggleSelected, onEd
             ))}
           </div>
         )}
-        <button className="btn-primary" style={{ width: '100%', justifyContent: 'center' }} disabled={readOnly} onClick={() => onToggleSelected(recipe)}>
+        {/* The Card sits on this heading rather than the title block: this is where it is the
+            fallback anyway, and one place for it beats it appearing twice. */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: '#7A7568', letterSpacing: 0.5 }}>INSTRUCTIONS</h3>
+          {recipe.cardUrl && (
+            <a href={recipe.cardUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#5B7C5A', fontWeight: 600, fontSize: 14, textDecoration: 'none', padding: '8px 14px', background: '#E8F0E7', borderRadius: 10 }}>
+              Recipe {I.external}
+            </a>
+          )}
+        </div>
+        {steps.length > 0 ? (
+          <ol role="list" style={{ background: '#F5EDE3', borderRadius: 14, padding: 16, marginBottom: 20, listStyle: 'none' }}>
+            {steps.map((step, i) => (
+              <li
+                key={i}
+                role="listitem"
+                style={{ display: 'flex', gap: 12, padding: '10px 0', borderBottom: i < steps.length - 1 ? '1px solid #E5DED3' : 'none' }}
+              >
+                <span style={{ fontWeight: 700, color: '#5B7C5A', flexShrink: 0 }}>{i + 1}</span>
+                <span style={{ fontSize: 15 }}>{step}</span>
+              </li>
+            ))}
+          </ol>
+        ) : recipe.cardUrl ? (
+          <p style={{ color: '#7A7568', fontSize: 14, marginBottom: 20 }}>No Steps yet. Cook from the Recipe Card above.</p>
+        ) : (
+          <p style={{ color: '#7A7568', fontSize: 14, marginBottom: 20 }}>No instructions yet.</p>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+          <BatchStepper batch={batch} readOnly={readOnly} onChange={changeBatch} />
+        </div>
+        <button
+          className="btn-primary"
+          style={{ width: '100%', justifyContent: 'center' }}
+          disabled={readOnly}
+          onClick={toggleSelected}
+        >
           {I.cart} <span>{recipe.selected ? 'Remove from Shopping List' : 'Add to Shopping List'}</span>
         </button>
 

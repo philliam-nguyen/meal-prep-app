@@ -8,6 +8,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { addAisle } from './helpers/aisles.js';
 import { startApp } from './helpers/app.js';
 import { createRecipe, readShoppingList, setSelected } from './helpers/recipes.js';
 import { setAisle, setGotIt } from './helpers/shopping.js';
@@ -19,10 +20,14 @@ async function amountsByIngredient(app) {
   );
 }
 
-/** Creates a Recipe and marks it a Selected Recipe, which is what puts it on the list. */
-async function selectRecipe(app, body) {
+/**
+ * Creates a Recipe and marks it a Selected Recipe, which is what puts it on the list. A Batch says
+ * how many times it is being made; without one the Recipe is made once, as every Recipe was before
+ * Batch existed.
+ */
+async function selectRecipe(app, body, batch) {
   const recipe = await createRecipe(app, body);
-  await setSelected(app, recipe.id, true);
+  await setSelected(app, recipe.id, true, batch);
   return recipe;
 }
 
@@ -238,6 +243,7 @@ describe('the Shopping List', () => {
 
   it('carries the Got It mark and Aisle the Ingredient itself holds onto the entry', async (t) => {
     const app = await startApp(t);
+    const produce = await addAisle(app, 'Produce');
     await selectRecipe(app, {
       name: 'Minestrone',
       type: 'Soup',
@@ -245,12 +251,12 @@ describe('the Shopping List', () => {
     });
     const [{ ingredientId }] = await readShoppingList(app);
     await setGotIt(app, ingredientId, true);
-    await setAisle(app, ingredientId, 'Produce');
+    await setAisle(app, ingredientId, produce.id);
 
     const [entry] = await readShoppingList(app);
 
     assert.equal(entry.gotIt, true);
-    assert.equal(entry.aisle, 'Produce');
+    assert.equal(entry.aisleId, produce.id);
   });
 
   it('reports an Ingredient with no Aisle set as having none', async (t) => {
@@ -263,7 +269,7 @@ describe('the Shopping List', () => {
 
     const [entry] = await readShoppingList(app);
 
-    assert.equal(entry.aisle, null);
+    assert.equal(entry.aisleId, null);
     assert.equal(entry.gotIt, false);
   });
 
@@ -321,10 +327,117 @@ describe('the Shopping List', () => {
       {
         ingredientId: 'I001',
         name: 'Onion',
-        aisle: null,
+        aisleId: null,
         gotIt: false,
+        covered: false,
         amounts: [{ quantity: 2, unit: '' }],
       },
     ]);
+  });
+});
+
+// The Batch multiplies. A cook making a double batch of stew needs twice the beef, and the
+// arithmetic belongs in the same query that sums the amounts rather than in a second place that
+// could disagree with it - which is the defect this whole derivation was built to remove.
+describe('the Shopping List and the Batch', () => {
+  it('multiplies a quantified amount by the Batch', async (t) => {
+    const app = await startApp(t);
+
+    await selectRecipe(
+      app,
+      {
+        name: 'Minestrone',
+        type: 'Soup',
+        ingredients: [
+          { name: 'Onion', quantity: 2, unit: '' },
+          { name: 'Tomato', quantity: 400, unit: 'g' },
+        ],
+      },
+      3,
+    );
+
+    assert.deepEqual(await amountsByIngredient(app), {
+      Onion: [{ quantity: 6, unit: '' }],
+      Tomato: [{ quantity: 1200, unit: 'g' }],
+    });
+  });
+
+  it('leaves an unquantified Recipe Ingredient unquantified whatever the Batch', async (t) => {
+    const app = await startApp(t);
+
+    await selectRecipe(
+      app,
+      {
+        name: 'Minestrone',
+        type: 'Soup',
+        ingredients: [
+          { name: 'Black pepper', quantity: null, unit: '' },
+          { name: 'Onion', quantity: 2, unit: '' },
+        ],
+      },
+      4,
+    );
+
+    assert.deepEqual(await amountsByIngredient(app), {
+      'Black pepper': [],
+      Onion: [{ quantity: 8, unit: '' }],
+    });
+  });
+
+  it('gives two Selected Recipes sharing an Ingredient their own Batch each', async (t) => {
+    const app = await startApp(t);
+    await selectRecipe(
+      app,
+      {
+        name: 'Minestrone',
+        type: 'Soup',
+        ingredients: [{ name: 'Onion', quantity: 2, unit: '' }],
+      },
+      3,
+    );
+    await selectRecipe(
+      app,
+      {
+        name: 'Ragu',
+        type: 'Dinner',
+        ingredients: [{ name: 'Onion', quantity: 1, unit: '' }],
+      },
+      2,
+    );
+
+    // Six onions for three pots of minestrone and two for two pans of ragu, which is eight. One
+    // factor applied to the sum would have said either fifteen or ten.
+    assert.deepEqual(await amountsByIngredient(app), { Onion: [{ quantity: 8, unit: '' }] });
+  });
+
+  it('changes the list when the Batch of an already Selected Recipe changes', async (t) => {
+    const app = await startApp(t);
+    const recipe = await selectRecipe(app, {
+      name: 'Minestrone',
+      type: 'Soup',
+      ingredients: [{ name: 'Onion', quantity: 2, unit: '' }],
+    });
+
+    await setSelected(app, recipe.id, true, 4);
+
+    assert.deepEqual(await amountsByIngredient(app), { Onion: [{ quantity: 8, unit: '' }] });
+  });
+
+  it('is back to one Recipe\'s worth when a Recipe is deselected and selected again', async (t) => {
+    const app = await startApp(t);
+    const recipe = await selectRecipe(
+      app,
+      {
+        name: 'Minestrone',
+        type: 'Soup',
+        ingredients: [{ name: 'Onion', quantity: 2, unit: '' }],
+      },
+      5,
+    );
+
+    await setSelected(app, recipe.id, false);
+    await setSelected(app, recipe.id, true);
+
+    assert.deepEqual(await amountsByIngredient(app), { Onion: [{ quantity: 2, unit: '' }] });
   });
 });

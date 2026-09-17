@@ -1,6 +1,13 @@
 import { useState } from 'react';
 import { RECIPE_TYPES } from '@meal-prep/shared';
-import { findProblems, ingredientRow, rowsNamingIngredient, toRecipePayload } from '../recipeForm.js';
+import {
+  findProblems,
+  ingredientRow,
+  rowsHoldingStep,
+  rowsNamingIngredient,
+  stepRow,
+  toRecipePayload,
+} from '../recipeForm.js';
 import { I } from '../icons.jsx';
 
 // The fields of a Recipe, used to type a new one and to correct an existing one. One component
@@ -37,7 +44,11 @@ const cardStyle = {
 };
 
 /** The form's starting state for a Recipe that does not exist yet. */
-export const BLANK_RECIPE = { name: '', type: '', cardUrl: '', ingredients: [] };
+export const BLANK_RECIPE = { name: '', type: '', cardUrl: '', ingredients: [], steps: [] };
+
+// The buttons that sit at the end of a row: an icon, no chrome, and an accessible name saying which
+// row they act on, because "the trash button" is not something a screen reader can count.
+const rowButtonStyle = { background: 'none', border: 'none', cursor: 'pointer', padding: 4 };
 
 export function RecipeForm({ initial, saveLabel, onSave, onCancel, headerAction, toast }) {
   const [name, setName] = useState(initial.name);
@@ -46,6 +57,12 @@ export function RecipeForm({ initial, saveLabel, onSave, onCancel, headerAction,
   const [rows, setRows] = useState(
     initial.ingredients.length > 0 ? initial.ingredients.map(ingredientRow) : [ingredientRow()],
   );
+  // One empty row to type into rather than none, the way the Ingredient rows start. A Recipe that
+  // has no Steps is a Recipe whose one row was left blank, and a blank row is dropped on save.
+  const [stepRows, setStepRows] = useState(() => {
+    const steps = initial.steps ?? [];
+    return steps.length > 0 ? steps.map((text) => stepRow({ text })) : [stepRow()];
+  });
   const [problems, setProblems] = useState({});
   const [saving, setSaving] = useState(false);
 
@@ -57,6 +74,15 @@ export function RecipeForm({ initial, saveLabel, onSave, onCancel, headerAction,
     return index === -1 ? '' : problems[`/ingredients/${index}/${field}`];
   };
 
+  // The same offset the Ingredient rows have, and for the same reason: the payload skips blank
+  // rows, so the third row on screen is not the third Step in the request whenever a blank sits
+  // above it.
+  const stepsToSend = rowsHoldingStep(stepRows);
+  const problemForStep = (rowId) => {
+    const index = stepsToSend.findIndex((row) => row.id === rowId);
+    return index === -1 ? '' : problems[`/steps/${index}`];
+  };
+
   const addRow = () => setRows((current) => [...current, ingredientRow()]);
   const removeRow = (rowId) => setRows((current) => current.filter((row) => row.id !== rowId));
   const updateRow = (rowId, field, value) =>
@@ -64,8 +90,27 @@ export function RecipeForm({ initial, saveLabel, onSave, onCancel, headerAction,
       current.map((row) => (row.id === rowId ? { ...row, [field]: value } : row)),
     );
 
+  const addStepRow = () => setStepRows((current) => [...current, stepRow()]);
+  const removeStepRow = (rowId) =>
+    setStepRows((current) => current.filter((row) => row.id !== rowId));
+  const updateStepRow = (rowId, text) =>
+    setStepRows((current) => current.map((row) => (row.id === rowId ? { ...row, text } : row)));
+
+  // Moving a Step is swapping it with its neighbour, which is what "up" and "down" mean to the cook
+  // reading a numbered list. A move off either end is not offered and does nothing if it arrives.
+  const moveStepRow = (rowId, offset) =>
+    setStepRows((current) => {
+      const index = current.findIndex((row) => row.id === rowId);
+      const target = index + offset;
+      if (index === -1 || target < 0 || target >= current.length) return current;
+      const moved = [...current];
+      moved[index] = current[target];
+      moved[target] = current[index];
+      return moved;
+    });
+
   const handleSave = async () => {
-    const payload = toRecipePayload({ name, type, cardUrl, rows });
+    const payload = toRecipePayload({ name, type, cardUrl, rows, stepRows });
     const found = findProblems(payload);
     setProblems(found);
     if (Object.keys(found).length > 0) {
@@ -178,13 +223,7 @@ export function RecipeForm({ initial, saveLabel, onSave, onCancel, headerAction,
                 <button
                   onClick={() => removeRow(row.id)}
                   aria-label={`Remove ${row.name || 'ingredient'}`}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#C26A5A',
-                    cursor: 'pointer',
-                    padding: 4,
-                  }}
+                  style={{ ...rowButtonStyle, color: '#C26A5A' }}
                 >
                   {I.trash}
                 </button>
@@ -202,6 +241,76 @@ export function RecipeForm({ initial, saveLabel, onSave, onCancel, headerAction,
           {I.plus} Add Ingredient
         </button>
         <FieldError>{problems['/ingredients']}</FieldError>
+      </div>
+
+      {/* Below the Ingredient rows and in their style, because the two are one act of typing: what
+          to buy, then what to do with it. Optional, so a Recipe with only a Recipe Card saves with
+          every row left blank. */}
+      <div style={{ ...cardStyle, marginBottom: 20 }}>
+        <h3
+          style={{
+            fontSize: 14,
+            fontWeight: 700,
+            color: '#7A7568',
+            letterSpacing: 0.5,
+            marginBottom: 14,
+          }}
+        >
+          STEPS
+        </h3>
+
+        {stepRows.map((row, index) => (
+          <div key={row.id} style={{ marginBottom: 10 }}>
+            <div className="step-row">
+              {/* The position the cook reads the Step by. Decoration to a screen reader, which gets
+                  the number in each control's name instead. */}
+              <span className="step-number" aria-hidden="true">
+                {index + 1}
+              </span>
+              <input
+                className="input-field"
+                aria-label={`Step ${index + 1}`}
+                placeholder="e.g., Brown the beef in batches"
+                value={row.text}
+                onChange={(event) => updateStepRow(row.id, event.target.value)}
+              />
+              <button
+                onClick={() => moveStepRow(row.id, -1)}
+                aria-label={`Move step ${index + 1} up`}
+                disabled={index === 0}
+                style={{ ...rowButtonStyle, color: index === 0 ? '#D8D2C7' : '#7A7568' }}
+              >
+                {I.up}
+              </button>
+              <button
+                onClick={() => moveStepRow(row.id, 1)}
+                aria-label={`Move step ${index + 1} down`}
+                disabled={index === stepRows.length - 1}
+                style={{
+                  ...rowButtonStyle,
+                  color: index === stepRows.length - 1 ? '#D8D2C7' : '#7A7568',
+                }}
+              >
+                {I.down}
+              </button>
+              {stepRows.length > 1 && (
+                <button
+                  onClick={() => removeStepRow(row.id)}
+                  aria-label={`Remove step ${index + 1}`}
+                  style={{ ...rowButtonStyle, color: '#C26A5A' }}
+                >
+                  {I.trash}
+                </button>
+              )}
+            </div>
+            <FieldError>{problemForStep(row.id)}</FieldError>
+          </div>
+        ))}
+
+        <button className="btn-secondary" onClick={addStepRow} style={{ marginTop: 8 }}>
+          {I.plus} Add Step
+        </button>
+        <FieldError>{problems['/steps']}</FieldError>
       </div>
 
       <div style={{ display: 'flex', gap: 10 }}>

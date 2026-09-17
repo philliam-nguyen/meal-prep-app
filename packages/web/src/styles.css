@@ -90,6 +90,19 @@ input:focus, textarea:focus, select:focus { outline: 2px solid #5B7C5A; outline-
 .checkbox-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .checkbox-btn:disabled:hover { border-color: #E5DED3; }
 
+/* The Batch stepper, centred under Instructions and above Add to Shopping List: minus, count,
+   plus, and nothing else. The approved mock (ticket 04 of the Recipe Steps and Batch feature)
+   dropped the "Batch" label and the filled row behind it once the sheet had a place, the Selected
+   Recipes area, that names the number instead - a bare stepper here would otherwise be the only
+   place in the app using the word, and the group now floats on the sheet's own background. */
+.batch-stepper { display: inline-flex; align-items: center; gap: 12px; }
+.batch-step { width: 44px; height: 44px; background: white; border: 1.5px solid #E5DED3; border-radius: 12px; color: #3D5A3C; font-family: 'Nunito', sans-serif; font-size: 20px; font-weight: 700; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: border-color 0.2s; }
+.batch-step:hover:not(:disabled) { border-color: #5B7C5A; }
+/* Two reasons a step is disabled and one appearance for both: the bound has been reached, or the
+   backend is offline and every write is greyed out with it (ADR-0009). */
+.batch-step:disabled { opacity: 0.35; cursor: not-allowed; }
+.batch-count { min-width: 34px; text-align: center; font-weight: 700; font-size: 20px; color: #2C2C2C; font-variant-numeric: tabular-nums; }
+
 .recipe-card { background: white; border-radius: 16px; padding: 18px 20px; border: 1px solid #F0EBE3; cursor: pointer; transition: all 0.2s; }
 .recipe-card:hover { border-color: #5B7C5A; box-shadow: 0 4px 20px rgba(91,124,90,0.08); transform: translateY(-1px); }
 .recipe-card:active { transform: translateY(0); }
@@ -119,6 +132,11 @@ input:focus, textarea:focus, select:focus { outline: 2px solid #5B7C5A; outline-
 .shopping-item:last-child { border-bottom: none; }
 .shopping-item.got-it { opacity: 0.5; }
 .shopping-item.got-it .item-name { text-decoration: line-through; }
+/* Covered: muted like Got It (the entry needs no more attention this trip) but never struck
+   through - the Ingredient itself is untouched, only already on the shelf at home. */
+.shopping-item.covered { opacity: 0.6; }
+.checkbox-btn.covered { background: #F5EDE3; border-color: #C9C2B4; color: #8A7F5C; }
+.covered-label { display: inline-flex; align-items: center; gap: 3px; margin-left: 8px; color: #8A7F5C; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
 
 .nav-bar { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255,255,255,0.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 1px solid #F0EBE3; padding: 6px 0 env(safe-area-inset-bottom, 8px); z-index: 100; display: flex; justify-content: space-around; }
 .nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 12px; border-radius: 12px; cursor: pointer; transition: all 0.2s; border: none; background: none; color: #A39E93; font-size: 11px; font-weight: 600; font-family: 'Nunito', sans-serif; }
@@ -131,6 +149,11 @@ input:focus, textarea:focus, select:focus { outline: 2px solid #5B7C5A; outline-
 .ingredient-row input { flex: 1; }
 .ingredient-row .qty-input { width: 70px; flex: none; }
 .ingredient-row .unit-input { width: 90px; flex: none; }
+/* One Step to a row, in the shape of an Ingredient row so the two read as one form: the number the
+   cook will read it by, the line itself, and the controls that move or remove it. */
+.step-row { display: flex; gap: 8px; align-items: center; }
+.step-row input { flex: 1; }
+.step-number { width: 20px; flex: none; text-align: right; color: #A39E93; font-weight: 700; font-size: 13px; }
 
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200; display: flex; align-items: flex-end; justify-content: center; }
 /* A fixed four fifths of the screen on a phone, whatever the Recipe holds, so every sheet opens
