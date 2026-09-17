@@ -207,6 +207,11 @@ export function MealPrepApp() {
     } catch {
       show(!selected, recipe.batch);
       toast(`Could not ${selected ? 'add' : 'remove'} ${recipe.name}. Nothing was saved.`);
+      // The revert is a guess: a response lost on the way back looks the same as a write the server
+      // never saw, and after one of those the server may hold what this screen just took away.
+      // Asking now, rather than leaving it to the poll, closes the window where a stepper tap on
+      // this Recipe would be treated as a draft and die with the sheet.
+      loadData(true);
       return;
     }
     toast(selected ? `Added ${recipe.name} to your shopping list` : `Removed ${recipe.name} from your shopping list`);
@@ -232,6 +237,8 @@ export function MealPrepApp() {
     } catch {
       show(recipe.batch);
       toast(`Could not change how many times you are making ${recipe.name}. Nothing was saved.`);
+      // Same resync as the toggle above, for the same phantom-write reason.
+      loadData(true);
       return;
     }
     loadData(true);
@@ -265,6 +272,9 @@ export function MealPrepApp() {
     } catch {
       show(!inPantry);
       toast(`Could not update ${ingredient.name}. Nothing was saved.`);
+      // The revert is a guess - the server may have applied a write whose response was lost - so
+      // ask it, as the Selected toggle's catch explains.
+      loadData(true);
       return;
     }
     loadData(true);
@@ -283,6 +293,8 @@ export function MealPrepApp() {
     } catch {
       show(!gotIt);
       toast(`Could not update ${entry.name}. Nothing was saved.`);
+      // Same phantom-write resync as the toggles above.
+      loadData(true);
       return;
     }
     loadData(true);
@@ -306,6 +318,8 @@ export function MealPrepApp() {
     } catch {
       show(previous);
       toast(`Could not set the aisle for ${entry.name}. Nothing was saved.`);
+      // Same phantom-write resync as the toggles above.
+      loadData(true);
       return;
     }
     loadData(true);
@@ -326,6 +340,8 @@ export function MealPrepApp() {
     } catch {
       show(previous);
       toast(`Could not set the aisle for ${ingredient.name}. Nothing was saved.`);
+      // Same phantom-write resync as the toggles above.
+      loadData(true);
       return;
     }
     loadData(true);

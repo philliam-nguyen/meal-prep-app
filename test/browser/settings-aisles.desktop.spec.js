@@ -33,7 +33,11 @@ async function openSettings(page) {
   await expect(page.getByRole('heading', { name: 'AISLES' })).toBeVisible();
 }
 
-/** The Aisle names on screen, top to bottom, which is the order the cook walks them in. */
+/**
+ * The Aisle names on screen, top to bottom, which is the order the cook walks them in. Asserted
+ * through expect.poll wherever a write has just landed: the toast confirms the request, not the
+ * re-render, and a plain toEqual read in that gap sees the old rows.
+ */
 async function namesOnScreen(page) {
   return page.locator('[data-aisle-name]').allTextContents();
 }
@@ -63,15 +67,15 @@ test('a cook sets up the walk through their store', async ({ page }) => {
   await page.getByLabel('Add an aisle').fill(bakery);
   await page.getByRole('button', { name: 'Add aisle' }).click();
   await expect(page.locator('[data-aisle-name]')).toHaveCount(2);
-  expect(await namesOnScreen(page)).toEqual([produce, bakery]);
+  await expect.poll(() => namesOnScreen(page)).toEqual([produce, bakery]);
 
   // Moved, which is the whole walk going back to the API and coming out in the new order.
   await page.getByRole('button', { name: `Move ${produce} down` }).click();
   await expect(page.getByRole('button', { name: `Move ${produce} down` })).toBeDisabled();
-  expect(await namesOnScreen(page)).toEqual([bakery, produce]);
+  await expect.poll(() => namesOnScreen(page)).toEqual([bakery, produce]);
   await page.getByRole('button', { name: `Move ${produce} up` }).click();
   await expect(page.getByRole('button', { name: `Move ${produce} up` })).toBeDisabled();
-  expect(await namesOnScreen(page)).toEqual([produce, bakery]);
+  await expect.poll(() => namesOnScreen(page)).toEqual([produce, bakery]);
 
   // Renamed, and it stays where it was in the walk.
   const bread = uniqueName('Bread');
@@ -81,14 +85,14 @@ test('a cook sets up the walk through their store', async ({ page }) => {
   // Scoped to the walk's own rows: the bulk-filing pickers below list every Aisle as an option,
   // so the bare text is ambiguous the moment a concurrent test leaves an Ingredient behind.
   await expect(page.locator('[data-aisle-name]', { hasText: bread })).toBeVisible();
-  expect(await namesOnScreen(page)).toEqual([produce, bread]);
+  await expect.poll(() => namesOnScreen(page)).toEqual([produce, bread]);
 
   // Removed, behind the one question the control asks first.
   await page.getByRole('button', { name: `Remove ${bread}` }).click();
   await expect(page.getByText(`Remove ${bread}?`)).toBeVisible();
   await page.getByRole('button', { name: 'Remove', exact: true }).click();
   await expect(page.getByText(`Removed ${bread}`)).toBeVisible();
-  expect(await namesOnScreen(page)).toEqual([produce]);
+  await expect.poll(() => namesOnScreen(page)).toEqual([produce]);
 });
 
 // The end of the walk is not somewhere a section can be sent onward from, and the API takes the
