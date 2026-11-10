@@ -41,6 +41,14 @@ const REQUIRED_GUARDRAILS = [
   'trustProxy',
 ];
 
+// Fastify 5.12 stopped honouring a bare hop count: it now trusts no hop at all, on the grounds that a
+// count cannot tell a proxy from a caller reaching the process directly. That would key the Demo
+// Variant's rate limit on CloudFront's address. The function restores what the count meant (trust
+// the first `hops` addresses inward from the socket), which is safe here because the deployment, not
+// this process, guarantees the socket is the proxy (ADR-0008). A switch passes through unchanged.
+const trustProxyFor = (setting) =>
+  typeof setting === 'number' ? (_address, hop) => hop < setting : setting;
+
 // Async because the guardrails have to finish loading before the first route is registered; see
 // registerGuardrails. Every caller awaits it.
 export async function buildApp({
@@ -64,10 +72,9 @@ export async function buildApp({
     // rather than read.
     bodyLimit: guardrails.bodyLimitBytes,
     // What makes request.ip the visitor rather than the last proxy in front of them, and so what
-    // makes rate limiting per-address wherever the deployment puts a proxy in the path. Passed
-    // through as read: Fastify takes the switch and the hop count alike, and config.js is where the
-    // choice between them is explained.
-    trustProxy: guardrails.trustProxy,
+    // makes rate limiting per-address wherever the deployment puts a proxy in the path. config.js is
+    // where the choice between the switch and the hop count is explained.
+    trustProxy: trustProxyFor(guardrails.trustProxy),
   });
   app.decorate('db', pool);
   // Read by the write paths that enforce a row cap, in the same way they reach the pool.

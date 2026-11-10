@@ -113,6 +113,14 @@ replace; if it replaces, the count silently resolves to CloudFront's address and
 shares one rate-limit bucket. A test asserts the address the limiter keys on, because the thing
 being tested is the proxy's configuration rather than the arithmetic.
 
+Fastify 5.12 stopped honouring a bare hop count and now trusts no hop when given one, because a
+count cannot tell a proxy from a caller that reached the process directly. `app.js` therefore hands
+Fastify the count as a function, `(address, hop) => hop < count`, which is what the count meant
+before. Overriding that default is acceptable here because nothing reaches the Demo Variant's API
+except through the proxy: no published port, the `tag:proxy` grant, and an instance security group
+sourced only from CloudFront. If any of those three changes, the hop count stops being safe and the
+trusted proxies should be named by address instead.
+
 This stays inside [0002](./0002-variant-seam-in-infrastructure.md): one build, one code path, two
 values in two `.env` files.
 
