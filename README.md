@@ -1,4 +1,4 @@
-# Meal Prep App
+# Thyme Saver
 
 A mobile-friendly web app for meal prepping, backed by Postgres behind a small API.
 

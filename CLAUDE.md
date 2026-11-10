@@ -1,4 +1,4 @@
-# meal-prep-app
+# thyme-saver
 
 ## Agent skills
 
